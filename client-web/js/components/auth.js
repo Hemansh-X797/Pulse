@@ -1,8 +1,7 @@
 import { state, setState } from '../state.js';
-import { Auth } from '../api.js';
+import { Auth, API_BASE } from '../api.js';
 import { connectWs } from '../ws.js';
 import { Feed } from '../api.js';
-import { showToast } from '../utils.js';
 
 export function renderAuth() {
   const isSignup = state.screen === 'signup';
@@ -64,10 +63,12 @@ export function wireAuth() {
     setState({ screen: state.screen === 'signup' ? 'login' : 'signup', authError: '' });
   };
 
-  document.getElementById('oauth-google').onclick = () =>
-    showToast('Google sign-in lands in Phase 3 — full OAuth flow.');
-  document.getElementById('oauth-discord').onclick = () =>
-    showToast('Discord sign-in lands in Phase 3 — full OAuth flow.');
+  document.getElementById('oauth-google').onclick = () => {
+    window.location.href = `${API_BASE}/auth/google/login`;
+  };
+  document.getElementById('oauth-discord').onclick = () => {
+    window.location.href = `${API_BASE}/auth/discord/login`;
+  };
 
   document.getElementById('f-submit').onclick = async () => {
     const username = document.getElementById('f-username').value.trim();

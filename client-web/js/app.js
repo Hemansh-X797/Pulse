@@ -43,7 +43,36 @@ function render() {
 
 onStateChange(render);
 
+async function completeLogin(token) {
+  localStorage.setItem('pulse_token', token);
+  setState({ token });
+  const me = await Auth.me();
+  const feed = await FeedApi.list();
+  setState({ me, screen: 'app', posts: feed.posts });
+  connectWs();
+}
+
 (async function boot() {
+  // OAuth callback lands back here with #token=... or #oauth_error=...
+  if (window.location.hash.startsWith('#token=')) {
+    const token = decodeURIComponent(window.location.hash.slice('#token='.length));
+    history.replaceState(null, '', window.location.pathname);
+    try {
+      await completeLogin(token);
+      return;
+    } catch (e) {
+      localStorage.removeItem('pulse_token');
+      setState({ token: null, screen: 'login', authError: 'Sign-in succeeded but loading your account failed — try again.' });
+      return;
+    }
+  }
+  if (window.location.hash.startsWith('#oauth_error=')) {
+    const msg = decodeURIComponent(window.location.hash.slice('#oauth_error='.length));
+    history.replaceState(null, '', window.location.pathname);
+    setState({ screen: 'login', authError: msg });
+    return;
+  }
+
   if (state.token) {
     try {
       const me = await Auth.me();
