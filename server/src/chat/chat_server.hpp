@@ -77,6 +77,7 @@ private:
     std::unordered_map<int64_t, std::unordered_set<int>> channel_subscribers_;
     std::unordered_map<int, int64_t> fd_user_;
     std::unordered_map<int, bool> fd_is_ws_;
+    std::unordered_set<int64_t> online_users_;
 
     void send_line(int fd, const json& j) {
         std::string s = j.dump();
@@ -111,6 +112,18 @@ private:
         // (fine for Phase 1 scale; Phase 3 indexes this properly with Redis)
         std::lock_guard<std::mutex> lock(conn_mu_);
         fd_user_[fd] = user_id;
+        online_users_.insert(user_id);
+    }
+
+    bool is_still_online_after_disconnect(int64_t user_id, int disconnecting_fd) {
+        // A user may have multiple tabs/connections open; only report them
+        // offline once their last connection drops.
+        std::lock_guard<std::mutex> lock(conn_mu_);
+        for (auto& [fd, uid] : fd_user_) {
+            if (uid == user_id && fd != disconnecting_fd) return true;
+        }
+        online_users_.erase(user_id);
+        return false;
     }
 
     void handle_client(int fd) {
@@ -154,11 +167,23 @@ private:
             run_raw_loop(fd);
         }
 
+        int64_t disconnected_user = -1;
+        std::vector<int64_t> disconnected_channels;
         {
             std::lock_guard<std::mutex> lock(conn_mu_);
-            for (auto& [cid, fds] : channel_subscribers_) fds.erase(fd);
+            auto uit = fd_user_.find(fd);
+            if (uit != fd_user_.end()) disconnected_user = uit->second;
+            for (auto& [cid, fds] : channel_subscribers_) {
+                if (fds.count(fd)) disconnected_channels.push_back(cid);
+                fds.erase(fd);
+            }
             fd_user_.erase(fd);
             fd_is_ws_.erase(fd);
+        }
+        if (disconnected_user != -1 && !is_still_online_after_disconnect(disconnected_user, fd)) {
+            for (int64_t cid : disconnected_channels) {
+                broadcast_to_channel(cid, {{"op", "presence"}, {"user_id", disconnected_user}, {"online", false}});
+            }
         }
         ::close(fd);
     }
@@ -244,6 +269,17 @@ private:
                 channel_subscribers_[channel_id].insert(fd);
             }
             send_line(fd, {{"op", "joined"}, {"channel_id", channel_id}});
+            broadcast_to_channel(channel_id, {{"op", "presence"}, {"user_id", user_id}, {"online", true}});
+            return;
+        }
+
+        if (op == "typing") {
+            int64_t channel_id = req.value("channel_id", 0);
+            auto user = db_.get_user(user_id);
+            broadcast_to_channel(channel_id, {
+                {"op", "typing"}, {"channel_id", channel_id},
+                {"user_id", user_id}, {"username", user ? user->username : "?"}
+            });
             return;
         }
 

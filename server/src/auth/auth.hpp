@@ -1,4 +1,5 @@
 #pragma once
+#include <cctype>
 #include <string>
 #include <random>
 #include <sstream>
@@ -54,8 +55,15 @@ private:
 struct SignupResult { bool ok; std::string error; int64_t user_id = 0; };
 struct LoginResult { bool ok; std::string error; int64_t user_id = 0; std::string token; };
 
+inline bool is_valid_username_char(char c) {
+    return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.';
+}
+
 inline SignupResult signup(db::Database& db, const std::string& username, const std::string& display_name, const std::string& password) {
     if (username.size() < 3 || username.size() > 32) return {false, "username must be 3-32 chars"};
+    for (char c : username) {
+        if (!is_valid_username_char(c)) return {false, "username can only contain letters, numbers, '_' and '.'"};
+    }
     if (password.size() < 8) return {false, "password must be at least 8 chars"};
     std::string salt = random_hex(16);
     std::string hash = hash_password(password, salt);

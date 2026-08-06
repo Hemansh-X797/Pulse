@@ -17,6 +17,7 @@
 #include "json.hpp"
 #include "../common/db.hpp"
 #include "../common/emoji_renderer.hpp"
+#include "../common/rate_limiter.hpp"
 #include "../auth/auth.hpp"
 
 namespace pulse::gateway {
@@ -26,7 +27,8 @@ using json = nlohmann::json;
 class ApiServer {
 public:
     ApiServer(db::Database& db, auth::SessionStore& sessions, int port)
-        : db_(db), sessions_(sessions), port_(port) {}
+        : db_(db), sessions_(sessions), port_(port),
+          auth_limiter_(8, 60) {} // 8 signup/login attempts per IP per 60s
 
     void run() {
         int server_fd = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -50,6 +52,7 @@ private:
     db::Database& db_;
     auth::SessionStore& sessions_;
     int port_;
+    security::RateLimiter auth_limiter_;
 
     static std::vector<std::string> split_path(const std::string& path) {
         std::vector<std::string> parts;
@@ -89,6 +92,14 @@ private:
     }
 
     void handle(int fd) {
+        sockaddr_in peer{};
+        socklen_t peer_len = sizeof(peer);
+        std::string client_ip = "unknown";
+        if (getpeername(fd, reinterpret_cast<sockaddr*>(&peer), &peer_len) == 0) {
+            char buf_ip[INET_ADDRSTRLEN];
+            if (inet_ntop(AF_INET, &peer.sin_addr, buf_ip, sizeof(buf_ip))) client_ip = buf_ip;
+        }
+
         std::string request;
         char chunk[8192];
         // Read headers first
@@ -136,7 +147,7 @@ private:
         int status = 200;
 
         try {
-            route(method, parts, body, request, resp_json, status);
+            route(method, parts, body, request, client_ip, resp_json, status);
         } catch (const std::exception& e) {
             status = 400;
             resp_json = {{"error", std::string("bad request: ") + e.what()}};
@@ -156,12 +167,15 @@ private:
     }
 
     void route(const std::string& method, const std::vector<std::string>& parts,
-               const std::string& body, const std::string& request,
+               const std::string& body, const std::string& request, const std::string& client_ip,
                json& resp_json, int& status) {
         json in = body.empty() ? json::object() : json::parse(body);
 
         // POST /signup
         if (method == "POST" && parts.size() == 1 && parts[0] == "signup") {
+            if (!auth_limiter_.allow(client_ip)) {
+                status = 429; resp_json = {{"error", "too many attempts, try again shortly"}}; return;
+            }
             auto result = auth::signup(db_, in.value("username", ""), in.value("display_name", ""), in.value("password", ""));
             if (!result.ok) { status = 400; resp_json = {{"error", result.error}}; return; }
             resp_json = {{"ok", true}, {"user_id", result.user_id}};
@@ -170,6 +184,9 @@ private:
 
         // POST /login
         if (method == "POST" && parts.size() == 1 && parts[0] == "login") {
+            if (!auth_limiter_.allow(client_ip)) {
+                status = 429; resp_json = {{"error", "too many attempts, try again shortly"}}; return;
+            }
             auto result = auth::login(db_, sessions_, in.value("username", ""), in.value("password", ""));
             if (!result.ok) { status = 401; resp_json = {{"error", result.error}}; return; }
             resp_json = {{"ok", true}, {"user_id", result.user_id}, {"token", result.token}};
