@@ -1,26 +1,17 @@
-#include <fstream>
-#include <sstream>
 #include <thread>
 #include <iostream>
 
 #include "common/db.hpp"
+#include "common/schema_sql.hpp"
 #include "auth/auth.hpp"
 #include "chat/chat_server.hpp"
 #include "gateway/api_server.hpp"
 
-static std::string read_file(const std::string& path) {
-    std::ifstream f(path);
-    std::stringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
-}
-
 int main(int argc, char** argv) {
     std::string db_path = argc > 1 ? argv[1] : "pulse.db";
-    std::string schema_path = "db/schema.sql";
 
     pulse::db::Database db(db_path);
-    db.run_schema(read_file(schema_path));
+    db.run_schema(pulse::db::kSchemaSql);
 
     pulse::auth::SessionStore sessions;
 
