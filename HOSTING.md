@@ -26,7 +26,7 @@ Steps (same shape on all of them):
 ```bash
 # 1. Spin up the smallest Ubuntu 24.04 VM they offer.
 # 2. SSH in, install build tools:
-sudo apt update && sudo apt install -y cmake build-essential
+sudo apt update && sudo apt install -y cmake build-essential libssl-dev
 
 # 3. Copy the repo over (scp, or git clone if you push it to a repo):
 scp -r ./socialapp user@your-vm-ip:~/
@@ -186,3 +186,12 @@ nginx + HTTPS on the VM (Option C) once more than a handful of people are
 using it regularly — Vercel serves the client over HTTPS automatically,
 but browsers will block a `wss://` page from talking to a plain `ws://`
 backend, so at that point the VM needs HTTPS/WSS too.
+
+## Turning on real Google / Discord sign-in
+
+The OAuth buttons work out of the box — they just need your own app
+credentials, since Google and Discord each require registering an
+application under your own account (normal for any app, no way around it).
+See **`docs/OAUTH_SETUP.md`** for the full 5-minutes-per-provider
+walkthrough, including exactly which environment variables to set on
+the VM and how they interact with the systemd service from Option A.

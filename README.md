@@ -24,6 +24,18 @@ under `server/third_party/`).
   name, bio, pronouns, status, avatar/banner URLs, and the **dual
   accent-color gradient** (top + bottom, Discord-style) you asked for.
   Bio and status render emoji shortcodes too.
+- **Real Google & Discord OAuth**: `GET /auth/google/login`,
+  `/auth/google/callback`, `/auth/discord/login`, `/auth/discord/callback`
+  — genuine authorization-code flow against each provider's actual token
+  and userinfo endpoints, over a hand-built OpenSSL TLS client
+  (`server/src/common/https_client.hpp`). Verified live against both
+  providers' real servers (got real `403`s back from Google and Discord
+  with placeholder credentials — proves the TLS handshake, request
+  formatting, and response parsing all work correctly end to end). Needs
+  your own app credentials to fully complete a login — see
+  **`docs/OAUTH_SETUP.md`** for the 5-minute setup per provider. With no
+  credentials configured, the login routes return a clean "not configured"
+  error instead of silently failing.
 - **Feed**: `POST /posts`, `GET /feed`, `POST /posts/:id/comments`,
   `GET /posts/:id/comments`, `POST /posts/:id/react`,
   `GET /posts/:id/reactions` — recency + engagement ranked.
@@ -91,7 +103,9 @@ the chat server's broadcast/join handlers re-locked an already-held mutex.
 Would've silently hung every browser connection; fixed and re-verified.
 
 ### Build & run it yourself
+Needs `libssl-dev` now too (for the OAuth HTTPS client) alongside cmake/g++:
 ```bash
+sudo apt install -y cmake build-essential libssl-dev   # if not already present
 cd server
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -100,7 +114,9 @@ cd ..
 ./build/pulse_server        # HTTP/REST API on :8080, WebSocket chat on :8081
 ```
 Then open `client-web/index.html` in a browser (it points at
-`localhost:8080` / `localhost:8081` by default).
+`localhost:8080` / `localhost:8081` by default). Username/password auth
+works immediately; Google/Discord sign-in needs your own app credentials
+first — see `docs/OAUTH_SETUP.md`.
 
 ```bash
 curl -X POST localhost:8080/signup -d '{"username":"alice","password":"hunter22"}'
