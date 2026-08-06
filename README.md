@@ -35,13 +35,49 @@ under `server/third_party/`).
 - **Emoji engine**: `server/src/common/emoji_renderer.hpp` — one-pass
   `:fire:` → 🔥 parser wired into DMs, posts, comments, bios, and statuses.
 
-### Web client (`client-web/index.html`)
-Single-file, no build step. Dark theme, gradient-driven UI tied to your
-two-accent-color idea, styled chat bubbles (yours on the right, gradient
-fill; theirs on the left), a feed with reactions/comments, and a profile
-editor with a **live gradient preview** as you drag the two color pickers.
-Google/Discord sign-in buttons are visible but disabled — wired for real in
-Phase 3.
+### Web client (`client-web/`)
+Modular ES-module app — no build step, no bundler, just real `import`/`export`
+across files you can open and edit directly:
+```
+client-web/
+├── index.html              # shell: loads fonts, CSS, and js/app.js
+├── css/
+│   ├── tokens.css          # design tokens — colors, type, radii, the grad
+│   ├── shell.css            # sidebar + layout
+│   ├── auth.css             # login/signup + brand-accurate OAuth buttons
+│   ├── chat.css              # bubbles + composer
+│   ├── feed.css               # post cards, reactions, comments
+│   └── profile.css             # profile editor + gradient preview
+├── js/
+│   ├── app.js               # entry point: router + render loop
+│   ├── state.js              # single store + subscribe/set
+│   ├── api.js                  # REST client
+│   ├── ws.js                    # WebSocket client
+│   ├── utils.js                  # shared formatting helpers
+│   └── components/
+│       ├── auth.js, sidebar.js, feed.js, dm.js, profile.js
+└── assets/
+    ├── google-logo.svg      # real 4-color Google "G" mark
+    └── discord-logo.svg     # real Discord Clyde mark, white-on-blurple
+```
+Design pass: a split-screen luxury auth screen (original painterly SVG
+artwork, serif wordmark, pill inputs, circular brand-accurate OAuth
+buttons) built to match a real high-end reference bar, not a generic AI
+SaaS template. Real vendored libraries — **Lucide** icons (ISC-licensed,
+pulled from their source repo) and **anime.js** (MIT, pulled from npm) —
+power the icon set and entrance micro-animations; nothing hand-waved with
+emoji-as-icons or CSS-only fake polish. Type pairing is Fraunces (serif,
+display) + Inter (body) + IBM Plex Mono (handles/timestamps). Verified
+with real screenshots via headless Chrome + Playwright, not just "should
+look right" — caught and fixed a jagged-ridgeline artifact in the artwork
+and an emoji-font-fallback inconsistency in the reaction buttons before
+shipping.
+
+See **`HOSTING.md`** for exactly where to put this online — options range
+from a $0 Oracle free-tier VM to Vercel (client) + a VM (server), plus what
+two lines to edit in `js/api.js`/`js/ws.js` to point the client at your
+server instead of `localhost`.
+
 
 ### Verified end-to-end
 A full simulation (`server` running + real WebSocket client, same code path
