@@ -4,8 +4,10 @@
 CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    password_salt TEXT NOT NULL,
+    password_hash TEXT DEFAULT NULL,
+    password_salt TEXT DEFAULT NULL,
+    google_id     TEXT DEFAULT NULL UNIQUE,
+    discord_id    TEXT DEFAULT NULL UNIQUE,
     display_name  TEXT NOT NULL,
     bio           TEXT DEFAULT '',
     pronouns      TEXT DEFAULT '',

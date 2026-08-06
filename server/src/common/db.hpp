@@ -93,7 +93,45 @@ public:
         return sqlite3_last_insert_rowid(db_);
     }
 
-    struct AuthRow { int64_t id; std::string password_hash; std::string password_salt; std::string display_name; };
+    // OAuth-only account: no password, identified by provider + provider_id.
+    // `provider` must be "google_id" or "discord_id" (column name, trusted
+    // caller-side only — never pass user input here).
+    std::optional<int64_t> create_oauth_user(const std::string& provider_column, const std::string& provider_id,
+                                              const std::string& username, const std::string& display_name) {
+        std::string sql = "INSERT INTO users(username, display_name, " + provider_column + ", created_at) "
+                           "VALUES (?, ?, ?, strftime('%s','now'));";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return std::nullopt;
+        sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, display_name.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 3, provider_id.c_str(), -1, SQLITE_TRANSIENT);
+        int rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        if (rc != SQLITE_DONE) return std::nullopt;
+        return sqlite3_last_insert_rowid(db_);
+    }
+
+    std::optional<int64_t> find_user_id_by_oauth(const std::string& provider_column, const std::string& provider_id) {
+        std::string sql = "SELECT id FROM users WHERE " + provider_column + " = ?;";
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(db_, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return std::nullopt;
+        sqlite3_bind_text(stmt, 1, provider_id.c_str(), -1, SQLITE_TRANSIENT);
+        std::optional<int64_t> result;
+        if (sqlite3_step(stmt) == SQLITE_ROW) result = sqlite3_column_int64(stmt, 0);
+        sqlite3_finalize(stmt);
+        return result;
+    }
+
+    bool username_taken(const std::string& username) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "SELECT 1 FROM users WHERE username = ?;", -1, &stmt, nullptr);
+        sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+        bool taken = sqlite3_step(stmt) == SQLITE_ROW;
+        sqlite3_finalize(stmt);
+        return taken;
+    }
+
+    struct AuthRow { int64_t id; std::string password_hash; std::string password_salt; std::string display_name; bool has_password; };
 
     std::optional<AuthRow> find_user_for_login(const std::string& username) {
         sqlite3_stmt* stmt;
@@ -104,8 +142,11 @@ public:
         if (sqlite3_step(stmt) == SQLITE_ROW) {
             AuthRow row;
             row.id = sqlite3_column_int64(stmt, 0);
-            row.password_hash = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-            row.password_salt = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            const unsigned char* hash = sqlite3_column_text(stmt, 1);
+            const unsigned char* salt = sqlite3_column_text(stmt, 2);
+            row.has_password = hash != nullptr && salt != nullptr;
+            row.password_hash = hash ? reinterpret_cast<const char*>(hash) : "";
+            row.password_salt = salt ? reinterpret_cast<const char*>(salt) : "";
             row.display_name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
             result = row;
         }
