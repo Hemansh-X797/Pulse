@@ -19,6 +19,7 @@ target_include_directories(pulse_server PRIVATE
 )
 
 find_package(Threads REQUIRED)
-target_link_libraries(pulse_server PRIVATE Threads::Threads dl)
+find_package(OpenSSL REQUIRED)
+target_link_libraries(pulse_server PRIVATE Threads::Threads dl OpenSSL::SSL OpenSSL::Crypto)
 
 target_compile_options(pulse_server PRIVATE -O2 -Wall -Wextra -Wno-unused-parameter)

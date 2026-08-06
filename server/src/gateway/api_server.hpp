@@ -12,13 +12,17 @@
 #include <optional>
 #include <sstream>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "json.hpp"
 #include "../common/db.hpp"
 #include "../common/emoji_renderer.hpp"
 #include "../common/rate_limiter.hpp"
+#include "../common/config.hpp"
+#include "../common/https_client.hpp"
 #include "../auth/auth.hpp"
+#include "../auth/oauth.hpp"
 
 namespace pulse::gateway {
 
@@ -53,6 +57,36 @@ private:
     auth::SessionStore& sessions_;
     int port_;
     security::RateLimiter auth_limiter_;
+    config::OAuthConfig oauth_config_;
+
+    static std::unordered_map<std::string, std::string> parse_query(const std::string& full_path) {
+        std::unordered_map<std::string, std::string> out;
+        size_t qpos = full_path.find('?');
+        if (qpos == std::string::npos) return out;
+        std::string qs = full_path.substr(qpos + 1);
+        std::stringstream ss(qs);
+        std::string pair;
+        while (std::getline(ss, pair, '&')) {
+            size_t eq = pair.find('=');
+            if (eq == std::string::npos) continue;
+            std::string key = pair.substr(0, eq);
+            std::string val = pair.substr(eq + 1);
+            // minimal percent-decode, sufficient for OAuth codes/state
+            std::string decoded;
+            for (size_t i = 0; i < val.size(); ++i) {
+                if (val[i] == '%' && i + 2 < val.size()) {
+                    decoded += static_cast<char>(std::strtol(val.substr(i + 1, 2).c_str(), nullptr, 16));
+                    i += 2;
+                } else if (val[i] == '+') {
+                    decoded += ' ';
+                } else {
+                    decoded += val[i];
+                }
+            }
+            out[key] = decoded;
+        }
+        return out;
+    }
 
     static std::vector<std::string> split_path(const std::string& path) {
         std::vector<std::string> parts;
@@ -142,15 +176,30 @@ private:
 
         std::string path = full_path.substr(0, full_path.find('?'));
         auto parts = split_path(path);
+        auto query = parse_query(full_path);
 
         json resp_json;
         int status = 200;
+        std::string redirect_to;
 
         try {
-            route(method, parts, body, request, client_ip, resp_json, status);
+            route(method, parts, query, body, request, client_ip, resp_json, status, redirect_to);
         } catch (const std::exception& e) {
             status = 400;
             resp_json = {{"error", std::string("bad request: ") + e.what()}};
+        }
+
+        if (!redirect_to.empty()) {
+            std::ostringstream out;
+            out << "HTTP/1.1 302 Found\r\n"
+                << "Location: " << redirect_to << "\r\n"
+                << "Access-Control-Allow-Origin: *\r\n"
+                << "Content-Length: 0\r\n"
+                << "Connection: close\r\n\r\n";
+            std::string out_s = out.str();
+            ::send(fd, out_s.data(), out_s.size(), 0);
+            ::close(fd);
+            return;
         }
 
         std::string body_out = resp_json.dump();
@@ -167,9 +216,56 @@ private:
     }
 
     void route(const std::string& method, const std::vector<std::string>& parts,
+               const std::unordered_map<std::string, std::string>& query,
                const std::string& body, const std::string& request, const std::string& client_ip,
-               json& resp_json, int& status) {
+               json& resp_json, int& status, std::string& redirect_to) {
         json in = body.empty() ? json::object() : json::parse(body);
+
+        // GET /auth/google/login  -> redirect to Google's consent screen
+        if (method == "GET" && parts.size() == 3 && parts[0] == "auth" && parts[1] == "google" && parts[2] == "login") {
+            if (!oauth_config_.google_configured()) {
+                status = 501; resp_json = {{"error", "Google sign-in isn't configured on this server yet"}}; return;
+            }
+            redirect_to = oauth::google_auth_url(oauth_config_, oauth::random_state());
+            return;
+        }
+
+        // GET /auth/google/callback?code=...
+        if (method == "GET" && parts.size() == 3 && parts[0] == "auth" && parts[1] == "google" && parts[2] == "callback") {
+            auto it = query.find("code");
+            if (it == query.end()) {
+                redirect_to = oauth_config_.frontend_url + "/#oauth_error=missing_code";
+                return;
+            }
+            auto result = oauth::handle_google_callback(db_, sessions_, oauth_config_, it->second);
+            redirect_to = result.ok
+                ? oauth_config_.frontend_url + "/#token=" + result.session_token
+                : oauth_config_.frontend_url + "/#oauth_error=" + https::url_encode(result.error);
+            return;
+        }
+
+        // GET /auth/discord/login -> redirect to Discord's consent screen
+        if (method == "GET" && parts.size() == 3 && parts[0] == "auth" && parts[1] == "discord" && parts[2] == "login") {
+            if (!oauth_config_.discord_configured()) {
+                status = 501; resp_json = {{"error", "Discord sign-in isn't configured on this server yet"}}; return;
+            }
+            redirect_to = oauth::discord_auth_url(oauth_config_, oauth::random_state());
+            return;
+        }
+
+        // GET /auth/discord/callback?code=...
+        if (method == "GET" && parts.size() == 3 && parts[0] == "auth" && parts[1] == "discord" && parts[2] == "callback") {
+            auto it = query.find("code");
+            if (it == query.end()) {
+                redirect_to = oauth_config_.frontend_url + "/#oauth_error=missing_code";
+                return;
+            }
+            auto result = oauth::handle_discord_callback(db_, sessions_, oauth_config_, it->second);
+            redirect_to = result.ok
+                ? oauth_config_.frontend_url + "/#token=" + result.session_token
+                : oauth_config_.frontend_url + "/#oauth_error=" + https::url_encode(result.error);
+            return;
+        }
 
         // POST /signup
         if (method == "POST" && parts.size() == 1 && parts[0] == "signup") {
