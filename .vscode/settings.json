@@ -1,0 +1,8 @@
+{
+    "cmake.sourceDirectory": "C:/Users/SSC/Desktop/Hemansh/Files/Projects/Ongoing Projects/Applications/Pulse/server",
+    "workbench.iconTheme": "material-icon-theme",
+    "editor.cursorBlinking": "smooth",
+    "material-icon-theme.folders.associations": {
+        "client-web": "public"
+    }
+}
