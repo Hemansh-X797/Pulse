@@ -1,0 +1,25 @@
+.profile-scroll { flex: 1; overflow-y: auto; padding: 28px; display: flex; justify-content: center; }
+.profile-card { width: 100%; max-width: 560px; }
+.banner-preview {
+  height: 130px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; position: relative;
+  transition: background .2s;
+}
+.profile-avatar-lg {
+  width: 78px; height: 78px; border-radius: 50%; border: 4px solid var(--surface-1); position: absolute;
+  bottom: -39px; left: 26px; display: flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 600; color: var(--void); font-family: var(--f-display);
+  transition: background .2s;
+}
+.profile-body {
+  background: var(--surface-1); border: 1px solid var(--hairline); border-top: none;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg); padding: 56px 26px 26px;
+}
+.profile-body .field { margin-bottom: 17px; }
+#p-bio { width: 100%; min-height: 70px; resize: vertical; }
+.grad-controls { display: flex; gap: 16px; margin-top: 4px; margin-bottom: 6px; }
+.grad-controls .field { flex: 1; }
+.field input[type=color] { height: 42px; padding: 4px; cursor: pointer; border-radius: var(--radius-sm); }
+.save-row { display: flex; justify-content: flex-end; align-items: center; margin-top: 22px; gap: 14px; }
+.saved-tag { color: var(--good); font-size: 12.5px; font-weight: 500; opacity: 0; transition: opacity .3s; }
+.saved-tag.show { opacity: 1; }
+.save-btn { padding: 11px 24px; }

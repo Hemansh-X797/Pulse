@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1400" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#101820"/>
+      <stop offset="24%" stop-color="#1c2b39"/>
+      <stop offset="46%" stop-color="#3a4a54"/>
+      <stop offset="64%" stop-color="#8a7562"/>
+      <stop offset="80%" stop-color="#d3a05f"/>
+      <stop offset="100%" stop-color="#f0c07a"/>
+    </linearGradient>
+
+    <radialGradient id="sun" cx="50%" cy="102%" r="70%">
+      <stop offset="0%"  stop-color="#ffedc2" stop-opacity="0.9"/>
+      <stop offset="30%" stop-color="#f7c07a" stop-opacity="0.5"/>
+      <stop offset="65%" stop-color="#c98f5e" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#c98f5e" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="ridge1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4a5850"/>
+      <stop offset="100%" stop-color="#333e3a"/>
+    </linearGradient>
+    <linearGradient id="ridge2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2b332f"/>
+      <stop offset="100%" stop-color="#1a201d"/>
+    </linearGradient>
+    <linearGradient id="ridge3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#141814"/>
+      <stop offset="100%" stop-color="#0a0c0a"/>
+    </linearGradient>
+
+    <filter id="cloudSoft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="ridgeSoft" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="2.2"/>
+    </filter>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch" result="noise"/>
+      <feColorMatrix in="noise" type="matrix"
+        values="0 0 0 0 1
+                0 0 0 0 1
+                0 0 0 0 1
+                0 0 0 0.03 0"/>
+    </filter>
+  </defs>
+
+  <rect x="0" y="0" width="900" height="1400" fill="url(#sky)"/>
+  <rect x="0" y="650" width="900" height="750" fill="url(#sun)"/>
+
+  <!-- soft cloud bands, gentle horizontal drift -->
+  <g filter="url(#cloudSoft)">
+    <ellipse cx="160" cy="230" rx="230" ry="26" fill="#dfd6cf" opacity="0.22"/>
+    <ellipse cx="600" cy="330" rx="320" ry="20" fill="#f0dcc0" opacity="0.20"/>
+    <ellipse cx="380" cy="430" rx="400" ry="24" fill="#f4d5a8" opacity="0.18"/>
+    <ellipse cx="80"  cy="520" rx="260" ry="18" fill="#f2c98f" opacity="0.16"/>
+  </g>
+
+  <!-- far ridge: broad, gentle rolling curve -->
+  <path filter="url(#ridgeSoft)" fill="url(#ridge1)"
+    d="M0,900
+       C 90,865 160,875 230,850
+       C 320,820 380,845 460,825
+       C 560,800 620,835 700,815
+       C 790,795 850,820 900,805
+       L900,1400 L0,1400 Z"/>
+
+  <!-- mid ridge -->
+  <path filter="url(#ridgeSoft)" fill="url(#ridge2)"
+    d="M0,1020
+       C 80,975 170,1000 260,965
+       C 360,928 430,965 520,935
+       C 620,900 690,940 780,910
+       C 830,895 870,915 900,900
+       L900,1400 L0,1400 Z"/>
+
+  <!-- near ridge, larger and darkest -->
+  <path fill="url(#ridge3)"
+    d="M0,1170
+       C 110,1110 210,1150 320,1095
+       C 420,1045 500,1090 600,1040
+       C 700,990 800,1030 900,995
+       L900,1400 L0,1400 Z"/>
+
+  <rect x="0" y="0" width="900" height="1400" filter="url(#grain)"/>
+  <rect x="0" y="0" width="900" height="1400" fill="#05060a" opacity="0.10"/>
+</svg>
