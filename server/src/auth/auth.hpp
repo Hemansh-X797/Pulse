@@ -75,6 +75,7 @@ inline SignupResult signup(db::Database& db, const std::string& username, const 
 inline LoginResult login(db::Database& db, SessionStore& sessions, const std::string& username, const std::string& password) {
     auto row = db.find_user_for_login(username);
     if (!row) return {false, "invalid username or password"};
+    if (!row->has_password) return {false, "this account signs in with Google or Discord — use that instead"};
     std::string hash = hash_password(password, row->password_salt);
     if (hash != row->password_hash) return {false, "invalid username or password"};
     std::string token = sessions.create_session(row->id);
