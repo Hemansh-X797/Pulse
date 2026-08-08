@@ -10,6 +10,9 @@ export const state = {
   onlineUserIds: new Set(),
   typingUser: null,
   wsConnected: false,
+  replyTarget: null,   // { id, sender, body } — message being replied to
+  editingId: null,     // message id currently being edited inline
+  unreadChannels: 0,   // total unread across DM channels, for the sidebar badge
   posts: [],
   commentsOpen: {},
   commentsCache: {},
