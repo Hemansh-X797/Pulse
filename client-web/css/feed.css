@@ -48,3 +48,20 @@
 }
 .comment-input-row input:focus { border-color: var(--hairline-strong); }
 .comment-input-row button { padding: 7px 14px; font-size: 12px; }
+
+.post-image-wrap { margin: -4px 0 14px; border-radius: var(--radius-md); overflow: hidden; border: 1px solid var(--hairline); }
+.post-image { width: 100%; display: block; max-height: 480px; object-fit: cover; }
+
+.composer-post-left { display: flex; align-items: center; gap: 10px; }
+.composer-attach-btn {
+  width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--hairline); background: var(--surface-2);
+  color: var(--ink-mid); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.composer-attach-btn:hover { background: var(--surface-3); color: var(--ink-hi); }
+.composer-image-chip { position: relative; display: inline-block; margin-top: 10px; }
+.composer-image-chip img { max-height: 140px; border-radius: var(--radius-sm); border: 1px solid var(--hairline); display: block; }
+.composer-image-chip button {
+  position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; border: none;
+  background: var(--surface-3); color: var(--ink-hi); cursor: pointer; font-size: 14px; line-height: 1;
+}
