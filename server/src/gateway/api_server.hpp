@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -21,6 +22,8 @@
 #include "../common/rate_limiter.hpp"
 #include "../common/config.hpp"
 #include "../common/https_client.hpp"
+#include "../common/base64.hpp"
+#include "../common/media_store.hpp"
 #include "../auth/auth.hpp"
 #include "../auth/oauth.hpp"
 
@@ -32,7 +35,8 @@ class ApiServer {
 public:
     ApiServer(db::Database& db, auth::SessionStore& sessions, int port)
         : db_(db), sessions_(sessions), port_(port),
-          auth_limiter_(8, 60) {} // 8 signup/login attempts per IP per 60s
+          auth_limiter_(8, 60), // 8 signup/login attempts per IP per 60s
+          media_(config::env("PULSE_MEDIA_DIR", "media")) {}
 
     void run() {
         int server_fd = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -58,6 +62,7 @@ private:
     int port_;
     security::RateLimiter auth_limiter_;
     config::OAuthConfig oauth_config_;
+    media::MediaStore media_;
 
     static std::unordered_map<std::string, std::string> parse_query(const std::string& full_path) {
         std::unordered_map<std::string, std::string> out;
@@ -120,7 +125,7 @@ private:
         return {
             {"id", p.id}, {"author_id", p.author_id}, {"author_username", p.author_username},
             {"author_display_name", p.author_display_name}, {"author_avatar_url", p.author_avatar_url},
-            {"body", p.body_rendered}, {"created_at", p.created_at},
+            {"body", p.body_rendered}, {"media_url", p.media_url}, {"created_at", p.created_at},
             {"reaction_count", p.reaction_count}, {"comment_count", p.comment_count},
         };
     }
@@ -156,6 +161,12 @@ private:
             size_t cl_start = cl_pos + 15;
             size_t cl_end = request.find("\r\n", cl_start);
             long content_length = std::strtol(request.substr(cl_start, cl_end - cl_start).c_str(), nullptr, 10);
+            if (content_length > 8 * 1024 * 1024) { // 8MB cap — comfortably covers a 5MB image as base64
+                std::string resp = "HTTP/1.1 413 Payload Too Large\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
+                ::send(fd, resp.data(), resp.size(), 0);
+                ::close(fd);
+                return;
+            }
             while (static_cast<long>(body.size()) < content_length) {
                 ssize_t n = ::recv(fd, chunk, sizeof(chunk), 0);
                 if (n <= 0) break;
@@ -177,6 +188,38 @@ private:
         std::string path = full_path.substr(0, full_path.find('?'));
         auto parts = split_path(path);
         auto query = parse_query(full_path);
+
+        // GET /media/:filename — served directly, bypassing the JSON
+        // response path entirely since this returns raw image bytes.
+        if (method == "GET" && parts.size() == 2 && parts[0] == "media") {
+            auto filepath = media_.resolve(parts[1]);
+            if (!filepath) {
+                std::string resp = "HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
+                ::send(fd, resp.data(), resp.size(), 0);
+                ::close(fd);
+                return;
+            }
+            std::ifstream file(*filepath, std::ios::binary);
+            std::ostringstream ss;
+            ss << file.rdbuf();
+            std::string bytes = ss.str();
+            std::string ext = filepath->extension().string();
+            std::string content_type = ext == ".png" ? "image/png" : ext == ".jpg" ? "image/jpeg"
+                                      : ext == ".webp" ? "image/webp" : ext == ".gif" ? "image/gif"
+                                      : "application/octet-stream";
+            std::ostringstream out;
+            out << "HTTP/1.1 200 OK\r\n"
+                << "Content-Type: " << content_type << "\r\n"
+                << "Cache-Control: public, max-age=31536000, immutable\r\n"
+                << "Access-Control-Allow-Origin: *\r\n"
+                << "Content-Length: " << bytes.size() << "\r\n"
+                << "Connection: close\r\n\r\n";
+            std::string headers = out.str();
+            ::send(fd, headers.data(), headers.size(), 0);
+            ::send(fd, bytes.data(), bytes.size(), 0);
+            ::close(fd);
+            return;
+        }
 
         json resp_json;
         int status = 200;
@@ -345,14 +388,43 @@ private:
             return;
         }
 
-        // POST /posts  {"body": "..."}
+        // POST /posts  {"body": "...", "media_url": "/media/abc.png" (optional)}
         if (method == "POST" && parts.size() == 1 && parts[0] == "posts") {
             if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
             std::string raw = in.value("body", "");
+            std::string media_url = in.value("media_url", "");
             if (raw.empty() || raw.size() > 2000) { status = 400; resp_json = {{"error", "post body invalid length"}}; return; }
             std::string rendered = emoji::render(raw);
-            int64_t post_id = db_.create_post(*uid, raw, rendered);
+            int64_t post_id = db_.create_post(*uid, raw, rendered, media_url);
             resp_json = {{"ok", true}, {"post_id", post_id}};
+            return;
+        }
+
+        // POST /media  {"data_base64": "...", "mime": "image/png"}
+        // Returns {"url": "/media/xyz.png"} — plug that url into avatar_url,
+        // banner_url, or a post's media_url. Auth required, 5MB cap,
+        // PNG/JPEG/WEBP/GIF only (enforced in MediaStore).
+        if (method == "POST" && parts.size() == 1 && parts[0] == "media") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            std::string data_b64 = in.value("data_base64", "");
+            std::string mime = in.value("mime", "");
+            auto bytes = b64::decode(data_b64);
+            auto result = media_.save(db_, *uid, bytes, mime);
+            if (!result.ok) { status = 400; resp_json = {{"error", result.error}}; return; }
+            resp_json = {{"ok", true}, {"url", result.url}};
+            return;
+        }
+
+        // GET /channels — every DM/group channel this user is in, each
+        // with an unread count, for a sidebar list with unread badges.
+        if (method == "GET" && parts.size() == 1 && parts[0] == "channels") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            auto channels = db_.channels_with_unread(*uid);
+            json arr = json::array();
+            for (auto& c : channels) {
+                arr.push_back({{"channel_id", c.channel_id}, {"is_group", c.is_group}, {"name", c.name}, {"unread", c.unread}});
+            }
+            resp_json = {{"channels", arr}};
             return;
         }
 
