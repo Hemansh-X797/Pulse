@@ -6,9 +6,15 @@
 //
 // Protocol (one JSON object per line):
 //   -> {"op":"auth","token":"..."}
-//   -> {"op":"send","channel_id":1,"body":"hey :fire:"}
+//   -> {"op":"send","channel_id":1,"body":"hey :fire:","reply_to_id":0}
+//   -> {"op":"edit","channel_id":1,"message_id":12,"body":"hey :fire: edited"}
+//   -> {"op":"delete","channel_id":1,"message_id":12}
+//   -> {"op":"read","channel_id":1,"message_id":12}
 //   -> {"op":"history","channel_id":1,"limit":50}
-//   <- {"op":"message","channel_id":1,"sender":"alice","body":"hey \ud83d\udd25","id":12,"ts":123}
+//   <- {"op":"message","channel_id":1,"sender":"alice","body":"hey \ud83d\udd25","id":12,"ts":123,"reply_to_id":0}
+//   <- {"op":"message_edited","channel_id":1,"id":12,"body":"...","edited_at":123}
+//   <- {"op":"message_deleted","channel_id":1,"id":12}
+//   <- {"op":"read_receipt","channel_id":1,"user_id":2,"message_id":12}
 //   <- {"op":"error","message":"..."}
 
 #include <arpa/inet.h>
@@ -286,12 +292,13 @@ private:
         if (op == "send") {
             int64_t channel_id = req.value("channel_id", 0);
             std::string body = req.value("body", "");
+            int64_t reply_to_id = req.value("reply_to_id", 0);
             if (body.empty() || body.size() > 4000) {
                 send_line(fd, {{"op", "error"}, {"message", "message body invalid length"}});
                 return;
             }
             std::string rendered = emoji::render(body);
-            int64_t msg_id = db_.insert_message(channel_id, user_id, body, rendered);
+            int64_t msg_id = db_.insert_message(channel_id, user_id, body, rendered, reply_to_id);
             auto user = db_.get_user(user_id);
             json payload = {
                 {"op", "message"},
@@ -300,9 +307,59 @@ private:
                 {"sender_id", user_id},
                 {"sender", user ? user->username : "?"},
                 {"body", rendered},
+                {"reply_to_id", reply_to_id},
                 {"ts", static_cast<int64_t>(time(nullptr))}
             };
             broadcast_to_channel(channel_id, payload);
+            return;
+        }
+
+        if (op == "edit") {
+            int64_t message_id = req.value("message_id", 0);
+            std::string body = req.value("body", "");
+            if (body.empty() || body.size() > 4000) {
+                send_line(fd, {{"op", "error"}, {"message", "message body invalid length"}});
+                return;
+            }
+            auto sender = db_.message_sender(message_id);
+            if (!sender || *sender != user_id) {
+                send_line(fd, {{"op", "error"}, {"message", "you can only edit your own messages"}});
+                return;
+            }
+            int64_t channel_id = req.value("channel_id", 0);
+            std::string rendered = emoji::render(body);
+            db_.edit_message(message_id, body, rendered);
+            broadcast_to_channel(channel_id, {
+                {"op", "message_edited"}, {"channel_id", channel_id},
+                {"id", message_id}, {"body", rendered},
+                {"edited_at", static_cast<int64_t>(time(nullptr))}
+            });
+            return;
+        }
+
+        if (op == "delete") {
+            int64_t message_id = req.value("message_id", 0);
+            auto sender = db_.message_sender(message_id);
+            if (!sender || *sender != user_id) {
+                send_line(fd, {{"op", "error"}, {"message", "you can only delete your own messages"}});
+                return;
+            }
+            int64_t channel_id = req.value("channel_id", 0);
+            db_.delete_message(message_id);
+            broadcast_to_channel(channel_id, {
+                {"op", "message_deleted"}, {"channel_id", channel_id}, {"id", message_id}
+            });
+            return;
+        }
+
+        if (op == "read") {
+            int64_t channel_id = req.value("channel_id", 0);
+            int64_t message_id = req.value("message_id", 0);
+            db_.mark_read(channel_id, user_id, message_id);
+            broadcast_to_channel(channel_id, {
+                {"op", "read_receipt"}, {"channel_id", channel_id},
+                {"user_id", user_id}, {"message_id", message_id}
+            });
             return;
         }
 
@@ -314,7 +371,8 @@ private:
             for (auto& m : msgs) {
                 arr.push_back({
                     {"id", m.id}, {"sender", m.sender_username},
-                    {"body", m.body_rendered}, {"ts", m.created_at}
+                    {"body", m.body_rendered}, {"ts", m.created_at},
+                    {"reply_to_id", m.reply_to_id}, {"edited_at", m.edited_at}, {"deleted", m.deleted}
                 });
             }
             send_line(fd, {{"op", "history"}, {"channel_id", channel_id}, {"messages", arr}});
