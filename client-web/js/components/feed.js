@@ -1,7 +1,9 @@
 import { state, setState, rerender } from '../state.js';
-import { Feed as FeedApi } from '../api.js';
-import { initials, gradientStyle, timeAgo, esc } from '../utils.js';
+import { Feed as FeedApi, Media } from '../api.js';
+import { initials, gradientStyle, timeAgo, esc, mediaUrl, showToast } from '../utils.js';
 import { icon } from '../icons.js';
+
+let pendingImageUrl = null;
 
 export function renderFeed() {
   return `
@@ -12,8 +14,13 @@ export function renderFeed() {
   <div class="feed-scroll">
     <div class="composer-post">
       <textarea id="post-input" placeholder="What's happening? Try :fire: :rocket: :100:"></textarea>
+      <div id="composer-image-preview"></div>
       <div class="composer-post-row">
-        <span class="composer-hint mono">:shortcode: → emoji</span>
+        <div class="composer-post-left">
+          <button class="composer-attach-btn" id="post-attach" type="button" title="Attach image">${icon('imagePlus', 15)}</button>
+          <input type="file" id="post-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden/>
+          <span class="composer-hint mono">:shortcode: → emoji</span>
+        </div>
         <button class="btn btn-brand" id="post-submit">Post</button>
       </div>
     </div>
@@ -35,6 +42,7 @@ function renderPostCard(p) {
       </div>
     </div>
     <div class="post-body">${p.body}</div>
+    ${p.media_url ? `<div class="post-image-wrap"><img class="post-image" src="${mediaUrl(p.media_url)}" alt=""/></div>` : ''}
     <div class="post-actions">
       <button class="react-btn" data-react="${p.id}" data-shortcode="fire">${icon('flame', 13)}</button>
       <button class="react-btn" data-react="${p.id}" data-shortcode="heart">${icon('heart', 13)}</button>
@@ -52,11 +60,40 @@ function renderPostCard(p) {
 }
 
 export function wireFeed() {
+  pendingImageUrl = null;
+
+  const attachBtn = document.getElementById('post-attach');
+  const fileInput = document.getElementById('post-file');
+  const previewBox = document.getElementById('composer-image-preview');
+
+  attachBtn.onclick = () => fileInput.click();
+  fileInput.onchange = async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    try {
+      const { url } = await Media.upload(file);
+      pendingImageUrl = url;
+      previewBox.innerHTML = `
+        <div class="composer-image-chip">
+          <img src="${mediaUrl(url)}" alt=""/>
+          <button id="composer-image-remove" type="button">&times;</button>
+        </div>`;
+      document.getElementById('composer-image-remove').onclick = () => {
+        pendingImageUrl = null;
+        previewBox.innerHTML = '';
+      };
+    } catch (e) {
+      showToast(e.message);
+    }
+  };
+
   document.getElementById('post-submit').onclick = async () => {
     const el = document.getElementById('post-input');
     if (!el.value.trim()) return;
-    await FeedApi.create(el.value);
+    await FeedApi.create(el.value, pendingImageUrl || undefined);
     el.value = '';
+    pendingImageUrl = null;
+    previewBox.innerHTML = '';
     const feed = await FeedApi.list();
     setState({ posts: feed.posts });
   };
