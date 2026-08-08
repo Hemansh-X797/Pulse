@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS posts (
     author_id     INTEGER NOT NULL REFERENCES users(id),
     body_raw      TEXT NOT NULL,
     body_rendered TEXT NOT NULL,
+    media_url     TEXT DEFAULT '',
     created_at    INTEGER NOT NULL
 );
 
@@ -48,6 +49,14 @@ CREATE TABLE IF NOT EXISTS post_reactions (
 CREATE INDEX IF NOT EXISTS idx_posts_created ON posts(created_at);
 CREATE INDEX IF NOT EXISTS idx_comments_post ON post_comments(post_id, created_at);
 
+CREATE TABLE IF NOT EXISTS media (
+    id          TEXT PRIMARY KEY,
+    owner_id    INTEGER NOT NULL REFERENCES users(id),
+    mime_type   TEXT NOT NULL,
+    byte_size   INTEGER NOT NULL,
+    created_at  INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS dm_channels (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     is_group   INTEGER NOT NULL DEFAULT 0,
@@ -68,6 +77,9 @@ CREATE TABLE IF NOT EXISTS messages (
     sender_id       INTEGER NOT NULL REFERENCES users(id),
     body_raw        TEXT NOT NULL,
     body_rendered   TEXT NOT NULL,
+    reply_to_id     INTEGER DEFAULT NULL REFERENCES messages(id),
+    edited_at       INTEGER DEFAULT NULL,
+    deleted         INTEGER NOT NULL DEFAULT 0,
     created_at      INTEGER NOT NULL
 );
 
@@ -76,6 +88,14 @@ CREATE TABLE IF NOT EXISTS message_reactions (
     user_id    INTEGER NOT NULL REFERENCES users(id),
     emoji      TEXT NOT NULL,
     PRIMARY KEY (message_id, user_id, emoji)
+);
+
+CREATE TABLE IF NOT EXISTS read_receipts (
+    channel_id            INTEGER NOT NULL REFERENCES dm_channels(id),
+    user_id               INTEGER NOT NULL REFERENCES users(id),
+    last_read_message_id  INTEGER NOT NULL DEFAULT 0,
+    updated_at            INTEGER NOT NULL,
+    PRIMARY KEY (channel_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, created_at);
