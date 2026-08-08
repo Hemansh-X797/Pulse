@@ -1,3 +1,5 @@
+import { API_BASE } from './api.js';
+
 export function initials(name) {
   return (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
@@ -14,6 +16,14 @@ export function timeAgo(ts) {
   if (d < 3600) return Math.floor(d / 60) + 'm';
   if (d < 86400) return Math.floor(d / 3600) + 'h';
   return Math.floor(d / 86400) + 'd';
+}
+
+// Server returns relative paths like "/media/abc.png" — resolve against
+// the API host so <img src> works regardless of where the client is hosted.
+export function mediaUrl(path) {
+  if (!path) return '';
+  if (path.startsWith('http')) return path;
+  return API_BASE + path;
 }
 
 export function esc(s) {
