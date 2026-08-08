@@ -3,6 +3,7 @@ import { Auth, Feed as FeedApi } from './api.js';
 import { connectWs } from './ws.js';
 import { renderAuth, wireAuth } from './components/auth.js';
 import { renderSidebar, wireSidebar } from './components/sidebar.js';
+import { startUnreadPolling } from './unread.js';
 import { renderFeed, wireFeed } from './components/feed.js';
 import { renderDm, wireDm } from './components/dm.js';
 import { renderProfile, wireProfile } from './components/profile.js';
@@ -50,6 +51,7 @@ async function completeLogin(token) {
   const feed = await FeedApi.list();
   setState({ me, screen: 'app', posts: feed.posts });
   connectWs();
+  startUnreadPolling();
 }
 
 (async function boot() {
@@ -79,6 +81,7 @@ async function completeLogin(token) {
       const feed = await FeedApi.list();
       setState({ me, screen: 'app', posts: feed.posts });
       connectWs();
+      startUnreadPolling();
       return;
     } catch (e) {
       localStorage.removeItem('pulse_token');
