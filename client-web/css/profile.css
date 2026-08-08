@@ -4,6 +4,14 @@
   height: 130px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; position: relative;
   transition: background .2s;
 }
+.media-upload-btn {
+  position: absolute; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--hairline-strong);
+  background: rgba(10,10,12,0.65); backdrop-filter: blur(4px); color: var(--ink-hi);
+  display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s, transform .12s;
+}
+.media-upload-btn:hover { background: rgba(10,10,12,0.85); transform: scale(1.06); }
+.banner-upload-btn { top: 12px; right: 12px; }
+.avatar-upload-btn { position: absolute; bottom: 0; right: 0; width: 24px; height: 24px; }
 .profile-avatar-lg {
   width: 78px; height: 78px; border-radius: 50%; border: 4px solid var(--surface-1); position: absolute;
   bottom: -39px; left: 26px; display: flex; align-items: center; justify-content: center;
