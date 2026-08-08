@@ -22,7 +22,7 @@ export const Auth = {
 
 export const Feed = {
   list: () => api('/feed'),
-  create: (body) => api('/posts', { method: 'POST', body: JSON.stringify({ body }) }),
+  create: (body, media_url) => api('/posts', { method: 'POST', body: JSON.stringify({ body, media_url }) }),
   react: (postId, shortcode) => api(`/posts/${postId}/react`, { method: 'POST', body: JSON.stringify({ shortcode }) }),
   comments: (postId) => api(`/posts/${postId}/comments`),
   comment: (postId, body) => api(`/posts/${postId}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
@@ -31,4 +31,30 @@ export const Feed = {
 export const DMs = {
   createWith: (with_username) => api('/dms', { method: 'POST', body: JSON.stringify({ with_username }) }),
   createGroup: (name, member_usernames) => api('/groups', { method: 'POST', body: JSON.stringify({ name, member_usernames }) }),
+};
+
+export const Channels = {
+  list: () => api('/channels'),
+};
+
+// Reads a File as base64 and uploads it, returning { url }.
+// Used for avatars, banners, and post images alike.
+export function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result; // "data:image/png;base64,AAAA..."
+      const comma = result.indexOf(',');
+      resolve(result.slice(comma + 1));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+export const Media = {
+  upload: async (file) => {
+    const data_base64 = await fileToBase64(file);
+    return api('/media', { method: 'POST', body: JSON.stringify({ data_base64, mime: file.type }) });
+  },
 };
