@@ -28,6 +28,7 @@ struct Post {
     std::string author_display_name;
     std::string author_avatar_url;
     std::string body_rendered;
+    std::string media_url;
     int64_t created_at;
     int reaction_count = 0;
     int comment_count = 0;
@@ -48,6 +49,9 @@ struct Message {
     int64_t sender_id;
     std::string sender_username;
     std::string body_rendered;
+    int64_t reply_to_id = 0;
+    int64_t edited_at = 0;
+    bool deleted = false;
     int64_t created_at;
 };
 
@@ -210,14 +214,15 @@ public:
     }
 
     // ---- posts ----
-    int64_t create_post(int64_t author_id, const std::string& body_raw, const std::string& body_rendered) {
+    int64_t create_post(int64_t author_id, const std::string& body_raw, const std::string& body_rendered, const std::string& media_url = "") {
         sqlite3_stmt* stmt;
         sqlite3_prepare_v2(db_,
-            "INSERT INTO posts(author_id, body_raw, body_rendered, created_at) VALUES (?, ?, ?, strftime('%s','now'));",
+            "INSERT INTO posts(author_id, body_raw, body_rendered, media_url, created_at) VALUES (?, ?, ?, ?, strftime('%s','now'));",
             -1, &stmt, nullptr);
         sqlite3_bind_int64(stmt, 1, author_id);
         sqlite3_bind_text(stmt, 2, body_raw.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(stmt, 3, body_rendered.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, media_url.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
         return sqlite3_last_insert_rowid(db_);
@@ -229,7 +234,7 @@ public:
         std::vector<Post> out;
         sqlite3_stmt* stmt;
         const char* sql =
-            "SELECT p.id, p.author_id, u.username, u.display_name, u.avatar_url, p.body_rendered, p.created_at, "
+            "SELECT p.id, p.author_id, u.username, u.display_name, u.avatar_url, p.body_rendered, p.media_url, p.created_at, "
             "  (SELECT COUNT(*) FROM post_reactions r WHERE r.post_id = p.id) AS rc, "
             "  (SELECT COUNT(*) FROM post_comments c WHERE c.post_id = p.id) AS cc "
             "FROM posts p JOIN users u ON u.id = p.author_id "
@@ -247,9 +252,11 @@ public:
             const unsigned char* av = sqlite3_column_text(stmt, 4);
             p.author_avatar_url = av ? reinterpret_cast<const char*>(av) : "";
             p.body_rendered = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
-            p.created_at = sqlite3_column_int64(stmt, 6);
-            p.reaction_count = sqlite3_column_int(stmt, 7);
-            p.comment_count = sqlite3_column_int(stmt, 8);
+            const unsigned char* mu = sqlite3_column_text(stmt, 6);
+            p.media_url = mu ? reinterpret_cast<const char*>(mu) : "";
+            p.created_at = sqlite3_column_int64(stmt, 7);
+            p.reaction_count = sqlite3_column_int(stmt, 8);
+            p.comment_count = sqlite3_column_int(stmt, 9);
             out.push_back(p);
         }
         sqlite3_finalize(stmt);
@@ -377,15 +384,16 @@ public:
     }
 
     // ---- messages ----
-    int64_t insert_message(int64_t channel_id, int64_t sender_id, const std::string& body_raw, const std::string& body_rendered) {
+    int64_t insert_message(int64_t channel_id, int64_t sender_id, const std::string& body_raw, const std::string& body_rendered, int64_t reply_to_id = 0) {
         sqlite3_stmt* stmt;
         sqlite3_prepare_v2(db_,
-            "INSERT INTO messages(channel_id, sender_id, body_raw, body_rendered, created_at) VALUES (?, ?, ?, ?, strftime('%s','now'));",
+            "INSERT INTO messages(channel_id, sender_id, body_raw, body_rendered, reply_to_id, created_at) VALUES (?, ?, ?, ?, ?, strftime('%s','now'));",
             -1, &stmt, nullptr);
         sqlite3_bind_int64(stmt, 1, channel_id);
         sqlite3_bind_int64(stmt, 2, sender_id);
         sqlite3_bind_text(stmt, 3, body_raw.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(stmt, 4, body_rendered.c_str(), -1, SQLITE_TRANSIENT);
+        if (reply_to_id > 0) sqlite3_bind_int64(stmt, 5, reply_to_id); else sqlite3_bind_null(stmt, 5);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
         return sqlite3_last_insert_rowid(db_);
@@ -395,7 +403,8 @@ public:
         std::vector<Message> out;
         sqlite3_stmt* stmt;
         const char* sql =
-            "SELECT m.id, m.channel_id, m.sender_id, u.username, m.body_rendered, m.created_at "
+            "SELECT m.id, m.channel_id, m.sender_id, u.username, m.body_rendered, "
+            "       COALESCE(m.reply_to_id, 0), COALESCE(m.edited_at, 0), m.deleted, m.created_at "
             "FROM messages m JOIN users u ON u.id = m.sender_id "
             "WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ?;";
         sqlite3_prepare_v2(db_, sql, -1, &stmt, nullptr);
@@ -407,12 +416,117 @@ public:
             m.channel_id = sqlite3_column_int64(stmt, 1);
             m.sender_id = sqlite3_column_int64(stmt, 2);
             m.sender_username = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-            m.body_rendered = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-            m.created_at = sqlite3_column_int64(stmt, 5);
+            m.reply_to_id = sqlite3_column_int64(stmt, 5);
+            m.edited_at = sqlite3_column_int64(stmt, 6);
+            m.deleted = sqlite3_column_int(stmt, 7) != 0;
+            m.body_rendered = m.deleted ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            m.created_at = sqlite3_column_int64(stmt, 8);
             out.push_back(m);
         }
         sqlite3_finalize(stmt);
         return out;
+    }
+
+    // Returns the sender_id of a message, or nullopt if it doesn't exist —
+    // used to check ownership before allowing edit/delete.
+    std::optional<int64_t> message_sender(int64_t message_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "SELECT sender_id FROM messages WHERE id = ?;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, message_id);
+        std::optional<int64_t> result;
+        if (sqlite3_step(stmt) == SQLITE_ROW) result = sqlite3_column_int64(stmt, 0);
+        sqlite3_finalize(stmt);
+        return result;
+    }
+
+    bool edit_message(int64_t message_id, const std::string& body_raw, const std::string& body_rendered) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "UPDATE messages SET body_raw = ?, body_rendered = ?, edited_at = strftime('%s','now') WHERE id = ? AND deleted = 0;",
+            -1, &stmt, nullptr);
+        sqlite3_bind_text(stmt, 1, body_raw.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, body_rendered.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt, 3, message_id);
+        int rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        return rc == SQLITE_DONE;
+    }
+
+    bool delete_message(int64_t message_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "UPDATE messages SET deleted = 1 WHERE id = ?;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, message_id);
+        int rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        return rc == SQLITE_DONE;
+    }
+
+    // ---- read receipts ----
+    void mark_read(int64_t channel_id, int64_t user_id, int64_t message_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "INSERT INTO read_receipts(channel_id, user_id, last_read_message_id, updated_at) VALUES (?, ?, ?, strftime('%s','now')) "
+            "ON CONFLICT(channel_id, user_id) DO UPDATE SET last_read_message_id = excluded.last_read_message_id, updated_at = excluded.updated_at "
+            "WHERE excluded.last_read_message_id > read_receipts.last_read_message_id;",
+            -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, channel_id);
+        sqlite3_bind_int64(stmt, 2, user_id);
+        sqlite3_bind_int64(stmt, 3, message_id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    int unread_count(int64_t channel_id, int64_t user_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "SELECT COUNT(*) FROM messages WHERE channel_id = ? AND deleted = 0 AND sender_id != ? AND id > "
+            "  COALESCE((SELECT last_read_message_id FROM read_receipts WHERE channel_id = ? AND user_id = ?), 0);",
+            -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, channel_id);
+        sqlite3_bind_int64(stmt, 2, user_id);
+        sqlite3_bind_int64(stmt, 3, channel_id);
+        sqlite3_bind_int64(stmt, 4, user_id);
+        int count = 0;
+        if (sqlite3_step(stmt) == SQLITE_ROW) count = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+        return count;
+    }
+
+    // Channels a user belongs to, each with its unread count — powers a
+    // DM sidebar/unread-badge list without N+1 queries from the client.
+    struct ChannelUnread { int64_t channel_id; bool is_group; std::string name; int unread; };
+    std::vector<ChannelUnread> channels_with_unread(int64_t user_id) {
+        std::vector<ChannelUnread> out;
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "SELECT c.id, c.is_group, c.name FROM dm_channels c "
+            "JOIN dm_members m ON m.channel_id = c.id WHERE m.user_id = ?;",
+            -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, user_id);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            ChannelUnread cu;
+            cu.channel_id = sqlite3_column_int64(stmt, 0);
+            cu.is_group = sqlite3_column_int(stmt, 1) != 0;
+            cu.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            cu.unread = unread_count(cu.channel_id, user_id);
+            out.push_back(cu);
+        }
+        sqlite3_finalize(stmt);
+        return out;
+    }
+
+    // ---- media ----
+    void insert_media(const std::string& id, int64_t owner_id, const std::string& mime, int64_t byte_size) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "INSERT INTO media(id, owner_id, mime_type, byte_size, created_at) VALUES (?, ?, ?, ?, strftime('%s','now'));",
+            -1, &stmt, nullptr);
+        sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt, 2, owner_id);
+        sqlite3_bind_text(stmt, 3, mime.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt, 4, byte_size);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
     }
 
 private:
