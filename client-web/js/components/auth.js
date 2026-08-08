@@ -2,6 +2,7 @@ import { state, setState } from '../state.js';
 import { Auth, API_BASE } from '../api.js';
 import { connectWs } from '../ws.js';
 import { Feed } from '../api.js';
+import { startUnreadPolling } from '../unread.js';
 
 export function renderAuth() {
   const isSignup = state.screen === 'signup';
@@ -85,6 +86,7 @@ export function wireAuth() {
       const feed = await Feed.list();
       setState({ me, screen: 'app', posts: feed.posts, authError: '' });
       connectWs();
+      startUnreadPolling();
     } catch (e) {
       setState({ authError: e.message });
     }
