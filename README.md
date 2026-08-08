@@ -123,10 +123,33 @@ curl -X POST localhost:8080/signup -d '{"username":"alice","password":"hunter22"
 curl -X POST localhost:8080/login  -d '{"username":"alice","password":"hunter22"}'
 ```
 
-## What's next (Phase 3)
-Google + Discord OAuth, presence/typing indicators/read receipts, media
-uploads (avatars/banners/post images), Postgres migration, and the feed
-suggestion engine v2. See `ARCHITECTURE.md` for the full phasing — nothing
+## What's new this round
+
+- **Message edit/delete/reply** — real chat depth: `edit`, `delete`, and
+  `reply_to_id` WebSocket ops, permission-checked server-side (you can only
+  edit/delete your own messages), with reply-tag snippets and a "message
+  deleted" placeholder in the UI. Verified live between two real WebSocket
+  clients, including the rejection path for deleting someone else's message.
+- **Read receipts + unread badges** — `read` op marks a channel read up to
+  a message id; `GET /channels` returns every channel a user's in with a
+  per-channel unread count; the sidebar shows a live badge. Caught and
+  fixed a real bug here: the badge didn't appear because the login screen
+  had its own duplicate login path that skipped starting the unread-poll
+  loop — found by actually screenshotting a logged-in user with unread
+  messages, not just checking the API response.
+- **Real media uploads** — `POST /media` (base64 JSON in, since the server
+  stays dependency-free with no multipart parser), 5MB cap, PNG/JPEG/WEBP/GIF
+  only, served back at `/media/:file`. Wired into avatar upload, banner
+  upload, and post images, with a genuine byte-for-byte round-trip test
+  (upload → disk → HTTP serve → identical bytes back) before it touched
+  any UI.
+
+## What's next (Phase 4)
+Postgres migration (SQLite is genuinely fine at current scale but won't
+scale past it), a real feed ranking model (current one is recency +
+engagement count — works, but naive), horizontal scaling for the chat
+service, pinned messages, and push notifications once a mobile client
+exists. See `ARCHITECTURE.md` for the full phasing — nothing
 on your feature list is cut, it's sequenced so every phase is something you
 can actually run.
 
