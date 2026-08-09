@@ -6,10 +6,14 @@ import { icon } from '../icons.js';
 const EMOJI_HINT = [':fire:', ':heart:', ':rocket:', ':100:', ':joy:', ':thumbsup:', ':eyes:', ':clap:', ':tada:', ':skull:'];
 
 export function renderDm() {
+  const inServer = state.activeServerId !== null;
+  const channel = inServer ? state.activeServerChannels.find(c => c.id === state.activeServerChannelId) : null;
+  const serverName = inServer ? (state.servers.find(s => s.id === state.activeServerId)?.name || '') : '';
+
   return `
   <div class="topbar">
-    <h2>Direct Messages</h2>
-    <span class="sub mono">channel #${state.dmChannelId}</span>
+    <h2>${inServer ? `# ${esc(channel?.name || '')}` : 'Direct Messages'}</h2>
+    <span class="sub mono">${inServer ? esc(serverName) : `channel #${state.dmChannelId}`}</span>
     <span class="ws-status ${state.wsConnected ? 'live' : ''}" title="${state.wsConnected ? 'Connected' : 'Reconnecting…'}"></span>
   </div>
   <div class="chat-scroll" id="chat-scroll">
@@ -72,9 +76,9 @@ function renderBubbleRow(m) {
     </div>
     ${mine && !isEditing ? `
     <div class="msg-actions">
-      <button class="msg-action-btn" data-reply="${m.id}" title="Reply">${icon('messageCircle', 13)}</button>
-      <button class="msg-action-btn" data-edit="${m.id}" title="Edit">${icon('penLine', 13)}</button>
-      <button class="msg-action-btn" data-delete="${m.id}" title="Delete">&times;</button>
+      <button class="msg-action-btn" data-reply="${m.id}" aria-label="Reply to this message" title="Reply">${icon('messageCircle', 13)}</button>
+      <button class="msg-action-btn" data-edit="${m.id}" aria-label="Edit this message" title="Edit">${icon('penLine', 13)}</button>
+      <button class="msg-action-btn" data-delete="${m.id}" aria-label="Delete this message" title="Delete">&times;</button>
     </div>` : mine ? '' : `
     <div class="msg-actions">
       <button class="msg-action-btn" data-reply="${m.id}" title="Reply">${icon('messageCircle', 13)}</button>
