@@ -1,4 +1,5 @@
 import { state, setState } from './state.js';
+import { showToast } from './utils.js';
 
 export const WS_URL = 'ws://localhost:8081';
 
@@ -66,6 +67,13 @@ export function connectWs() {
       clearTimeout(typingTimeout);
       setState({ typingUser: msg.username });
       typingTimeout = setTimeout(() => setState({ typingUser: null }), 2500);
+      return;
+    }
+
+    if (msg.op === 'notification') {
+      setState({ unreadNotifications: state.unreadNotifications + 1 });
+      showToast(`${msg.actor_username} ${msg.type === 'message' ? 'sent a message' : msg.type === 'reaction' ? 'reacted to your post' : 'commented on your post'}`);
+      return;
     }
   };
 
@@ -78,6 +86,16 @@ export function connectWs() {
 export function disconnectWs() {
   if (socket) socket.close();
   socket = null;
+}
+
+// Switches the active chat channel mid-session — used both for DM
+// channels and server channels, since a server channel is just another
+// channel_id under the hood (same chat ops, same everything).
+export function switchChannel(channelId) {
+  setState({ dmChannelId: channelId, messages: [], replyTarget: null, editingId: null });
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify({ op: 'join', channel_id: channelId }));
+  socket.send(JSON.stringify({ op: 'history', channel_id: channelId, limit: 50 }));
 }
 
 function send(payload) {
