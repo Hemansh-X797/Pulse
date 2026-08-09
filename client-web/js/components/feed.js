@@ -17,7 +17,7 @@ export function renderFeed() {
       <div id="composer-image-preview"></div>
       <div class="composer-post-row">
         <div class="composer-post-left">
-          <button class="composer-attach-btn" id="post-attach" type="button" title="Attach image">${icon('imagePlus', 15)}</button>
+          <button class="composer-attach-btn" id="post-attach" type="button" aria-label="Attach an image to this post" title="Attach image">${icon('imagePlus', 15)}</button>
           <input type="file" id="post-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden/>
           <span class="composer-hint mono">:shortcode: → emoji</span>
         </div>
@@ -44,10 +44,10 @@ function renderPostCard(p) {
     <div class="post-body">${p.body}</div>
     ${p.media_url ? `<div class="post-image-wrap"><img class="post-image" src="${mediaUrl(p.media_url)}" alt=""/></div>` : ''}
     <div class="post-actions">
-      <button class="react-btn" data-react="${p.id}" data-shortcode="fire">${icon('flame', 13)}</button>
-      <button class="react-btn" data-react="${p.id}" data-shortcode="heart">${icon('heart', 13)}</button>
-      <button class="react-btn react-btn-text mono" data-react="${p.id}" data-shortcode="100">100</button>
-      <button class="comment-toggle mono" data-comments="${p.id}">${p.comment_count} comment${p.comment_count === 1 ? '' : 's'}</button>
+      <button class="react-btn" data-react="${p.id}" data-shortcode="fire" aria-label="React with fire">${icon('flame', 13)}</button>
+      <button class="react-btn" data-react="${p.id}" data-shortcode="heart" aria-label="React with heart">${icon('heart', 13)}</button>
+      <button class="react-btn react-btn-text mono" data-react="${p.id}" data-shortcode="100" aria-label="React with 100">100</button>
+      <button class="comment-toggle mono" data-comments="${p.id}" aria-expanded="${open}">${p.comment_count} comment${p.comment_count === 1 ? '' : 's'}</button>
     </div>
     <div class="comments-box ${open ? 'open' : ''}">
       ${comments.map(c => `<div class="comment-row"><b>${esc(c.author)}</b> ${c.body}</div>`).join('') || '<div class="comment-row muted">No comments yet.</div>'}
