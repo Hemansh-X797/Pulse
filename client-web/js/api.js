@@ -37,6 +37,21 @@ export const Channels = {
   list: () => api('/channels'),
 };
 
+export const Servers = {
+  create: (name, accent_color_top, accent_color_bottom) =>
+    api('/servers', { method: 'POST', body: JSON.stringify({ name, accent_color_top, accent_color_bottom }) }),
+  list: () => api('/servers'),
+  channels: (serverId) => api(`/servers/${serverId}/channels`),
+  createChannel: (serverId, name) => api(`/servers/${serverId}/channels`, { method: 'POST', body: JSON.stringify({ name }) }),
+  join: (invite_code) => api('/servers/join', { method: 'POST', body: JSON.stringify({ invite_code }) }),
+};
+
+export const Notifications = {
+  list: () => api('/notifications'),
+  markRead: (id) => api(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllRead: () => api('/notifications/read-all', { method: 'POST' }),
+};
+
 // Reads a File as base64 and uploads it, returning { url }.
 // Used for avatars, banners, and post images alike.
 export function fileToBase64(file) {
