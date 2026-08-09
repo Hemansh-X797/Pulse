@@ -113,6 +113,19 @@ private:
         for (int fd : fds) send_line(fd, payload);
     }
 
+    // Pushes to every connection a user has open, regardless of which
+    // channel (if any) they're currently subscribed to — used for
+    // notifications, which should land even if you're looking at a
+    // different tab/channel/screen.
+    void push_to_user(int64_t user_id, const json& payload) {
+        std::vector<int> fds;
+        {
+            std::lock_guard<std::mutex> lock(conn_mu_);
+            for (auto& [fd, uid] : fd_user_) if (uid == user_id) fds.push_back(fd);
+        }
+        for (int fd : fds) send_line(fd, payload);
+    }
+
     void subscribe_user_channels(int fd, int64_t user_id) {
         // naive: subscribe this fd to every channel the user is a member of
         // (fine for Phase 1 scale; Phase 3 indexes this properly with Redis)
@@ -311,6 +324,20 @@ private:
                 {"ts", static_cast<int64_t>(time(nullptr))}
             };
             broadcast_to_channel(channel_id, payload);
+
+            // Notify other channel members — lands even if they're not
+            // currently viewing this channel (different tab, different
+            // screen, or offline entirely — it'll be waiting in /notifications).
+            for (int64_t member_id : db_.channel_members(channel_id)) {
+                if (member_id == user_id) continue;
+                std::string preview = rendered.size() > 80 ? rendered.substr(0, 80) + "…" : rendered;
+                db_.create_notification(member_id, "message", user_id, user ? user->username : "?", channel_id, 0, preview);
+                push_to_user(member_id, {
+                    {"op", "notification"}, {"type", "message"},
+                    {"actor_username", user ? user->username : "?"},
+                    {"channel_id", channel_id}, {"body", preview}
+                });
+            }
             return;
         }
 
