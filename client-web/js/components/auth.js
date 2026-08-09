@@ -1,5 +1,5 @@
 import { state, setState } from '../state.js';
-import { Auth, API_BASE } from '../api.js';
+import { Auth, API_BASE, Servers } from '../api.js';
 import { connectWs } from '../ws.js';
 import { Feed } from '../api.js';
 import { startUnreadPolling } from '../unread.js';
@@ -87,6 +87,7 @@ export function wireAuth() {
       setState({ me, screen: 'app', posts: feed.posts, authError: '' });
       connectWs();
       startUnreadPolling();
+      Servers.list().then(({ servers }) => setState({ servers })).catch(() => {});
     } catch (e) {
       setState({ authError: e.message });
     }
