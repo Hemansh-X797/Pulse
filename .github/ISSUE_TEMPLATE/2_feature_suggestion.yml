@@ -1,0 +1,24 @@
+name: "💡 Feature Suggestion"
+description: Propose an architectural enhancement, optimization, or UI design tweak.
+title: "[FEATURE]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### HGC Feature Request Protocol
+        All ideas submitted remain subject to the **HGC Master Proprietary License (v3.0)**.
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature / Improvement Description
+      placeholder: Clear summary of the feature, optimization, or new REST/WS route.
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Value & Use Case
+      placeholder: Why is this feature valuable and how does it fit into the architecture?
+    validations:
+      required: true

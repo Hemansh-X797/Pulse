@@ -1,0 +1,41 @@
+name: "🐛 Bug Report"
+description: Report a bug, broken API route, or UI layout glitch.
+title: "[BUG]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### HGC Bug Reporting System
+        Please ensure you are running the latest build before filing a report.
+  - type: input
+    id: component
+    attributes:
+      label: Affected Module / File
+      placeholder: "e.g., server/src/gateway/api_server.hpp or client-web/js/ws.js"
+    validations:
+      required: true
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description & Behavior
+      placeholder: Describe what happened and what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. See error in browser console / terminal output
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Info
+      placeholder: "OS: Windows/Linux | Compiler: GCC 13/Clang 16 | Browser: Chrome/Firefox"
+    validations:
+      required: false
