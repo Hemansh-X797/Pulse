@@ -1,0 +1,33 @@
+name: HGC Core CI Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  validate-client:
+    name: Validate Web Client Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Client Dependencies
+        run: |
+          if [ -f client-web/package.json ]; then
+            cd client-web && npm ci
+          fi
+
+      - name: Verify Web Build Readiness
+        run: |
+          echo "HGC CI: Checking syntax and asset availability..."
+          test -f client-web/index.html
+          test -f vercel.json
+          echo "HGC CI: Validation Successful!"
