@@ -2,8 +2,13 @@
   width: 252px; background: var(--surface-0); border-right: 1px solid var(--hairline);
   display: flex; flex-direction: column; flex-shrink: 0;
 }
-.sidebar-mark { display: flex; align-items: center; gap: 8px; padding: 26px 22px 20px; }
-.sidebar-mark-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--grad); }
+.sidebar-mark { display: flex; align-items: center; gap: 8px; padding: 22px 16px 20px 22px; }
+.sidebar-mark-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--grad); flex-shrink: 0; }
+.sidebar-logo { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.channel-item { font-family: var(--f-body); }
+.channel-hash { color: var(--ink-lo); font-weight: 600; margin-right: 2px; }
+.channel-add { color: var(--ink-lo); }
+.channel-add:hover { color: var(--ink-hi); }
 .sidebar-logo { font-family: var(--f-display); font-weight: 600; font-size: 18px; letter-spacing: 0.01em; }
 
 .nav-section { padding: 4px 14px; }
