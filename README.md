@@ -144,6 +144,41 @@ curl -X POST localhost:8080/login  -d '{"username":"alice","password":"hunter22"
   (upload → disk → HTTP serve → identical bytes back) before it touched
   any UI.
 
+## What's new this round
+
+- **Servers** — Discord-style multi-channel spaces. Create one, get an
+  invite code, others join with it, each server has its own channel list
+  with a default `general` channel. Built to reuse the *existing* chat
+  infrastructure entirely — a server channel is just another `channel_id`,
+  so edit/delete/reply/typing/read-receipts all work in server channels
+  for free, zero duplicated code. Caught and fixed a real gap during
+  testing: joining a server (or adding a channel to one) didn't
+  automatically grant channel-level access — fixed before it shipped.
+- **Notifications** — real-time (WebSocket push, lands even if you're not
+  viewing the channel that triggered it) plus persisted (`GET
+  /notifications`, read/read-all marking). Fires on new DM/server
+  messages, post reactions, and comments. Verified with a live multi-user
+  WebSocket test, not just an API check.
+- **Server icon rail** — the Discord-style leftmost icon strip (Home +
+  server icons + add/join button), confirmed working end-to-end with
+  real gradient server icons and correct active-state highlighting.
+- **Serverless functions** (`serverless/`) — push notification fan-out,
+  image thumbnailing, and scheduled feed re-scoring, each with a real
+  explanation of *why* it belongs off the always-on C++ server (bursty
+  vs. steady-state load) rather than just being there because it was
+  asked for. Includes the C++-side signed-webhook dispatcher
+  (`server/src/common/webhook_dispatch.hpp`, compiles clean, not wired
+  into the request path by default) and a shared HMAC verification
+  helper both sides use to trust each other.
+- **Accessibility pass** — focus-visible outlines, a skip-to-content
+  link, `aria-label`s on every icon-only button, keyboard handlers on
+  nav items, `prefers-reduced-motion` support.
+- Two more real bugs caught by screenshotting rather than trusting the
+  API response: the chat topbar didn't reflect which channel/server you
+  were actually in (still said "Direct Messages / channel #N" inside a
+  server), and the notifications panel showed redundant duplicated text.
+  Both fixed and re-verified with screenshots before shipping.
+
 ## What's next (Phase 4)
 Postgres migration (SQLite is genuinely fine at current scale but won't
 scale past it), a real feed ranking model (current one is recency +
