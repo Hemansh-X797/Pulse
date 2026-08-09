@@ -1,0 +1,9 @@
+{
+  "name": "pulse-thumbnail",
+  "version": "1.0.0",
+  "description": "Serverless image thumbnailing for Pulse — see handler.js for the full explanation.",
+  "main": "handler.js",
+  "dependencies": {
+    "sharp": "^0.35.3"
+  }
+}

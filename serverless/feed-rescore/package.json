@@ -1,0 +1,9 @@
+{
+  "name": "pulse-feed-rescore",
+  "version": "1.0.0",
+  "description": "Scheduled feed re-scoring for Pulse — see handler.js for the full explanation.",
+  "main": "handler.js",
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "pulse-push-notify",
+  "version": "1.0.0",
+  "description": "Serverless push notification dispatch for Pulse — see handler.js for the full explanation.",
+  "main": "handler.js",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}
