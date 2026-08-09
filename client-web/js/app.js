@@ -1,8 +1,9 @@
 import { state, onStateChange, setState } from './state.js';
-import { Auth, Feed as FeedApi } from './api.js';
+import { Auth, Feed as FeedApi, Servers } from './api.js';
 import { connectWs } from './ws.js';
 import { renderAuth, wireAuth } from './components/auth.js';
 import { renderSidebar, wireSidebar } from './components/sidebar.js';
+import { renderRail, wireRail } from './components/rail.js';
 import { startUnreadPolling } from './unread.js';
 import { renderFeed, wireFeed } from './components/feed.js';
 import { renderDm, wireDm } from './components/dm.js';
@@ -21,7 +22,8 @@ function render() {
     : state.tab === 'dm' ? renderDm()
     : renderProfile();
 
-  root.innerHTML = `${renderSidebar()}<div class="main">${bodyMarkup}</div>`;
+  root.innerHTML = `${renderRail()}${renderSidebar()}<div class="main">${bodyMarkup}</div>`;
+  wireRail();
   wireSidebar();
   if (state.tab === 'feed') wireFeed();
   else if (state.tab === 'dm') wireDm();
@@ -44,6 +46,15 @@ function render() {
 
 onStateChange(render);
 
+async function loadServers() {
+  try {
+    const { servers } = await Servers.list();
+    setState({ servers });
+  } catch (e) {
+    // non-fatal
+  }
+}
+
 async function completeLogin(token) {
   localStorage.setItem('pulse_token', token);
   setState({ token });
@@ -52,6 +63,7 @@ async function completeLogin(token) {
   setState({ me, screen: 'app', posts: feed.posts });
   connectWs();
   startUnreadPolling();
+  loadServers();
 }
 
 (async function boot() {
@@ -82,6 +94,7 @@ async function completeLogin(token) {
       setState({ me, screen: 'app', posts: feed.posts });
       connectWs();
       startUnreadPolling();
+      loadServers();
       return;
     } catch (e) {
       localStorage.removeItem('pulse_token');
