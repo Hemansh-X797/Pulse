@@ -228,8 +228,17 @@ public:
         return sqlite3_last_insert_rowid(db_);
     }
 
-    // Feed: newest-first with a simple engagement boost (reactions + comments),
-    // recency-decayed. Phase 3 replaces the scoring function, not the shape.
+    std::optional<int64_t> get_post_author(int64_t post_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "SELECT author_id FROM posts WHERE id = ?;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, post_id);
+        std::optional<int64_t> result;
+        if (sqlite3_step(stmt) == SQLITE_ROW) result = sqlite3_column_int64(stmt, 0);
+        sqlite3_finalize(stmt);
+        return result;
+    }
+
+    // Feed: newest-first with a simple engagement boost (reactions + comments),    // recency-decayed. Phase 3 replaces the scoring function, not the shape.
     std::vector<Post> feed(int limit, int offset) {
         std::vector<Post> out;
         sqlite3_stmt* stmt;
@@ -352,12 +361,18 @@ private:
 public:
 
     // ---- channels ----
-    int64_t create_dm_channel(bool is_group, const std::string& name, const std::vector<int64_t>& member_ids) {
+    int64_t create_dm_channel(bool is_group, const std::string& name, const std::vector<int64_t>& member_ids,
+                               int64_t server_id = 0, const std::string& topic = "", int position = 0) {
         exec("BEGIN;");
         sqlite3_stmt* stmt;
-        sqlite3_prepare_v2(db_, "INSERT INTO dm_channels(is_group, name, created_at) VALUES (?, ?, strftime('%s','now'));", -1, &stmt, nullptr);
+        sqlite3_prepare_v2(db_,
+            "INSERT INTO dm_channels(is_group, name, server_id, topic, position, created_at) VALUES (?, ?, ?, ?, ?, strftime('%s','now'));",
+            -1, &stmt, nullptr);
         sqlite3_bind_int(stmt, 1, is_group ? 1 : 0);
         sqlite3_bind_text(stmt, 2, name.c_str(), -1, SQLITE_TRANSIENT);
+        if (server_id > 0) sqlite3_bind_int64(stmt, 3, server_id); else sqlite3_bind_null(stmt, 3);
+        sqlite3_bind_text(stmt, 4, topic.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(stmt, 5, position);
         sqlite3_step(stmt);
         sqlite3_finalize(stmt);
         int64_t channel_id = sqlite3_last_insert_rowid(db_);
@@ -381,6 +396,251 @@ public:
         while (sqlite3_step(stmt) == SQLITE_ROW) ids.push_back(sqlite3_column_int64(stmt, 0));
         sqlite3_finalize(stmt);
         return ids;
+    }
+
+    void add_channel_member(int64_t channel_id, int64_t user_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "INSERT OR IGNORE INTO dm_members(channel_id, user_id, joined_at) VALUES (?, ?, strftime('%s','now'));",
+            -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, channel_id);
+        sqlite3_bind_int64(stmt, 2, user_id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    std::vector<int64_t> list_server_member_ids(int64_t server_id) {
+        std::vector<int64_t> ids;
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "SELECT user_id FROM server_members WHERE server_id = ?;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, server_id);
+        while (sqlite3_step(stmt) == SQLITE_ROW) ids.push_back(sqlite3_column_int64(stmt, 0));
+        sqlite3_finalize(stmt);
+        return ids;
+    }
+
+    // ---- servers ----
+    struct Server {
+        int64_t id; std::string name; std::string icon_url;
+        std::string accent_color_top; std::string accent_color_bottom;
+        int64_t owner_id; std::string invite_code;
+    };
+    struct ServerChannel { int64_t id; std::string name; std::string topic; int position; };
+
+    int64_t create_server(const std::string& name, int64_t owner_id, const std::string& invite_code,
+                           const std::string& accent_top = "#5865F2", const std::string& accent_bottom = "#EB459E") {
+        exec("BEGIN;");
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "INSERT INTO servers(name, owner_id, invite_code, accent_color_top, accent_color_bottom, created_at) "
+            "VALUES (?, ?, ?, ?, ?, strftime('%s','now'));", -1, &stmt, nullptr);
+        sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt, 2, owner_id);
+        sqlite3_bind_text(stmt, 3, invite_code.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 4, accent_top.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 5, accent_bottom.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        int64_t server_id = sqlite3_last_insert_rowid(db_);
+
+        sqlite3_stmt* mstmt;
+        sqlite3_prepare_v2(db_, "INSERT INTO server_members(server_id, user_id, role, joined_at) VALUES (?, ?, 'owner', strftime('%s','now'));", -1, &mstmt, nullptr);
+        sqlite3_bind_int64(mstmt, 1, server_id);
+        sqlite3_bind_int64(mstmt, 2, owner_id);
+        sqlite3_step(mstmt);
+        sqlite3_finalize(mstmt);
+        exec("COMMIT;");
+        return server_id;
+    }
+
+    bool add_server_member(int64_t server_id, int64_t user_id, const std::string& role = "member") {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "INSERT OR IGNORE INTO server_members(server_id, user_id, role, joined_at) VALUES (?, ?, ?, strftime('%s','now'));",
+            -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, server_id);
+        sqlite3_bind_int64(stmt, 2, user_id);
+        sqlite3_bind_text(stmt, 3, role.c_str(), -1, SQLITE_TRANSIENT);
+        int rc = sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        return rc == SQLITE_DONE;
+    }
+
+    bool is_server_member(int64_t server_id, int64_t user_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "SELECT 1 FROM server_members WHERE server_id = ? AND user_id = ?;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, server_id);
+        sqlite3_bind_int64(stmt, 2, user_id);
+        bool is_member = sqlite3_step(stmt) == SQLITE_ROW;
+        sqlite3_finalize(stmt);
+        return is_member;
+    }
+
+    std::optional<Server> get_server(int64_t server_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "SELECT id, name, icon_url, accent_color_top, accent_color_bottom, owner_id, invite_code FROM servers WHERE id = ?;",
+            -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, server_id);
+        std::optional<Server> result;
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            Server s;
+            s.id = sqlite3_column_int64(stmt, 0);
+            s.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            const unsigned char* icon = sqlite3_column_text(stmt, 2);
+            s.icon_url = icon ? reinterpret_cast<const char*>(icon) : "";
+            s.accent_color_top = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            s.accent_color_bottom = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            s.owner_id = sqlite3_column_int64(stmt, 5);
+            s.invite_code = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+            result = s;
+        }
+        sqlite3_finalize(stmt);
+        return result;
+    }
+
+    std::optional<Server> find_server_by_invite(const std::string& invite_code) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "SELECT id, name, icon_url, accent_color_top, accent_color_bottom, owner_id, invite_code FROM servers WHERE invite_code = ?;",
+            -1, &stmt, nullptr);
+        sqlite3_bind_text(stmt, 1, invite_code.c_str(), -1, SQLITE_TRANSIENT);
+        std::optional<Server> result;
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            Server s;
+            s.id = sqlite3_column_int64(stmt, 0);
+            s.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            const unsigned char* icon = sqlite3_column_text(stmt, 2);
+            s.icon_url = icon ? reinterpret_cast<const char*>(icon) : "";
+            s.accent_color_top = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            s.accent_color_bottom = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            s.owner_id = sqlite3_column_int64(stmt, 5);
+            s.invite_code = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+            result = s;
+        }
+        sqlite3_finalize(stmt);
+        return result;
+    }
+
+    std::vector<Server> list_user_servers(int64_t user_id) {
+        std::vector<Server> out;
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "SELECT s.id, s.name, s.icon_url, s.accent_color_top, s.accent_color_bottom, s.owner_id, s.invite_code "
+            "FROM servers s JOIN server_members m ON m.server_id = s.id WHERE m.user_id = ? ORDER BY s.created_at ASC;",
+            -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, user_id);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            Server s;
+            s.id = sqlite3_column_int64(stmt, 0);
+            s.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            const unsigned char* icon = sqlite3_column_text(stmt, 2);
+            s.icon_url = icon ? reinterpret_cast<const char*>(icon) : "";
+            s.accent_color_top = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            s.accent_color_bottom = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            s.owner_id = sqlite3_column_int64(stmt, 5);
+            s.invite_code = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+            out.push_back(s);
+        }
+        sqlite3_finalize(stmt);
+        return out;
+    }
+
+    std::vector<ServerChannel> list_server_channels(int64_t server_id) {
+        std::vector<ServerChannel> out;
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "SELECT id, name, topic, position FROM dm_channels WHERE server_id = ? ORDER BY position ASC, id ASC;",
+            -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, server_id);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            ServerChannel c;
+            c.id = sqlite3_column_int64(stmt, 0);
+            c.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            const unsigned char* topic = sqlite3_column_text(stmt, 2);
+            c.topic = topic ? reinterpret_cast<const char*>(topic) : "";
+            c.position = sqlite3_column_int(stmt, 3);
+            out.push_back(c);
+        }
+        sqlite3_finalize(stmt);
+        return out;
+    }
+
+    // ---- notifications ----
+    struct Notification {
+        int64_t id; std::string type; int64_t actor_id; std::string actor_username;
+        int64_t channel_id; int64_t post_id; std::string body; bool read; int64_t created_at;
+    };
+
+    int64_t create_notification(int64_t user_id, const std::string& type, int64_t actor_id,
+                                 const std::string& actor_username, int64_t channel_id, int64_t post_id,
+                                 const std::string& body) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "INSERT INTO notifications(user_id, type, actor_id, actor_username, channel_id, post_id, body, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'));", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, user_id);
+        sqlite3_bind_text(stmt, 2, type.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(stmt, 3, actor_id);
+        sqlite3_bind_text(stmt, 4, actor_username.c_str(), -1, SQLITE_TRANSIENT);
+        if (channel_id > 0) sqlite3_bind_int64(stmt, 5, channel_id); else sqlite3_bind_null(stmt, 5);
+        if (post_id > 0) sqlite3_bind_int64(stmt, 6, post_id); else sqlite3_bind_null(stmt, 6);
+        sqlite3_bind_text(stmt, 7, body.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+        return sqlite3_last_insert_rowid(db_);
+    }
+
+    std::vector<Notification> list_notifications(int64_t user_id, int limit) {
+        std::vector<Notification> out;
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_,
+            "SELECT id, type, actor_id, actor_username, COALESCE(channel_id,0), COALESCE(post_id,0), body, read, created_at "
+            "FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT ?;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, user_id);
+        sqlite3_bind_int(stmt, 2, limit);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            Notification n;
+            n.id = sqlite3_column_int64(stmt, 0);
+            n.type = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            n.actor_id = sqlite3_column_int64(stmt, 2);
+            n.actor_username = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            n.channel_id = sqlite3_column_int64(stmt, 4);
+            n.post_id = sqlite3_column_int64(stmt, 5);
+            n.body = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 6));
+            n.read = sqlite3_column_int(stmt, 7) != 0;
+            n.created_at = sqlite3_column_int64(stmt, 8);
+            out.push_back(n);
+        }
+        sqlite3_finalize(stmt);
+        return out;
+    }
+
+    int unread_notification_count(int64_t user_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read = 0;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, user_id);
+        int count = 0;
+        if (sqlite3_step(stmt) == SQLITE_ROW) count = sqlite3_column_int(stmt, 0);
+        sqlite3_finalize(stmt);
+        return count;
+    }
+
+    void mark_notification_read(int64_t notification_id, int64_t user_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, notification_id);
+        sqlite3_bind_int64(stmt, 2, user_id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    void mark_all_notifications_read(int64_t user_id) {
+        sqlite3_stmt* stmt;
+        sqlite3_prepare_v2(db_, "UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0;", -1, &stmt, nullptr);
+        sqlite3_bind_int64(stmt, 1, user_id);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
     }
 
     // ---- messages ----
