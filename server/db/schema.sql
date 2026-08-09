@@ -61,6 +61,9 @@ CREATE TABLE IF NOT EXISTS dm_channels (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     is_group   INTEGER NOT NULL DEFAULT 0,
     name       TEXT DEFAULT '',
+    server_id  INTEGER DEFAULT NULL REFERENCES servers(id),
+    topic      TEXT DEFAULT '',
+    position   INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL
 );
 
@@ -99,3 +102,46 @@ CREATE TABLE IF NOT EXISTS read_receipts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, created_at);
+
+-- ---------------- Servers (Discord-style multi-channel spaces) ----------------
+-- A "server" is a named space owning a set of channels (rows in dm_channels
+-- with server_id set). Chat itself — send/edit/delete/reply/read/typing —
+-- is entirely unchanged: a server channel is just a dm_channels row, so
+-- every existing chat op works on it with zero new code.
+CREATE TABLE IF NOT EXISTS servers (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                 TEXT NOT NULL,
+    icon_url             TEXT DEFAULT '',
+    accent_color_top     TEXT DEFAULT '#5865F2',
+    accent_color_bottom  TEXT DEFAULT '#EB459E',
+    owner_id             INTEGER NOT NULL REFERENCES users(id),
+    invite_code          TEXT NOT NULL UNIQUE,
+    created_at           INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS server_members (
+    server_id  INTEGER NOT NULL REFERENCES servers(id),
+    user_id    INTEGER NOT NULL REFERENCES users(id),
+    role       TEXT NOT NULL DEFAULT 'member', -- 'owner' | 'admin' | 'member'
+    joined_at  INTEGER NOT NULL,
+    PRIMARY KEY (server_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_channels_server ON dm_channels(server_id, position);
+CREATE INDEX IF NOT EXISTS idx_server_members_user ON server_members(user_id);
+
+-- ---------------- Notifications ----------------
+CREATE TABLE IF NOT EXISTS notifications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id), -- recipient
+    type        TEXT NOT NULL, -- 'message' | 'reaction' | 'comment' | 'server_invite'
+    actor_id    INTEGER REFERENCES users(id),           -- who caused it
+    actor_username TEXT DEFAULT '',
+    channel_id  INTEGER DEFAULT NULL,
+    post_id     INTEGER DEFAULT NULL,
+    body        TEXT DEFAULT '',
+    read        INTEGER NOT NULL DEFAULT 0,
+    created_at  INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, read, created_at);
