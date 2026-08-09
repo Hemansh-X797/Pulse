@@ -13,6 +13,18 @@ export const state = {
   replyTarget: null,   // { id, sender, body } — message being replied to
   editingId: null,     // message id currently being edited inline
   unreadChannels: 0,   // total unread across DM channels, for the sidebar badge
+
+  // Servers (Discord-style spaces)
+  servers: [],
+  activeServerId: null,      // null = Home context (Feed/DMs/Profile)
+  activeServerChannels: [],
+  activeServerChannelId: null,
+
+  // Notifications
+  notifications: [],
+  unreadNotifications: 0,
+  notificationsOpen: false,
+
   posts: [],
   commentsOpen: {},
   commentsCache: {},
