@@ -130,6 +130,16 @@ private:
         };
     }
 
+    // Notifies a post's author about a comment/reaction, unless they did
+    // it to their own post (no one needs a notification for that).
+    void notify_post_engagement(int64_t post_id, int64_t actor_id, const std::string& type, const std::string& detail) {
+        auto author_id = db_.get_post_author(post_id);
+        if (!author_id || *author_id == actor_id) return;
+        auto actor = db_.get_user(actor_id);
+        std::string body = type == "comment" ? "commented on your post" : ("reacted " + detail + " to your post");
+        db_.create_notification(*author_id, type, actor_id, actor ? actor->username : "?", 0, post_id, body);
+    }
+
     void handle(int fd) {
         sockaddr_in peer{};
         socklen_t peer_len = sizeof(peer);
@@ -436,6 +446,7 @@ private:
             if (raw.empty() || raw.size() > 1000) { status = 400; resp_json = {{"error", "comment body invalid length"}}; return; }
             std::string rendered = emoji::render(raw);
             int64_t comment_id = db_.add_comment(post_id, *uid, raw, rendered);
+            notify_post_engagement(post_id, *uid, "comment", rendered);
             resp_json = {{"ok", true}, {"comment_id", comment_id}};
             return;
         }
@@ -463,6 +474,7 @@ private:
             }
             if (emoji_str.empty()) { status = 400; resp_json = {{"error", "missing emoji"}}; return; }
             db_.add_post_reaction(post_id, *uid, emoji_str);
+            notify_post_engagement(post_id, *uid, "reaction", emoji_str);
             auto counts = db_.post_reactions(post_id);
             json arr = json::array();
             for (auto& rc : counts) arr.push_back({{"emoji", rc.emoji}, {"count", rc.count}});
@@ -503,6 +515,117 @@ private:
             }
             int64_t channel_id = db_.create_dm_channel(true, name, members);
             resp_json = {{"ok", true}, {"channel_id", channel_id}};
+            return;
+        }
+
+        // ---------------- Servers ----------------
+
+        // POST /servers {"name": "..."}  -> create a server, you're the owner
+        if (method == "POST" && parts.size() == 1 && parts[0] == "servers") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            std::string name = in.value("name", "");
+            if (name.empty() || name.size() > 60) { status = 400; resp_json = {{"error", "server name must be 1-60 chars"}}; return; }
+            std::string invite_code = auth::random_hex(6);
+            std::string accent_top = in.value("accent_color_top", "#5865F2");
+            std::string accent_bottom = in.value("accent_color_bottom", "#EB459E");
+            int64_t server_id = db_.create_server(name, *uid, invite_code, accent_top, accent_bottom);
+            // Every new server gets a default "general" channel, same as Discord.
+            db_.create_dm_channel(true, "general", {*uid}, server_id, "", 0);
+            resp_json = {{"ok", true}, {"server_id", server_id}, {"invite_code", invite_code}};
+            return;
+        }
+
+        // GET /servers — every server you're a member of
+        if (method == "GET" && parts.size() == 1 && parts[0] == "servers") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            auto servers = db_.list_user_servers(*uid);
+            json arr = json::array();
+            for (auto& s : servers) {
+                arr.push_back({
+                    {"id", s.id}, {"name", s.name}, {"icon_url", s.icon_url},
+                    {"accent_color_top", s.accent_color_top}, {"accent_color_bottom", s.accent_color_bottom},
+                    {"owner_id", s.owner_id},
+                    {"invite_code", s.owner_id == *uid ? s.invite_code : ""}, // only the owner sees the invite code by default
+                });
+            }
+            resp_json = {{"servers", arr}};
+            return;
+        }
+
+        // GET /servers/:id/channels
+        if (method == "GET" && parts.size() == 3 && parts[0] == "servers" && parts[2] == "channels") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            int64_t server_id = std::stoll(parts[1]);
+            if (!db_.is_server_member(server_id, *uid)) { status = 403; resp_json = {{"error", "not a member of this server"}}; return; }
+            auto channels = db_.list_server_channels(server_id);
+            json arr = json::array();
+            for (auto& c : channels) arr.push_back({{"id", c.id}, {"name", c.name}, {"topic", c.topic}, {"position", c.position}});
+            resp_json = {{"channels", arr}};
+            return;
+        }
+
+        // POST /servers/:id/channels {"name": "..."}
+        if (method == "POST" && parts.size() == 3 && parts[0] == "servers" && parts[2] == "channels") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            int64_t server_id = std::stoll(parts[1]);
+            if (!db_.is_server_member(server_id, *uid)) { status = 403; resp_json = {{"error", "not a member of this server"}}; return; }
+            std::string name = in.value("name", "new-channel");
+            auto existing = db_.list_server_channels(server_id);
+            int64_t channel_id = db_.create_dm_channel(true, name, {}, server_id, "", static_cast<int>(existing.size()));
+            // Every current server member gets access to the new channel immediately.
+            for (int64_t member_id : db_.list_server_member_ids(server_id)) {
+                db_.add_channel_member(channel_id, member_id);
+            }
+            resp_json = {{"ok", true}, {"channel_id", channel_id}};
+            return;
+        }
+
+        // POST /servers/join {"invite_code": "..."}
+        if (method == "POST" && parts.size() == 2 && parts[0] == "servers" && parts[1] == "join") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            std::string invite_code = in.value("invite_code", "");
+            auto server = db_.find_server_by_invite(invite_code);
+            if (!server) { status = 404; resp_json = {{"error", "invalid invite code"}}; return; }
+            db_.add_server_member(server->id, *uid);
+            // Give the new member access to every existing channel in the server.
+            for (auto& ch : db_.list_server_channels(server->id)) {
+                db_.add_channel_member(ch.id, *uid);
+            }
+            resp_json = {{"ok", true}, {"server_id", server->id}, {"name", server->name}};
+            return;
+        }
+
+        // ---------------- Notifications ----------------
+
+        // GET /notifications?limit=30
+        if (method == "GET" && parts.size() == 1 && parts[0] == "notifications") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            auto items = db_.list_notifications(*uid, 30);
+            json arr = json::array();
+            for (auto& n : items) {
+                arr.push_back({
+                    {"id", n.id}, {"type", n.type}, {"actor_id", n.actor_id}, {"actor_username", n.actor_username},
+                    {"channel_id", n.channel_id}, {"post_id", n.post_id}, {"body", n.body},
+                    {"read", n.read}, {"created_at", n.created_at}
+                });
+            }
+            resp_json = {{"notifications", arr}, {"unread", db_.unread_notification_count(*uid)}};
+            return;
+        }
+
+        // POST /notifications/:id/read
+        if (method == "POST" && parts.size() == 3 && parts[0] == "notifications" && parts[2] == "read") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            db_.mark_notification_read(std::stoll(parts[1]), *uid);
+            resp_json = {{"ok", true}};
+            return;
+        }
+
+        // POST /notifications/read-all
+        if (method == "POST" && parts.size() == 2 && parts[0] == "notifications" && parts[1] == "read-all") {
+            if (!uid) { status = 401; resp_json = {{"error", "unauthorized"}}; return; }
+            db_.mark_all_notifications_read(*uid);
+            resp_json = {{"ok", true}};
             return;
         }
 
