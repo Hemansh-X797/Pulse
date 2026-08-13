@@ -103,20 +103,31 @@ the chat server's broadcast/join handlers re-locked an already-held mutex.
 Would've silently hung every browser connection; fixed and re-verified.
 
 ### Build & run it yourself
-Needs `libssl-dev` now too (for the OAuth HTTPS client) alongside cmake/g++:
+Needs Postgres running (locally or remote) plus `libpqxx-dev` and
+`libssl-dev` alongside cmake/g++:
 ```bash
-sudo apt install -y cmake build-essential libssl-dev   # if not already present
+sudo apt install -y cmake build-essential libssl-dev libpqxx-dev pkg-config
+
+# local Postgres for dev (skip if pointing PULSE_DATABASE_URL at a remote one)
+sudo apt install -y postgresql-16
+sudo service postgresql start
+sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'devpassword';"
+sudo -u postgres psql -c "CREATE DATABASE pulse;"
+
 cd server
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j4
 cd ..
+# defaults to postgresql://postgres:devpassword@localhost:5432/pulse
+# if PULSE_DATABASE_URL isn't set — override it to point at Render/Railway/etc.
 ./build/pulse_server        # HTTP/REST API on :8080, WebSocket chat on :8081
 ```
 Then open `client-web/index.html` in a browser (it points at
 `localhost:8080` / `localhost:8081` by default). Username/password auth
 works immediately; Google/Discord sign-in needs your own app credentials
-first — see `docs/OAUTH_SETUP.md`.
+first — see `docs/OAUTH_SETUP.md`. Deploying on Render specifically (the
+current hosting plan)? See `docs/RENDER_DEPLOY.md`.
 
 ```bash
 curl -X POST localhost:8080/signup -d '{"username":"alice","password":"hunter22"}'
@@ -179,12 +190,45 @@ curl -X POST localhost:8080/login  -d '{"username":"alice","password":"hunter22"
   server), and the notifications panel showed redundant duplicated text.
   Both fixed and re-verified with screenshots before shipping.
 
+## Postgres migration (latest)
+
+The server now runs on **Postgres** instead of SQLite (`libpqxx`, real
+`postgres://` connection strings — exactly what Render/Railway/Supabase
+hand you). Tested against a real local Postgres 16 instance, not just
+written and assumed correct:
+
+- Full schema converted (`db/schema_postgres.sql`) and verified loading
+  clean on real Postgres.
+- Every endpoint re-tested end-to-end against it: auth, profiles, feed,
+  servers, channels, media upload, notifications, and the full chat
+  pipeline (send/edit/delete/reply/read-receipts) over real WebSocket
+  traffic.
+- **Caught and fixed two real bugs specific to Postgres**, not
+  translation guesses:
+  1. A feed-ranking query using a SELECT-list alias inside a compound
+     `ORDER BY` expression — valid in SQLite, rejected by Postgres.
+     Fixed with a derived-table wrapper.
+  2. A genuine concurrency bug: `libpqxx` connections aren't thread-safe,
+     and the server is heavily multi-threaded (thread-per-connection).
+     The first concurrency test crashed the server outright
+     (`pqxx::usage_error`). Fixed with a mutex serializing all DB access,
+     then re-verified by deliberately hammering the server with 30
+     concurrent messages from two threads at once — it held.
+- Added **optimistic-UI reconciliation support**: `send` now accepts an
+  optional `client_ref` field, echoed back verbatim in the broadcast
+  confirmation, so a client rendering a message immediately (before
+  server confirmation) can match its temporary local message to the
+  confirmed one by exact ID instead of guessing from content/timing.
+- See **`docs/RENDER_DEPLOY.md`** for deploying this on Render
+  specifically (Postgres + web service, Dockerfile included, free-tier
+  caveats noted honestly) since that's the current hosting plan.
+
 ## What's next (Phase 4)
-Postgres migration (SQLite is genuinely fine at current scale but won't
-scale past it), a real feed ranking model (current one is recency +
-engagement count — works, but naive), horizontal scaling for the chat
-service, pinned messages, and push notifications once a mobile client
-exists. See `ARCHITECTURE.md` for the full phasing — nothing
-on your feature list is cut, it's sequenced so every phase is something you
-can actually run.
+A real feed ranking model (current one is recency + engagement count —
+works, but naive), horizontal scaling for the chat service (now that
+Postgres is in place, multiple chat-server instances can share state
+through it — see `ARCHITECTURE.md`), pinned messages, and push
+notifications once a mobile client exists. See `ARCHITECTURE.md` for the
+full phasing — nothing on your feature list is cut, it's sequenced so
+every phase is something you can actually run.
 
