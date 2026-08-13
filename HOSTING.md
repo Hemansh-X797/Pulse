@@ -5,7 +5,7 @@ Pulse has two independent pieces to put online:
 1. **The server** (`server/`) — one compiled binary that opens two ports:
    `:8080` (REST API) and `:8081` (WebSocket chat). This needs a real VM or
    container host, not static hosting, because it's a long-running process
-   holding open connections and a SQLite file on disk.
+   holding open connections and a database connection.
 2. **The web client** (`client-web/`) — plain static files (HTML/CSS/JS,
    no build step). This can go on literally any static host.
 
@@ -26,7 +26,7 @@ Steps (same shape on all of them):
 ```bash
 # 1. Spin up the smallest Ubuntu 24.04 VM they offer.
 # 2. SSH in, install build tools:
-sudo apt update && sudo apt install -y cmake build-essential libssl-dev
+sudo apt update && sudo apt install -y cmake build-essential libssl-dev libpqxx-dev pkg-config
 
 # 3. Copy the repo over (scp, or git clone if you push it to a repo):
 scp -r ./socialapp user@your-vm-ip:~/
@@ -169,12 +169,15 @@ and `wss://pulse.yourdomain.com/ws`, adjusting the nginx config's
 
 ## A note on the database
 
-`pulse.db` (SQLite) lives next to the server binary and is created fresh
-on first run. Back it up regularly once real friends' accounts are in it —
-it's a single file, so `cp pulse.db pulse.db.bak` is a complete backup.
-Phase 2's architecture plan calls for migrating to Postgres before this
-needs to survive serious concurrent load; SQLite is genuinely fine for a
-friends-and-early-testers scale.
+The server now runs on **Postgres** (migrated from an earlier SQLite
+version — see `README.md`'s "Postgres migration" section for what
+changed and why). Set `PULSE_DATABASE_URL` to a real `postgres://`
+connection string — Render, Railway, and Supabase all hand you one
+directly from their managed-Postgres dashboards. See
+**`docs/RENDER_DEPLOY.md`** for the Render-specific walkthrough, which
+is the current hosting plan. Back it up with your provider's built-in
+Postgres backup tooling (Render/Railway/Supabase all offer this) rather
+than a manual file copy — that's the point of moving off SQLite.
 
 ## Quick recommendation
 
