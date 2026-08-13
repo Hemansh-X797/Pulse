@@ -306,6 +306,13 @@ private:
             int64_t channel_id = req.value("channel_id", 0);
             std::string body = req.value("body", "");
             int64_t reply_to_id = req.value("reply_to_id", 0);
+            // Optional client-supplied idempotency/reconciliation token —
+            // echoed back verbatim so a client doing optimistic UI (render
+            // immediately, reconcile on server confirmation) can match its
+            // temp local message to the confirmed one by exact id instead
+            // of guessing from content+timing. Never stored, purely a
+            // passthrough for the sending client's own use.
+            std::string client_ref = req.value("client_ref", "");
             if (body.empty() || body.size() > 4000) {
                 send_line(fd, {{"op", "error"}, {"message", "message body invalid length"}});
                 return;
@@ -323,6 +330,7 @@ private:
                 {"reply_to_id", reply_to_id},
                 {"ts", static_cast<int64_t>(time(nullptr))}
             };
+            if (!client_ref.empty()) payload["client_ref"] = client_ref;
             broadcast_to_channel(channel_id, payload);
 
             // Notify other channel members — lands even if they're not
