@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Flame, Heart, ImagePlus } from 'lucide-react';
@@ -38,7 +40,7 @@ export function HomeFeed() {
     <div className="flex h-full flex-col">
       <div className="flex h-[62px] shrink-0 items-baseline gap-2.5 border-b border-white/[0.07] px-7">
         <h2 className="font-serif text-lg font-semibold">Feed</h2>
-        <span className="text-xs text-neutral-500">posts from everyone on Pulse</span>
+        <span className="text-xs text-neutral-500">posts from everyone on PalSpace</span>
       </div>
 
       <div className="flex flex-1 flex-col items-center gap-3 overflow-y-auto px-7 py-7">
