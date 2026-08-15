@@ -1,4 +1,6 @@
-import { useParams } from '@tanstack/react-router';
+'use client';
+
+import { useParams } from 'next/navigation';
 import { ChatView } from '../components/chat/ChatView';
 
 export function DmHome() {
@@ -10,6 +12,6 @@ export function DmHome() {
 }
 
 export function DmChannel() {
-  const { channelId } = useParams({ from: '/_app/channels/@me/$channelId' });
-  return <ChatView channelId={channelId} channelLabel="direct message" />;
+  const params = useParams<{ channelId: string }>();
+  return <ChatView channelId={params.channelId} channelLabel="direct message" />;
 }
