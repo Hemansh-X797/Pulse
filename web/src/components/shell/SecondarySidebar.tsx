@@ -1,18 +1,21 @@
-import { Link, useLocation, useParams } from '@tanstack/react-router';
+'use client';
+
+import Link from 'next/link';
+import { usePathname, useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Hash, Plus, Bell } from 'lucide-react';
 import { useState } from 'react';
-import { listServerChannels, createServerChannel } from '../../lib/api/servers';
+import { listSpaceTopics, createSpaceTopic } from '../../lib/api/spaces';
 import { useAppStore } from '../../store/useAppStore';
 import { NotificationsPanel } from './NotificationsPanel';
 
 export function SecondarySidebar() {
-  const location = useLocation();
-  const isServerContext = location.pathname.startsWith('/channels/') && !location.pathname.startsWith('/channels/@me');
-  const isDmContext = location.pathname.startsWith('/channels/@me');
-  const isFeedContext = location.pathname === '/home';
+  const pathname = usePathname();
+  const isSpaceContext = pathname.startsWith('/spaces/');
+  const isDmContext = pathname.startsWith('/channels/@me');
+  const isFeedContext = pathname === '/home';
 
-  if (isServerContext) return <ServerChannelList />;
+  if (isSpaceContext) return <SpaceTopicList />;
   if (isDmContext) return <DmList />;
   if (isFeedContext) return <FeedFilters />;
   return null;
@@ -45,42 +48,49 @@ function NotifDot() {
   return <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-neutral-950 bg-pink-400" />;
 }
 
-function ServerChannelList() {
-  const { guildId } = useParams({ strict: false });
-  const { data: channels = [] } = useQuery({
-    queryKey: ['server-channels', guildId],
-    queryFn: () => listServerChannels(guildId!),
-    enabled: !!guildId,
+function SpaceTopicList() {
+  const params = useParams<{ spaceId: string }>();
+  const spaceId = params.spaceId;
+  const pathname = usePathname();
+  const { data: topics = [] } = useQuery({
+    queryKey: ['space-topics', spaceId],
+    queryFn: () => listSpaceTopics(spaceId!),
+    enabled: !!spaceId,
   });
 
-  async function handleAddChannel() {
-    const name = window.prompt('Channel name:');
-    if (!name || !guildId) return;
-    await createServerChannel(guildId, name);
+  async function handleAddTopic() {
+    const name = window.prompt('Topic name:');
+    if (!name || !spaceId) return;
+    await createSpaceTopic(spaceId, name);
   }
 
   return (
     <div className="flex w-[252px] shrink-0 flex-col border-r border-white/[0.07] bg-neutral-950">
-      <SidebarHeader title="Server" />
+      <SidebarHeader title="Space" />
       <div className="px-3.5">
         <div className="px-2.5 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-500">
-          Text Channels
+          Topics
         </div>
-        {channels.map((c) => (
-          <Link
-            key={c.id}
-            to="/channels/$guildId/$channelId"
-            params={{ guildId: guildId!, channelId: c.id }}
-            className="flex items-center gap-2 rounded-md px-3 py-2.5 text-[13.5px] font-medium text-neutral-400 hover:bg-neutral-900 hover:text-white [&.active]:bg-neutral-800 [&.active]:text-white"
-          >
-            <Hash size={14} className="text-neutral-500" /> {c.name}
-          </Link>
-        ))}
+        {topics.map((t) => {
+          const href = `/spaces/${spaceId}/${t.id}`;
+          const active = pathname === href;
+          return (
+            <Link
+              key={t.id}
+              href={href}
+              className={`flex items-center gap-2 rounded-md px-3 py-2.5 text-[13.5px] font-medium ${
+                active ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+              }`}
+            >
+              <Hash size={14} className="text-neutral-500" /> {t.name}
+            </Link>
+          );
+        })}
         <button
-          onClick={handleAddChannel}
+          onClick={handleAddTopic}
           className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-[13.5px] text-neutral-500 hover:text-white"
         >
-          <Plus size={14} /> Add channel
+          <Plus size={14} /> Add topic
         </button>
       </div>
     </div>
@@ -90,7 +100,7 @@ function ServerChannelList() {
 function DmList() {
   return (
     <div className="flex w-[252px] shrink-0 flex-col border-r border-white/[0.07] bg-neutral-950">
-      <SidebarHeader title="Pulse" />
+      <SidebarHeader title="PalSpace" />
       <div className="px-3.5">
         <div className="px-2.5 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-500">
           Direct Messages
@@ -106,7 +116,7 @@ function DmList() {
 function FeedFilters() {
   return (
     <div className="flex w-[252px] shrink-0 flex-col border-r border-white/[0.07] bg-neutral-950">
-      <SidebarHeader title="Pulse" />
+      <SidebarHeader title="PalSpace" />
       <div className="px-3.5">
         <div className="px-2.5 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-500">Feed</div>
         <div className="rounded-md bg-neutral-800 px-3 py-2.5 text-[13.5px] font-medium text-white">For You</div>
