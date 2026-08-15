@@ -1,7 +1,7 @@
 import { supabase } from '../supabase';
-import type { PulseNotification } from '../database.types';
+import type { PalSpaceNotification } from '../database.types';
 
-export async function listNotifications(limit = 30): Promise<{ notifications: PulseNotification[]; unread: number }> {
+export async function listNotifications(limit = 30): Promise<{ notifications: PalSpaceNotification[]; unread: number }> {
   const { data, error } = await supabase
     .from('notifications')
     .select('*')
