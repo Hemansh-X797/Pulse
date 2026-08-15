@@ -11,10 +11,10 @@ interface AppState {
   setSession: (session: Session | null) => void;
   setProfile: (profile: Profile | null) => void;
 
-  // ---- active context (which server/channel is open) ----
-  activeGuildId: string | null; // null = Home context (feed/DMs), matches the /channels/@me vs /channels/:guildId route split
+  // ---- active context (which space/topic is open) ----
+  activeSpaceId: string | null; // null = Home context (feed/DMs), matches the /channels/@me vs /spaces/:spaceId route split
   activeChannelId: string | null;
-  setActiveGuild: (guildId: string | null) => void;
+  setActiveSpace: (spaceId: string | null) => void;
   setActiveChannel: (channelId: string | null) => void;
 
   // ---- unread / notifications ----
@@ -38,9 +38,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSession: (session) => set({ session }),
   setProfile: (profile) => set({ profile }),
 
-  activeGuildId: null,
+  activeSpaceId: null,
   activeChannelId: null,
-  setActiveGuild: (guildId) => set({ activeGuildId: guildId }),
+  setActiveSpace: (spaceId) => set({ activeSpaceId: spaceId }),
   setActiveChannel: (channelId) => set({ activeChannelId: channelId }),
 
   unreadByChannel: {},
@@ -56,7 +56,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({
       session: null,
       profile: null,
-      activeGuildId: null,
+      activeSpaceId: null,
       activeChannelId: null,
       unreadByChannel: {},
       unreadNotifications: 0,
