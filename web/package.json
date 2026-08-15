@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/copy-assets.mjs",
+    "predev": "node scripts/copy-assets.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

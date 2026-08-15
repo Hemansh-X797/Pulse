@@ -146,7 +146,7 @@ function FeedFilters() {
       <SidebarHeader title="PalSpace" />
       <div className="px-3.5">
         <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">Feed</div>
-        <div className="rounded-xl bg-[var(--color-surface-raised)] px-3 py-2.5 text-[13.5px] font-medium text-[var(--color-ink)] presence-glow">For You</div>
+        <div className="rounded-xl bg-[var(--color-surface-raised)] px-3 py-2.5 text-[13.5px] font-medium text-[var(--color-ink)]">For You</div>
       </div>
     </div>
   );

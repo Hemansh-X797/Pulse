@@ -43,10 +43,6 @@
     margin: 0;
     font-family: var(--font-sans);
     background: var(--color-void);
-    background-image:
-      radial-gradient(1200px 600px at 15% -10%, color-mix(in oklab, var(--presence-default-a) 7%, transparent), transparent),
-      radial-gradient(1000px 500px at 90% 0%, color-mix(in oklab, var(--presence-default-b) 6%, transparent), transparent);
-    background-attachment: fixed;
     color: var(--color-ink);
     -webkit-font-smoothing: antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
@@ -90,9 +86,6 @@
   }
   .presence-ring {
     box-shadow: 0 0 0 2px var(--color-void), 0 0 0 3.5px color-mix(in oklab, var(--p-a, var(--presence-default-a)) 70%, var(--p-b, var(--presence-default-b)));
-  }
-  .presence-glow {
-    box-shadow: 0 0 0 1px var(--color-hairline), 0 8px 24px -8px color-mix(in oklab, var(--p-a, var(--presence-default-a)) 45%, var(--p-b, var(--presence-default-b)));
   }
   .glass-panel {
     background: color-mix(in oklab, var(--color-surface-raised) 88%, transparent);

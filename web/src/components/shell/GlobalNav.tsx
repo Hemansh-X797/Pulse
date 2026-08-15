@@ -42,7 +42,7 @@ function RailItem({
       <span
         className={`flex h-11 w-11 items-center justify-center rounded-2xl transition-all duration-150 ${
           active
-            ? 'bg-[var(--color-surface-overlay)] text-[var(--color-ink)] presence-glow'
+            ? 'bg-[var(--color-surface-overlay)] text-[var(--color-ink)]'
             : 'bg-[var(--color-surface)] text-[var(--color-ink-muted)] group-hover:bg-[var(--color-surface-raised)] group-hover:text-[var(--color-ink)]'
         }`}
       >

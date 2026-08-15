@@ -204,3 +204,37 @@ them here (they're heavy). Drop them into `public/avatars/`,
 respectively and they'll pick up automatically; the empty-feed
 illustration in particular is already wired with a graceful fallback (no
 broken-image icon) if the file isn't there yet.
+
+## 7. Visual correction pass — glow removed, Settings actually built
+
+Two real misses from the previous pass, fixed here:
+
+**The glow was overdesigned.** Diffuse gradient blooms behind text, soft
+shadow halos on active nav items — that reads as generic "AI-generated
+UI," not intentional design, and it wasn't consistent with the density
+and restraint of the references you pointed at (Instagram's rail,
+Discord's DM list). Removed: `.presence-glow` (soft blur-shadow) is gone
+entirely, and the body's ambient radial-gradient background wash is gone
+too. What's left of the presence-gradient system is just a **hard-edged
+ring** on avatars (`.presence-ring`) — closer to Instagram's own
+story-ring treatment than a glow effect — plus flat gradient fills on
+avatars/space icons themselves. No blur, no bloom.
+
+**Settings was still a stub with no way to actually customize a
+profile**, despite `updateProfile()` already existing and working fine
+in `profile.ts` — same pattern as the unread-counts bug from earlier:
+the plumbing existed, nothing used it. Built out for real: avatar +
+banner upload (reusing the same `uploadMedia()` used elsewhere, so it
+gets the same error handling and MIME fallback), display name, pronouns,
+status, bio, and an accent-color picker (6 presets + two native color
+inputs) that feeds directly into the presence-gradient system — so
+changing your colors here is what makes your avatar/messages/posts look
+like *yours* everywhere else in the app.
+
+**Assets were pointing at the wrong path.** Your repo has `assets/`
+sitting next to this app (`<repo-root>/assets/`, `<repo-root>/web/`),
+not nested inside it — the code was looking in the wrong place, would
+never have found the files no matter what you did. Added
+`scripts/copy-assets.mjs`, wired into `predev`/`prebuild`, which mirrors
+`../assets/` into `public/` automatically on every build. See
+`public/ASSETS.md` for the exact mapping.
