@@ -26,7 +26,7 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
         Relationships: [];
       };
-      servers: {
+      spaces: {
         Row: {
           id: string;
           name: string;
@@ -37,22 +37,26 @@ export interface Database {
           invite_code: string;
           created_at: string;
         };
-        Insert: Partial<Database['public']['Tables']['servers']['Row']> & { name: string; owner_id: string };
-        Update: Partial<Database['public']['Tables']['servers']['Row']>;
+        Insert: Partial<Database['public']['Tables']['spaces']['Row']> & { name: string; owner_id: string };
+        Update: Partial<Database['public']['Tables']['spaces']['Row']>;
         Relationships: [];
       };
-      server_members: {
-        Row: { server_id: string; user_id: string; role: 'owner' | 'admin' | 'member'; joined_at: string };
-        Insert: { server_id: string; user_id: string; role?: 'owner' | 'admin' | 'member' };
-        Update: Partial<Database['public']['Tables']['server_members']['Row']>;
+      space_members: {
+        Row: { space_id: string; user_id: string; role: 'owner' | 'admin' | 'member'; joined_at: string };
+        Insert: { space_id: string; user_id: string; role?: 'owner' | 'admin' | 'member' };
+        Update: Partial<Database['public']['Tables']['space_members']['Row']>;
         Relationships: [];
       };
+      // "channels" stays the DB table name (it backs both DMs and
+      // space-scoped group chat via is_group / space_id) but rows where
+      // space_id is set are labeled "Topic" everywhere in the UI/types
+      // layer — see the `Topic` alias at the bottom of this file.
       channels: {
         Row: {
           id: string;
           is_group: boolean;
           name: string;
-          server_id: string | null;
+          space_id: string | null;
           topic: string;
           position: number;
           created_at: string;
@@ -145,7 +149,7 @@ export interface Database {
         Row: {
           id: number;
           user_id: string;
-          type: 'message' | 'reaction' | 'comment' | 'server_invite';
+          type: 'message' | 'reaction' | 'comment' | 'space_invite' | 'friend_request' | 'friend_accept';
           actor_id: string | null;
           actor_username: string;
           channel_id: string | null;
@@ -181,15 +185,25 @@ export interface Database {
         Args: Record<string, never>;
         Returns: { channel_id: string; unread: number }[];
       };
+      transfer_space_ownership: {
+        Args: { p_space_id: string; p_new_owner: string };
+        Returns: void;
+      };
+      leave_or_delete_space: {
+        Args: { p_space_id: string };
+        Returns: { deleted: boolean };
+      };
     };
   };
 }
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
-export type Server = Database['public']['Tables']['servers']['Row'];
+export type Space = Database['public']['Tables']['spaces']['Row'];
 export type Channel = Database['public']['Tables']['channels']['Row'];
+/** UI-facing alias: a Channel row that belongs to a Space (space_id set) is a "Topic". */
+export type Topic = Channel;
 export type Message = Database['public']['Tables']['messages']['Row'];
 export type Post = Database['public']['Tables']['posts']['Row'];
 export type PostComment = Database['public']['Tables']['post_comments']['Row'];
-export type PulseNotification = Database['public']['Tables']['notifications']['Row'];
+export type PalSpaceNotification = Database['public']['Tables']['notifications']['Row'];
 export type FeedItem = Database['public']['Views']['feed_view']['Row'];
