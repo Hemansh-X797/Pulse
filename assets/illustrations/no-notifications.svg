@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <rect width="256" height="256" rx="48" fill="#18181B" />
+  <!-- Muted Bell Silhouette -->
+  <path d="M 128 64 C 104 64 88 80 88 108 V 148 L 72 164 H 184 L 168 148 V 108 C 168 80 152 64 128 64 Z" fill="#27272A" />
+  <path d="M 112 180 C 112 188 120 196 128 196 C 136 196 144 188 144 180" fill="none" stroke="#27272A" stroke-width="6" stroke-linecap="round" />
+</svg>
