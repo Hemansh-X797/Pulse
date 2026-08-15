@@ -149,19 +149,6 @@ export function HomeFeed() {
 function EmptyFeed() {
   return (
     <div className="mt-10 flex flex-col items-center gap-3 text-center">
-      {/* Wired to your empty-state illustration set from assets/req.md —
-          drop empty-feed.svg into public/illustrations/ and it renders
-          here automatically. Falls back to a plain text line (via
-          onError) until that file exists, so this never shows a broken
-          image icon in the meantime. */}
-      <img
-        src="/illustrations/empty-feed.svg"
-        alt=""
-        className="h-32 w-32 opacity-80"
-        onError={(e) => {
-          (e.target as HTMLImageElement).style.display = 'none';
-        }}
-      />
       <div className="text-[13px] text-[var(--color-ink-muted)]">No posts yet — be the first.</div>
     </div>
   );

@@ -113,7 +113,7 @@ function DmList() {
   return (
     <div className="flex w-[260px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)]">
       <SidebarHeader title="PalSpace" />
-      <div className="px-3.5">
+      <div className="flex flex-1 flex-col px-3.5">
         <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
           Direct Messages
         </div>
@@ -122,9 +122,19 @@ function DmList() {
             {Object.values(unreadByChannel).reduce((a, b) => a + b, 0)} unread — open a conversation to catch up.
           </p>
         )}
-        <p className="px-2.5 text-[12.5px] text-[var(--color-ink-muted)]">
-          Message a friend from their profile (<code className="text-[var(--color-ink)]">/username</code>) to start a DM.
-        </p>
+        <div className="mt-4 flex flex-1 flex-col items-center gap-3 px-2 text-center">
+          <img
+            src="/illustrations/empty-dms.svg"
+            alt=""
+            className="h-24 w-24 opacity-80"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+            Message a friend from their profile (<code className="text-[var(--color-ink)]">/username</code>) to start a DM.
+          </p>
+        </div>
       </div>
     </div>
   );

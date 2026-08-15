@@ -1,9 +1,19 @@
+'use client';
+
 import Link from 'next/link';
 
 export function Landing() {
   return (
     <div className="flex h-screen w-full items-center justify-center bg-[var(--color-void)] text-[var(--color-ink)]">
       <div className="text-center">
+        <img
+          src="/logo.svg"
+          alt="PalSpace"
+          className="mx-auto mb-4 h-12 w-12"
+          onError={(e) => {
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
         <div className="mb-2 flex items-center justify-center gap-2">
           <span className="h-2 w-2 rounded-full presence-fill" />
           <span className="font-serif text-3xl font-semibold">PalSpace</span>

@@ -9,7 +9,9 @@ const TYPE_LABEL: Record<string, string> = {
   message: 'sent a message',
   reaction: 'reacted to your post',
   comment: 'commented on your post',
-  server_invite: 'invited you to a server',
+  space_invite: 'invited you to a space',
+  friend_request: 'sent you a friend request',
+  friend_accept: 'accepted your friend request',
 };
 
 function timeAgo(iso: string) {
@@ -54,7 +56,17 @@ export function NotificationsPanel({ onClose }: { onClose: () => void }) {
         </div>
         <div className="overflow-y-auto">
           {!data || data.notifications.length === 0 ? (
-            <div className="px-3.5 py-6 text-center text-[12.5px] text-[var(--color-ink-muted)]">You're all caught up.</div>
+            <div className="flex flex-col items-center gap-2 px-3.5 py-7 text-center">
+              <img
+                src="/illustrations/no-notifications.svg"
+                alt=""
+                className="h-16 w-16 opacity-80"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              <span className="text-[12.5px] text-[var(--color-ink-muted)]">You're all caught up.</span>
+            </div>
           ) : (
             data.notifications.map((n) => (
               <button
