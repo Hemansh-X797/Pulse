@@ -1,9 +1,16 @@
+'use client';
+
+// NOTE: this is still the pre-rework signup form (email/password + OAuth
+// buttons side by side). The "Google-only account creation, link everything
+// else after" flow you asked for is a Phase 3 item (auth overhaul) — see
+// MIGRATION_GUIDE.md — so it's intentionally not changed here yet.
+
 import { useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useRouter } from 'next/navigation';
 import { signInWithPassword, signUpWithPassword, signInWithGoogle, signInWithDiscord } from '../lib/api/auth';
 
 export function Login() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +26,7 @@ export function Login() {
       } else {
         await signInWithPassword(email, password);
       }
-      navigate({ to: '/home' });
+      router.push('/home');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'something went wrong');
     }
@@ -37,11 +44,11 @@ export function Login() {
         <div className="w-full max-w-[340px]">
           <div className="mb-16 flex items-center justify-center gap-2">
             <span className="h-[7px] w-[7px] rounded-full bg-gradient-to-br from-indigo-400 to-pink-400" />
-            <span className="font-serif text-xl font-semibold">Pulse</span>
+            <span className="font-serif text-xl font-semibold">PalSpace</span>
           </div>
 
           <h1 className="mb-2.5 text-center font-serif text-3xl font-semibold">
-            {mode === 'signup' ? 'Join Pulse' : 'Welcome back'}
+            {mode === 'signup' ? 'Join PalSpace' : 'Welcome back'}
           </h1>
           <p className="mb-9 text-center text-[13.5px] text-neutral-500">
             {mode === 'signup' ? "pick a username, we'll handle the rest" : 'sign in to pick up where you left off'}
