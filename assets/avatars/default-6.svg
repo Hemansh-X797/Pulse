@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <!-- Dark Slate Background -->
+  <rect width="256" height="256" rx="56" fill="#18181B" />
+
+  <!-- Flat Unisex Pal Mascot Silhouette -->
+  <g transform="scale(0.5) translate(0, 8)">
+    <path d="M 144 352 V 210 C 144 140, 368 140, 368 210 V 352 C 368 375, 345 392, 322 392 C 300 392, 288 375, 288 352 V 336 H 224 V 352 C 224 375, 212 392, 190 392 C 167 392, 144 375, 144 352 Z" fill="#8B5CF6" />
+
+    <!-- Side Handles / Ears -->
+    <path d="M 120 230 C 100 230, 100 290, 120 290 Z" fill="#8B5CF6" />
+    <path d="M 392 230 C 412 230, 412 290, 392 290 Z" fill="#8B5CF6" />
+
+    <!-- Face Cutouts -->
+    <circle cx="216" cy="236" r="22" fill="#18181B" />
+    <circle cx="296" cy="236" r="22" fill="#18181B" />
+
+    <!-- Friendly Smile -->
+    <path d="M 232 272 Q 256 288 280 272" fill="none" stroke="#18181B" stroke-width="10" stroke-linecap="round" />
+  </g>
+</svg>
