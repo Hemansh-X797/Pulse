@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import type { Message, PulseNotification } from './database.types';
+import type { Message, PalSpaceNotification } from './database.types';
 
 // This file is the replacement for the ~400-line hand-built RFC 6455
 // WebSocket server (server/src/chat/chat_server.hpp) — the SHA-1
@@ -38,14 +38,14 @@ export function subscribeToChannelMessages(
 
 export function subscribeToNotifications(
   userId: string,
-  onNotification: (notification: PulseNotification) => void
+  onNotification: (notification: PalSpaceNotification) => void
 ): RealtimeChannel {
   return supabase
     .channel(`notifications:${userId}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-      (payload) => onNotification(payload.new as PulseNotification)
+      (payload) => onNotification(payload.new as PalSpaceNotification)
     )
     .subscribe();
 }
