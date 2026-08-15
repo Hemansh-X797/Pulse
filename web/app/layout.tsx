@@ -1,16 +1,123 @@
 import type { Metadata } from 'next';
+import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
+// Previously loaded via a <link> tag in the old Vite index.html — that
+// file has no Next.js equivalent, so these fonts were silently never
+// loading at all post-migration; every --font-serif/--font-mono
+// reference was quietly falling back to system fonts. next/font
+// self-hosts and subsets automatically, so this is a straight upgrade
+// over the old external Google Fonts request too (no render-blocking
+// network call, no layout shift while the real font swaps in).
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  weight: ['500', '600'],
+  style: ['normal', 'italic'],
+  variable: '--font-fraunces',
+  display: 'swap',
+});
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+const plexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  variable: '--font-plex-mono',
+  display: 'swap',
+});
+
+const SITE_URL = 'https://palspace.vercel.app';
+const CREATOR_URL = 'https://hemansh.vercel.app';
+
 export const metadata: Metadata = {
-  title: 'PalSpace',
-  description: 'chat, feed, spaces, stories — one app',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'PalSpace | Chat, Feed, Spaces & Stories',
+    template: '%s | PalSpace',
+  },
+  description:
+    'PalSpace — chat, feed, spaces, and stories in one app. Created by Hemansh Kumar Mishra (Hemansh-X797), polymath and systems architect.',
+  keywords: [
+    'PalSpace', 'social media app', 'chat app', 'spaces', 'topics', 'stories',
+    'Hemansh Kumar Mishra', 'Hemansh', 'Hemansh-X797', 'Pulse social platform',
+  ],
+  authors: [{ name: 'Hemansh Kumar Mishra', url: CREATOR_URL }],
+  creator: 'Hemansh Kumar Mishra',
+  publisher: 'Hemansh Kumar Mishra',
+  alternates: { canonical: SITE_URL },
+  openGraph: {
+    title: 'PalSpace | Chat, Feed, Spaces & Stories',
+    description: 'PalSpace — chat, feed, spaces, and stories in one app.',
+    url: SITE_URL,
+    siteName: 'PalSpace',
+    locale: 'en_US',
+    type: 'website',
+    images: [{ url: `${SITE_URL}/og/palspace.jpg`, width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PalSpace | Chat, Feed, Spaces & Stories',
+    description: 'Created by Hemansh Kumar Mishra. Chat, feed, spaces, and stories in one app.',
+    creator: '@_Hemansh',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-video-preview': -1, 'max-image-preview': 'large', 'max-snippet': -1 },
+  },
 };
+
+// Structured data linking PalSpace to its creator's Person entity — same
+// pattern as hemansh.vercel.app's own PersonGraph, but scoped from this
+// side: a SoftwareApplication node whose `author`/`creator` point at a
+// Person `@id` on the creator's own domain, rather than duplicating his
+// full bio here. Google resolves the two graphs as the same entity via
+// that shared @id + the reciprocal sameAs link back from his site.
+function AppGraph() {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'SoftwareApplication',
+        '@id': `${SITE_URL}/#app`,
+        name: 'PalSpace',
+        operatingSystem: 'Web',
+        applicationCategory: 'SocialNetworkingApplication',
+        url: SITE_URL,
+        description: 'Chat, feed, spaces, and stories in one app.',
+        author: { '@id': `${CREATOR_URL}/#person` },
+        creator: { '@id': `${CREATOR_URL}/#person` },
+      },
+      {
+        '@type': 'Person',
+        '@id': `${CREATOR_URL}/#person`,
+        name: 'Hemansh Kumar Mishra',
+        alternateName: ['Hemansh', 'Hemansh-X797'],
+        url: CREATOR_URL,
+        sameAs: [CREATOR_URL, 'https://github.com/Hemansh-X797', 'https://x.com/_Hemansh'],
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE_URL}/#website`,
+        url: SITE_URL,
+        name: 'PalSpace',
+        publisher: { '@id': `${CREATOR_URL}/#person` },
+        inLanguage: 'en-US',
+      },
+    ],
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />;
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${fraunces.variable} ${inter.variable} ${plexMono.variable}`}>
       <body>
+        <AppGraph />
         <Providers>{children}</Providers>
       </body>
     </html>

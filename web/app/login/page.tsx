@@ -1,4 +1,4 @@
-import { Login } from '../../src/pages/Login';
+import { Login } from '../../src/screens/Login';
 
 export default function Page() {
   return <Login />;

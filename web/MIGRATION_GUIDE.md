@@ -3,7 +3,7 @@
 This covers **only Phase 1**: moving `web/` from Vite+TanStack Router to
 Next.js App Router, and renaming Pulse → PalSpace / servers → spaces /
 channels-in-a-space → topics. It does not touch image upload, Friends,
-onboarding, the Discord-signup removal, Twilio, or the visual redesign —
+onboarding, the Discord-signup removal, or the visual redesign —
 those are Phases 2–4 from the plan, done as separate follow-ups so each is
 reviewable on its own.
 
@@ -85,7 +85,7 @@ layout and, where relevant, re-typed against the renamed tables.
   Supabase Storage bucket policy or MIME-type allowlist issue given it's
   scoped to "posts" specifically. Phase 2.
 - **Friends, onboarding (interests + contacts), search/hashtags, visual
-  redesign, Twilio, OAuth account linking, Render cron/realtime setup**:
+  redesign, OAuth account linking, Render cron/realtime setup**:
   all later phases, none started yet.
 
 ## 5. Deploying
@@ -98,3 +98,109 @@ layout and, where relevant, re-typed against the renamed tables.
 Next step, whenever you're ready: Phase 2 (image upload fix + Friends +
 onboarding + Settings profile panel + edit/delete + ownership rules wired
 into the UI).
+
+## 6. Phase 2, pass 1 — bug fixes (image upload, unread counts, comments/reactions)
+
+This pass focused on the three "this feels broken" issues, at real
+production depth — not stubs. Also ran an actual `next build` against the
+whole project to catch structural bugs, not just eyeballing the code; it
+found real ones (see below).
+
+### Image upload
+
+**Root cause: silent failure, not a PNG-specific bug.** `uploadMedia()`
+always threw a real error on failure, but neither `HomeFeed.tsx` nor
+`ChatView.tsx` had a `try/catch` around the call — the error just became
+an unhandled promise rejection with nothing shown on screen. That almost
+certainly explains "nothing happens when I try to post an image": it
+wasn't that PNGs specifically failed, it's that *every* failure was
+invisible, so whichever files you happened to test with looked broken.
+
+Also fixed while in there:
+- Client-side size cap raised from a leftover 5MB to 10MB, matching the
+  bucket setting you already made
+- MIME-type detection now falls back to the file extension when
+  `file.type` comes back empty (a real, if uncommon, browser/OS quirk)
+- The storage bucket + its RLS policies are now codified in
+  `supabase/migrations/003_storage_and_engagement_fixes.sql` instead of
+  being dashboard-only instructions in a doc — a missing/incomplete
+  policy there is the single most likely other cause, and it's exactly
+  the kind of setup step that's easy to half-do by hand
+- Both HomeFeed and ChatView now show a real inline error + a loading
+  spinner on the attach button while uploading
+
+### Unread counts
+
+**Root cause: the plumbing existed but was never connected.**
+`getUnreadCounts()` worked fine in isolation; nothing ever called it, and
+nothing kept it live. `unreadByChannel` sat at `{}` forever, so the
+badge always read zero regardless of actual unread messages.
+
+Fixed with a new `useUnreadCounts()` hook: fetches once on session-ready,
+then tops up live via a realtime subscription to `messages` INSERT
+events (unscoped subscription, but RLS still enforces you only ever
+receive rows for channels you're actually a member of — see the comment
+in `realtime.ts`). Wired into `app/(app)/layout.tsx` so it runs globally.
+Per-topic unread badges now also show in `SecondarySidebar`, which
+didn't exist before at all.
+
+### Comments & reactions
+
+- Reactions are now properly **toggleable** (click again to remove —
+  previously you could only ever add, never remove, and there was no way
+  to see your own reaction state)
+- Reaction counts are now actually rendered (they existed in
+  `feed_view.reaction_count` but nothing displayed them)
+- `feed_view` now also returns `my_reactions` (migration 003) so the UI
+  can highlight which reactions are yours
+- Comments now show a real avatar, display name, and timestamp instead
+  of just a bare username + text
+- Comment send button (and Enter-to-send) now correctly disables on
+  empty/whitespace-only input — same for post edits
+- **Posts had no UPDATE/DELETE RLS policy in the database at all** —
+  edit/delete on posts was structurally impossible server-side, not a
+  missing-button problem. Migration 003 adds both, plus matching
+  policies for comments, plus `edited_at` columns on both tables for the
+  "edited" label
+
+### Real bugs `next build` caught (worth knowing about)
+
+- **`app/(app)/channels/@me/` never actually worked.** A folder named
+  `@something` is reserved by the App Router for *parallel route slots*,
+  not a literal URL segment — it was silently compiling to plain
+  `/channels` with zero warning, never `/channels/@me`. Fixed by moving
+  the real route to `app/(app)/channels/me/` and adding a `rewrites()`
+  entry in `next.config.ts` so `/channels/@me` still works as the public
+  URL (verified with a real build + server smoke test, not just reading
+  the config).
+- `src/pages/` as a folder name silently collides with Next's legacy
+  Pages Router auto-detection, which broke every screen component's
+  build ("found pages without a React Component as default export").
+  Renamed to `src/screens/`.
+- `usePathname()` / `useParams()` are typed as nullable in this Next
+  version; a few components assumed non-null. Fixed with real
+  null-coalescing / narrowing, not blanket `any`.
+- The `package.json` had `next: "^15.5.0"` which resolved to a
+  non-existent, broken `15.5.23` build in testing — pinned to the
+  verified-working `15.1.6` exactly (no caret), so `npm install`
+  reproduces what was actually tested here.
+
+### What's still not done (next passes)
+
+Friends system, onboarding (interests + contacts), full Settings profile
+panel, the visual redesign, OAuth account linking, Render
+cron/realtime infra. None started yet — this pass was scoped to the
+three items you picked first, done properly rather than five things done
+halfway.
+
+### Assets
+
+Per `assets/req.md`: default avatars, space icons, empty-state
+illustrations, and a notification sound are referenced by path
+(`/avatars/default-N.png`, `/illustrations/empty-feed.svg`, etc.) but not
+bundled — you mentioned you've already prepared these but didn't upload
+them here (they're heavy). Drop them into `public/avatars/`,
+`public/illustrations/`, `public/space-icons/`, and `public/sounds/`
+respectively and they'll pick up automatically; the empty-feed
+illustration in particular is already wired with a graceful fallback (no
+broken-image icon) if the file isn't there yet.

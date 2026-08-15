@@ -6,7 +6,7 @@ import { listSpaceTopics } from '../lib/api/spaces';
 import { ChatView } from '../components/chat/ChatView';
 
 export function SpaceHome() {
-  const params = useParams<{ spaceId: string }>();
+  const params = useParams<{ spaceId: string }>()!;
   const spaceId = params.spaceId;
   const { data: topics = [] } = useQuery({
     queryKey: ['space-topics', spaceId],
@@ -16,7 +16,7 @@ export function SpaceHome() {
 
   if (!general) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-neutral-500">
+      <div className="flex h-full items-center justify-center text-sm text-[var(--color-ink-muted)]">
         This space doesn't have any topics yet.
       </div>
     );
@@ -25,7 +25,7 @@ export function SpaceHome() {
 }
 
 export function SpaceTopic() {
-  const params = useParams<{ spaceId: string; topicId: string }>();
+  const params = useParams<{ spaceId: string; topicId: string }>()!;
   const { spaceId, topicId } = params;
   const { data: topics = [] } = useQuery({
     queryKey: ['space-topics', spaceId],

@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthSync } from '../../src/hooks/useAuthSync';
+import { useUnreadCounts } from '../../src/hooks/useUnreadCounts';
 import { useAppStore } from '../../src/store/useAppStore';
 import { AppShell } from '../../src/components/shell/AppShell';
 
@@ -21,6 +22,8 @@ import { AppShell } from '../../src/components/shell/AppShell';
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { loading } = useAuthSync();
   const router = useRouter();
+  const session = useAppStore((s) => s.session);
+  useUnreadCounts(session);
 
   useEffect(() => {
     // useAuthSync sets session in the store; read it directly via

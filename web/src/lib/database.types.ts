@@ -120,10 +120,11 @@ export interface Database {
           body_raw: string;
           body_rendered: string;
           media_url: string;
+          edited_at: string | null;
           created_at: string;
         };
         Insert: { author_id: string; body_raw: string; body_rendered: string; media_url?: string };
-        Update: never;
+        Update: Partial<Pick<Database['public']['Tables']['posts']['Row'], 'body_raw' | 'body_rendered' | 'edited_at'>>;
         Relationships: [];
       };
       post_comments: {
@@ -133,10 +134,11 @@ export interface Database {
           author_id: string;
           body_raw: string;
           body_rendered: string;
+          edited_at: string | null;
           created_at: string;
         };
         Insert: { post_id: number; author_id: string; body_raw: string; body_rendered: string };
-        Update: never;
+        Update: Partial<Pick<Database['public']['Tables']['post_comments']['Row'], 'body_raw' | 'body_rendered' | 'edited_at'>>;
         Relationships: [];
       };
       post_reactions: {
@@ -171,11 +173,15 @@ export interface Database {
           author_username: string;
           author_display_name: string;
           author_avatar_url: string;
+          author_accent_top: string;
+          author_accent_bottom: string;
           body_rendered: string;
           media_url: string;
           created_at: string;
+          edited_at: string | null;
           reaction_count: number;
           comment_count: number;
+          my_reactions: string[];
         };
         Relationships: [];
       };

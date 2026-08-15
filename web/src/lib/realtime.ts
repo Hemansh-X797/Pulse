@@ -100,3 +100,22 @@ export function subscribeToPresence(
 export function unsubscribe(channel: RealtimeChannel) {
   supabase.removeChannel(channel);
 }
+
+/**
+ * Global "any new message anywhere I can see" subscription, used to
+ * drive live unread badges (GlobalNav's DM icon, SecondarySidebar's
+ * per-topic dots) without opening every channel. Deliberately has no
+ * `filter` — Realtime enforces the same RLS as everything else, so this
+ * only ever delivers rows the current user's `channel_members`
+ * membership actually grants access to; it is not a broad table scan
+ * from the client's perspective, even though the subscription itself
+ * looks unscoped.
+ */
+export function subscribeToAllMessages(onInsert: (message: Message) => void): RealtimeChannel {
+  return supabase
+    .channel('unread-tracker')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) =>
+      onInsert(payload.new as Message)
+    )
+    .subscribe();
+}

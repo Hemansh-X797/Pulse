@@ -6,7 +6,7 @@ import { getProfileByUsername } from '../lib/api/profile';
 import { createOrGetDM } from '../lib/api/channels';
 
 export function UserProfile() {
-  const params = useParams<{ username: string }>();
+  const params = useParams<{ username: string }>()!;
   const username = params.username;
   const router = useRouter();
   const { data: profile, isLoading } = useQuery({
@@ -21,7 +21,7 @@ export function UserProfile() {
 
   if (isLoading) return null;
   if (!profile) {
-    return <div className="flex h-full items-center justify-center text-sm text-neutral-500">User not found.</div>;
+    return <div className="flex h-full items-center justify-center text-sm text-[var(--color-ink-muted)]">User not found.</div>;
   }
 
   return (
@@ -36,7 +36,7 @@ export function UserProfile() {
       />
       <div className="px-8 pb-8">
         <div
-          className="-mt-10 mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 border-neutral-950 text-2xl font-bold text-black"
+          className="-mt-10 mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[var(--color-void)] text-2xl font-bold text-black"
           style={{
             background: profile.avatar_url
               ? `url(${profile.avatar_url}) center/cover`
@@ -46,22 +46,22 @@ export function UserProfile() {
           {!profile.avatar_url && profile.display_name.slice(0, 2).toUpperCase()}
         </div>
         <h1 className="font-serif text-2xl font-semibold">{profile.display_name}</h1>
-        <p className="mb-1 text-sm text-neutral-500">
+        <p className="mb-1 text-sm text-[var(--color-ink-muted)]">
           @{profile.username} {profile.pronouns && `· ${profile.pronouns}`}
         </p>
-        {profile.bio && <p className="mt-3 max-w-lg text-[14px] text-neutral-300">{profile.bio}</p>}
+        {profile.bio && <p className="mt-3 max-w-lg text-[14px] text-[var(--color-ink)]/80">{profile.bio}</p>}
         <button
           onClick={handleMessage}
-          className="mt-5 rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-black hover:bg-neutral-200"
+          className="mt-5 rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-black hover:bg-[var(--color-ink)]/90"
         >
           Message
         </button>
 
         {/* Instagram-style media grid: still a follow-up slice, not
             stubbed here on purpose — see notes in the original component. */}
-        <div className="mt-10 border-t border-white/[0.07] pt-6">
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-neutral-500">Shared Media</h2>
-          <p className="text-sm text-neutral-500">Media grid — next slice, not stubbed here on purpose.</p>
+        <div className="mt-10 border-t border-[var(--color-hairline)] pt-6">
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">Shared Media</h2>
+          <p className="text-sm text-[var(--color-ink-muted)]">Media grid — next slice, not stubbed here on purpose.</p>
         </div>
       </div>
     </div>

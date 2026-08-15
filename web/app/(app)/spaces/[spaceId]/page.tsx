@@ -1,4 +1,4 @@
-import { SpaceHome } from '../../../../src/pages/SpacePages';
+import { SpaceHome } from '../../../../src/screens/SpacePages';
 
 export default function Page() {
   return <SpaceHome />;

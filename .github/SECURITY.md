@@ -10,6 +10,7 @@ If you discover a potential security flaw within the C++ gateway, WebSocket prot
 
 1. Send a private report directly to **Hemansh** via your registered security contact channel or email.
 2. Include a detailed description of the vulnerability, steps to reproduce, and a Proof-of-Concept (PoC) if applicable.
+3. For Contact, Kindly refer to [This link](https://hemansh.vercel.app/contact), or via the email "**kundansmihra@gmail.com**".
 
 ## Review Protocol
 

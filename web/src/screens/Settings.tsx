@@ -28,12 +28,12 @@ export function Settings() {
     <div className="mx-auto h-full max-w-2xl overflow-y-auto px-8 py-10">
       <h1 className="mb-6 font-serif text-2xl font-semibold">Settings</h1>
 
-      <section className="mb-8 rounded-2xl border border-white/[0.07] bg-neutral-900/60 p-6">
-        <h2 className="mb-1 text-sm font-semibold text-white">Profile</h2>
-        <p className="mb-4 text-[13px] text-neutral-500">
-          Signed in as <span className="text-neutral-300">@{profile?.username ?? '…'}</span>
+      <section className="mb-8 rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)]/60 p-6">
+        <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Profile</h2>
+        <p className="mb-4 text-[13px] text-[var(--color-ink-muted)]">
+          Signed in as <span className="text-[var(--color-ink)]/80">@{profile?.username ?? '…'}</span>
         </p>
-        <p className="text-[12.5px] text-neutral-600">
+        <p className="text-[12.5px] text-[var(--color-ink-faint)]">
           Full profile customization (avatar, banner, accent colors, bio, pronouns, connected accounts) lands here in
           the next pass.
         </p>
@@ -41,7 +41,7 @@ export function Settings() {
 
       <section className="rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-6">
         <h2 className="mb-1 text-sm font-semibold text-red-300">Account</h2>
-        <p className="mb-4 text-[13px] text-neutral-500">Sign out of PalSpace on this device.</p>
+        <p className="mb-4 text-[13px] text-[var(--color-ink-muted)]">Sign out of PalSpace on this device.</p>
 
         {!confirmingLogout ? (
           <button
@@ -55,13 +55,13 @@ export function Settings() {
             <span className="text-[13px] text-red-200">Log out of PalSpace?</span>
             <button
               onClick={handleConfirmLogout}
-              className="rounded-full bg-red-500 px-3.5 py-1.5 text-[12.5px] font-semibold text-white hover:bg-red-400"
+              className="rounded-full bg-red-500 px-3.5 py-1.5 text-[12.5px] font-semibold text-[var(--color-ink)] hover:bg-red-400"
             >
               Yes, log out
             </button>
             <button
               onClick={() => setConfirmingLogout(false)}
-              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] text-neutral-400 hover:text-white"
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[12.5px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
             >
               <X size={13} /> Cancel
             </button>

@@ -1,4 +1,4 @@
-import { UserProfile } from '../../../src/pages/UserProfile';
+import { UserProfile } from '../../../src/screens/UserProfile';
 
 export default function Page() {
   return <UserProfile />;

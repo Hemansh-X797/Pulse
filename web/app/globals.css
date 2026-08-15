@@ -1,9 +1,40 @@
 @import "tailwindcss";
 
+/*
+  DESIGN TOKENS — see MIGRATION_GUIDE.md "Visual redesign" section for the
+  full rationale. Short version: the app's actual signature isn't a brand
+  color, it's that every person and space already carries their own
+  2-color gradient (accent_color_top/bottom in the schema) — this token
+  set makes that gradient the load-bearing visual identity throughout the
+  app (the --presence-* custom properties below), instead of a decorative
+  accent used only on avatar-initials fallback.
+*/
 @theme {
-  --font-serif: "Fraunces", ui-serif, serif;
-  --font-sans: "Inter", ui-sans-serif, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-serif: var(--font-fraunces), ui-serif, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  /* Void / surface scale — warmer and more deliberate than a flat
+     tailwind neutral-950; three distinct depths so panels, cards, and
+     popovers read as physically layered rather than same-gray-different-
+     border. */
+  --color-void: #0b0b0f;
+  --color-surface: #131319;
+  --color-surface-raised: #1a1a22;
+  --color-surface-overlay: #212129;
+  --color-hairline: rgba(255, 255, 255, 0.08);
+  --color-hairline-strong: rgba(255, 255, 255, 0.14);
+  --color-ink: #f2f2f5;
+  --color-ink-muted: #8d8d99;
+  --color-ink-faint: #56565f;
+
+  /* Default presence gradient (teal → violet) — used wherever a
+     person/space hasn't set custom accent colors yet. Deliberately not
+     the indigo→pink combo used elsewhere in dark-mode social UI (it's
+     Instagram's own gradient); teal→violet reads as distinctly
+     PalSpace's. */
+  --presence-default-a: #2dd4bf;
+  --presence-default-b: #a78bfa;
 }
 
 @layer base {
@@ -11,16 +42,61 @@
   body {
     margin: 0;
     font-family: var(--font-sans);
-    background: #0a0a0c;
-    color: #fafafa;
+    background: var(--color-void);
+    background-image:
+      radial-gradient(1200px 600px at 15% -10%, color-mix(in oklab, var(--presence-default-a) 7%, transparent), transparent),
+      radial-gradient(1000px 500px at 90% 0%, color-mix(in oklab, var(--presence-default-b) 6%, transparent), transparent);
+    background-attachment: fixed;
+    color: var(--color-ink);
     -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
   :focus-visible {
-    outline: 2px solid #818cf8;
+    outline: 2px solid var(--presence-default-a);
     outline-offset: 2px;
     border-radius: 4px;
   }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: #262626; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-surface-overlay); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-hairline-strong); }
   ::-webkit-scrollbar-track { background: transparent; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /*
+    Presence gradient utilities. Every component that renders a person or
+    a space sets --p-a / --p-b inline from that entity's own
+    accent_color_top/bottom (falling back to the default teal→violet
+    above) and then reaches for these classes — one system, everywhere,
+    instead of each component hand-rolling its own gradient string.
+  */
+  .presence-fill {
+    background: linear-gradient(150deg, var(--p-a, var(--presence-default-a)), var(--p-b, var(--presence-default-b)));
+  }
+  .presence-text {
+    background: linear-gradient(150deg, var(--p-a, var(--presence-default-a)), var(--p-b, var(--presence-default-b)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .presence-ring {
+    box-shadow: 0 0 0 2px var(--color-void), 0 0 0 3.5px color-mix(in oklab, var(--p-a, var(--presence-default-a)) 70%, var(--p-b, var(--presence-default-b)));
+  }
+  .presence-glow {
+    box-shadow: 0 0 0 1px var(--color-hairline), 0 8px 24px -8px color-mix(in oklab, var(--p-a, var(--presence-default-a)) 45%, var(--p-b, var(--presence-default-b)));
+  }
+  .glass-panel {
+    background: color-mix(in oklab, var(--color-surface-raised) 88%, transparent);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+  }
 }

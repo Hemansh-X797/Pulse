@@ -40,17 +40,17 @@ export function Login() {
         role="img"
         aria-label="Dusk over rolling hills"
       />
-      <div className="flex flex-1 items-center justify-center bg-neutral-950 p-10 text-neutral-50">
+      <div className="flex flex-1 items-center justify-center bg-[var(--color-void)] p-10 text-[var(--color-ink)]">
         <div className="w-full max-w-[340px]">
           <div className="mb-16 flex items-center justify-center gap-2">
-            <span className="h-[7px] w-[7px] rounded-full bg-gradient-to-br from-indigo-400 to-pink-400" />
+            <span className="h-[7px] w-[7px] rounded-full presence-fill" />
             <span className="font-serif text-xl font-semibold">PalSpace</span>
           </div>
 
           <h1 className="mb-2.5 text-center font-serif text-3xl font-semibold">
             {mode === 'signup' ? 'Join PalSpace' : 'Welcome back'}
           </h1>
-          <p className="mb-9 text-center text-[13.5px] text-neutral-500">
+          <p className="mb-9 text-center text-[13.5px] text-[var(--color-ink-muted)]">
             {mode === 'signup' ? "pick a username, we'll handle the rest" : 'sign in to pick up where you left off'}
           </p>
 
@@ -61,13 +61,13 @@ export function Login() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Display name"
-                  className="w-full rounded-full border border-white/[0.07] bg-neutral-900 px-5 py-3.5 text-center text-sm text-white placeholder-neutral-500 outline-none focus:border-white/20"
+                  className="w-full rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-5 py-3.5 text-center text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none focus:border-white/20"
                 />
                 <input
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Username"
-                  className="w-full rounded-full border border-white/[0.07] bg-neutral-900 px-5 py-3.5 text-center text-sm text-white placeholder-neutral-500 outline-none focus:border-white/20"
+                  className="w-full rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-5 py-3.5 text-center text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none focus:border-white/20"
                 />
               </>
             )}
@@ -76,26 +76,26 @@ export function Login() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email"
               type="email"
-              className="w-full rounded-full border border-white/[0.07] bg-neutral-900 px-5 py-3.5 text-center text-sm text-white placeholder-neutral-500 outline-none focus:border-white/20"
+              className="w-full rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-5 py-3.5 text-center text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none focus:border-white/20"
             />
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
               type="password"
-              className="w-full rounded-full border border-white/[0.07] bg-neutral-900 px-5 py-3.5 text-center text-sm text-white placeholder-neutral-500 outline-none focus:border-white/20"
+              className="w-full rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] px-5 py-3.5 text-center text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none focus:border-white/20"
             />
           </div>
 
           <button
             onClick={handleSubmit}
-            className="mx-auto block rounded-full bg-white px-8 py-3 text-[13.5px] font-semibold text-black transition hover:bg-neutral-200 active:scale-95"
+            className="mx-auto block rounded-full bg-white px-8 py-3 text-[13.5px] font-semibold text-black transition hover:bg-[var(--color-ink)]/90 active:scale-95"
           >
             {mode === 'signup' ? 'Create account' : "Let's go"}
           </button>
           <div className="mt-3.5 min-h-[16px] text-center text-xs text-red-400">{error}</div>
 
-          <div className="my-8 flex items-center gap-3 text-[11.5px] text-neutral-500">
+          <div className="my-8 flex items-center gap-3 text-[11.5px] text-[var(--color-ink-muted)]">
             <span className="h-px flex-1 bg-white/[0.07]" />
             or continue with
             <span className="h-px flex-1 bg-white/[0.07]" />
@@ -104,7 +104,7 @@ export function Login() {
           <div className="flex justify-center gap-3.5">
             <button
               onClick={() => signInWithGoogle()}
-              className="flex h-11 w-11 items-center justify-center rounded-full border border-white/[0.07] bg-neutral-900 transition hover:-translate-y-0.5 hover:bg-neutral-800"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] transition hover:-translate-y-0.5 hover:bg-[var(--color-surface-raised)]"
               aria-label="Continue with Google"
             >
               <GoogleIcon />
@@ -118,18 +118,18 @@ export function Login() {
             </button>
           </div>
 
-          <div className="mt-7 text-center text-[12.5px] text-neutral-400">
+          <div className="mt-7 text-center text-[12.5px] text-[var(--color-ink-muted)]">
             {mode === 'signup' ? (
               <>
                 Already have an account?{' '}
-                <button onClick={() => setMode('login')} className="border-b border-white/30 font-medium text-white">
+                <button onClick={() => setMode('login')} className="border-b border-white/30 font-medium text-[var(--color-ink)]">
                   Log in
                 </button>
               </>
             ) : (
               <>
                 New here?{' '}
-                <button onClick={() => setMode('signup')} className="border-b border-white/30 font-medium text-white">
+                <button onClick={() => setMode('signup')} className="border-b border-white/30 font-medium text-[var(--color-ink)]">
                   Create an account
                 </button>
               </>

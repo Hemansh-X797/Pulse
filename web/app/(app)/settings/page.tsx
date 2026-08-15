@@ -1,4 +1,4 @@
-import { Settings } from '../../../src/pages/Settings';
+import { Settings } from '../../../src/screens/Settings';
 
 export default function Page() {
   return <Settings />;

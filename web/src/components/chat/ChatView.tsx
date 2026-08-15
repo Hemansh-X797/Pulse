@@ -34,6 +34,23 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const queryClient = useQueryClient();
   const profile = useAppStore((s) => s.profile);
   const connectionStatus = useAppStore((s) => s.connectionStatus);
+  const setActiveChannel = useAppStore((s) => s.setActiveChannel);
+  const setUnreadByChannel = useAppStore((s) => s.setUnreadByChannel);
+  const unreadByChannel = useAppStore((s) => s.unreadByChannel);
+
+  // Tell useUnreadCounts "I'm looking at this channel right now" so its
+  // global subscription stops incrementing this one, and clear whatever
+  // unread count it already had — opening a channel counts as reading it,
+  // same behavior as the auto-markRead effect below for the DB-side count.
+  useEffect(() => {
+    setActiveChannel(channelId);
+    if (unreadByChannel[channelId]) {
+      const { [channelId]: _cleared, ...rest } = unreadByChannel;
+      setUnreadByChannel(rest);
+    }
+    return () => setActiveChannel(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId]);
 
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
@@ -43,6 +60,8 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const [ephemeralSeconds, setEphemeralSeconds] = useState(0);
   const [ephemeralMenuOpen, setEphemeralMenuOpen] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -166,27 +185,40 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
   async function handleAttachImage(file: File) {
     if (!profile) return;
-    const url = await uploadMedia(file);
-    const clientRef = crypto.randomUUID();
-    const optimistic: DisplayMessage = {
-      id: -Date.now(),
-      channel_id: channelId,
-      sender_id: profile.id,
-      sender_username: profile.username,
-      body_raw: '',
-      body_rendered: '',
-      reply_to_id: null,
-      edited_at: null,
-      deleted: false,
-      client_ref: clientRef,
-      expires_at: null,
-      media_url: url,
-      media_type: 'image',
-      created_at: new Date().toISOString(),
-      pending: true,
-    };
-    setMessages((prev) => [...prev, optimistic]);
-    await sendMessage(channelId, '', { clientRef, mediaUrl: url, mediaType: 'image' });
+    setAttachError(null);
+    setUploadingImage(true);
+    try {
+      const url = await uploadMedia(file);
+      const clientRef = crypto.randomUUID();
+      const optimistic: DisplayMessage = {
+        id: -Date.now(),
+        channel_id: channelId,
+        sender_id: profile.id,
+        sender_username: profile.username,
+        body_raw: '',
+        body_rendered: '',
+        reply_to_id: null,
+        edited_at: null,
+        deleted: false,
+        client_ref: clientRef,
+        expires_at: null,
+        media_url: url,
+        media_type: 'image',
+        created_at: new Date().toISOString(),
+        pending: true,
+      };
+      setMessages((prev) => [...prev, optimistic]);
+      await sendMessage(channelId, '', { clientRef, mediaUrl: url, mediaType: 'image' });
+    } catch (e) {
+      // This used to fail completely silently — no try/catch at all, so
+      // an upload error (bad MIME, oversized file, missing bucket
+      // policy) just vanished as an unhandled rejection and nothing
+      // happened on screen. That silence was very likely the actual
+      // "images don't work" bug, not the file type itself.
+      setAttachError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   async function toggleVoiceRecording() {
@@ -233,10 +265,10 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-[62px] shrink-0 items-baseline gap-2.5 border-b border-white/[0.07] px-7">
+      <div className="flex h-[62px] shrink-0 items-baseline gap-2.5 border-b border-[var(--color-hairline)] px-7">
         <h2 className="font-serif text-lg font-semibold"># {channelLabel}</h2>
         <span
-          className={`ml-auto h-1.5 w-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400' : 'bg-neutral-600'}`}
+          className={`ml-auto h-1.5 w-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400' : 'bg-[var(--color-ink-faint)]'}`}
           title={connectionStatus}
         />
       </div>
@@ -259,31 +291,45 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         </AnimatePresence>
       </div>
 
-      <div className={`px-7 text-[11.5px] text-neutral-500 transition-opacity ${typingUser ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`px-7 text-[11.5px] text-[var(--color-ink-muted)] transition-opacity ${typingUser ? 'opacity-100' : 'opacity-0'}`}>
         {typingUser && `${typingUser} is typing…`}
       </div>
 
+      {attachError && (
+        <div className="mx-7 mb-2 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-[12.5px] text-red-300">
+          {attachError}
+          <button onClick={() => setAttachError(null)} className="ml-3 text-red-400 hover:text-[var(--color-ink)]" aria-label="Dismiss">
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {replyTarget && (
-        <div className="mx-7 mb-2 flex items-center gap-2.5 rounded-lg border border-white/[0.07] bg-neutral-900 px-3 py-2">
-          <div className="h-full w-[3px] shrink-0 self-stretch rounded bg-gradient-to-br from-indigo-400 to-pink-400" />
+        <div className="mx-7 mb-2 flex items-center gap-2.5 rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface)] px-3 py-2">
+          <div className="h-full w-[3px] shrink-0 self-stretch rounded presence-fill" />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] text-neutral-500">replying to {replyTarget.sender_username}</div>
-            <div className="truncate text-[13px] text-neutral-400">{replyTarget.body_rendered}</div>
+            <div className="text-[10px] text-[var(--color-ink-muted)]">replying to {replyTarget.sender_username}</div>
+            <div className="truncate text-[13px] text-[var(--color-ink-muted)]">{replyTarget.body_rendered}</div>
           </div>
-          <button onClick={() => setReplyTarget(null)} className="text-neutral-500 hover:text-white" aria-label="Cancel reply">
+          <button onClick={() => setReplyTarget(null)} className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Cancel reply">
             <X size={16} />
           </button>
         </div>
       )}
 
       <div className="px-7 pb-6 pt-3">
-        <div className="flex items-center gap-2 rounded-full border border-white/[0.07] bg-neutral-900 py-1.5 pl-4 pr-1.5">
+        <div className="flex items-center gap-2 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] py-1.5 pl-4 pr-1.5">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-neutral-400 hover:text-white"
+            disabled={uploadingImage}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] disabled:opacity-40"
             aria-label="Attach image"
           >
-            <ImagePlus size={17} />
+            {uploadingImage ? (
+              <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-ink-faint)] border-t-[var(--color-ink)]" />
+            ) : (
+              <ImagePlus size={17} />
+            )}
           </button>
           <input
             ref={fileInputRef}
@@ -300,14 +346,14 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
           <div className="relative">
             <button
               onClick={() => setEphemeralMenuOpen((v) => !v)}
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${ephemeralSeconds ? 'text-pink-400' : 'text-neutral-400'} hover:text-white`}
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${ephemeralSeconds ? 'text-[var(--presence-default-a)]' : 'text-[var(--color-ink-muted)]'} hover:text-[var(--color-ink)]`}
               aria-label="Ephemeral message timer"
               aria-haspopup="true"
             >
               <Timer size={17} />
             </button>
             {ephemeralMenuOpen && (
-              <div className="absolute bottom-full left-0 mb-2 flex flex-col overflow-hidden rounded-lg border border-white/10 bg-neutral-800 text-[12.5px]">
+              <div className="absolute bottom-full left-0 mb-2 flex flex-col overflow-hidden rounded-lg border border-[var(--color-hairline-strong)] bg-[var(--color-surface-raised)] text-[12.5px]">
                 {EPHEMERAL_OPTIONS.map((opt) => (
                   <button
                     key={opt.seconds}
@@ -315,7 +361,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
                       setEphemeralSeconds(opt.seconds);
                       setEphemeralMenuOpen(false);
                     }}
-                    className={`px-4 py-2 text-left hover:bg-neutral-700 ${ephemeralSeconds === opt.seconds ? 'text-pink-400' : 'text-neutral-300'}`}
+                    className={`px-4 py-2 text-left hover:bg-[var(--color-surface-overlay)] ${ephemeralSeconds === opt.seconds ? 'text-[var(--presence-default-a)]' : 'text-[var(--color-ink)]/80'}`}
                   >
                     {opt.label}
                   </button>
@@ -326,7 +372,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
           <button
             onClick={toggleVoiceRecording}
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${recording ? 'text-red-400' : 'text-neutral-400'} hover:text-white`}
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${recording ? 'text-red-400' : 'text-[var(--color-ink-muted)]'} hover:text-[var(--color-ink)]`}
             aria-label={recording ? 'Stop recording' : 'Record a voice note'}
           >
             {recording ? <Square size={15} /> : <Mic size={17} />}
@@ -340,7 +386,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
             }}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder={ephemeralSeconds ? `Disappearing in ${ephemeralSeconds}s… try :fire:` : 'Message... try :fire: :heart: :rocket:'}
-            className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder-neutral-500 outline-none"
+            className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none"
           />
 
           <button
@@ -381,7 +427,7 @@ function MessageRow({
     return (
       <div className={`flex gap-2.5 py-1.5 ${isMine ? 'flex-row-reverse' : ''}`}>
         <div className="w-[30px] shrink-0" />
-        <div className="rounded-2xl border border-dashed border-white/10 px-3.5 py-2 font-mono text-[13px] italic text-neutral-500">
+        <div className="rounded-2xl border border-dashed border-[var(--color-hairline-strong)] px-3.5 py-2 font-mono text-[13px] italic text-[var(--color-ink-muted)]">
           message deleted
         </div>
       </div>
@@ -400,18 +446,18 @@ function MessageRow({
       transition={{ duration: 0.2 }}
       className={`group flex gap-2.5 py-1.5 ${isMine ? 'flex-row-reverse' : ''}`}
     >
-      <div className="mt-0.5 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-pink-400 text-[11px] font-bold text-black">
+      <div className="mt-0.5 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black">
         {initials}
       </div>
       <div className={`flex max-w-[70%] flex-col ${isMine ? 'items-end' : 'items-start'}`}>
         <div className={`mb-0.5 flex items-baseline gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
           <span className="text-[12.5px] font-semibold">{message.sender_username}</span>
-          {message.edited_at && <span className="font-mono text-[10px] text-neutral-500">edited</span>}
-          {isExpiring && <span className="font-mono text-[10px] text-pink-400">disappearing</span>}
+          {message.edited_at && <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">edited</span>}
+          {isExpiring && <span className="font-mono text-[10px] text-[var(--presence-default-a)]">disappearing</span>}
         </div>
 
         {replySnippet && (
-          <div className="mb-0.5 max-w-[320px] truncate font-mono text-[10.5px] text-neutral-500">
+          <div className="mb-0.5 max-w-[320px] truncate font-mono text-[10.5px] text-[var(--color-ink-muted)]">
             ↩ {replySnippet.sender_username}: {replySnippet.body_rendered}
           </div>
         )}
@@ -423,7 +469,7 @@ function MessageRow({
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && onSaveEdit(editValue)}
-              className="min-w-[220px] rounded-full border border-indigo-400 bg-neutral-800 px-3.5 py-2 text-sm text-white outline-none"
+              className="min-w-[220px] rounded-full border border-[var(--presence-default-b)] bg-[var(--color-surface-raised)] px-3.5 py-2 text-sm text-[var(--color-ink)] outline-none"
             />
             <button
               onClick={() => onSaveEdit(editValue)}
@@ -435,7 +481,7 @@ function MessageRow({
         ) : (
           <>
             {message.media_type === 'image' && message.media_url && (
-              <div className="mb-1 overflow-hidden rounded-xl border border-white/10">
+              <div className="mb-1 overflow-hidden rounded-xl border border-[var(--color-hairline-strong)]">
                 <img src={message.media_url} alt="" className="max-h-80 max-w-xs object-cover" />
               </div>
             )}
@@ -446,8 +492,8 @@ function MessageRow({
               <div
                 className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
                   isMine
-                    ? 'rounded-br-md bg-gradient-to-br from-indigo-400 to-pink-400 font-medium text-black'
-                    : 'rounded-bl-md border border-white/[0.07] bg-neutral-900 text-white'
+                    ? 'rounded-br-md presence-fill font-medium text-black'
+                    : 'rounded-bl-md border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink)]'
                 }`}
               >
                 {message.body_rendered}
@@ -458,15 +504,15 @@ function MessageRow({
       </div>
 
       <div className={`flex items-center gap-1 self-center opacity-0 transition-opacity group-hover:opacity-100 ${isMine ? 'order-first' : ''}`}>
-        <button onClick={onReply} className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-neutral-900 text-neutral-400 hover:text-white" aria-label="Reply">
+        <button onClick={onReply} className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Reply">
           <Reply size={12} />
         </button>
         {isMine && (
           <>
-            <button onClick={onEdit} className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-neutral-900 text-neutral-400 hover:text-white" aria-label="Edit">
+            <button onClick={onEdit} className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Edit">
               <Pencil size={12} />
             </button>
-            <button onClick={onDelete} className="flex h-6 w-6 items-center justify-center rounded-full border border-white/10 bg-neutral-900 text-neutral-400 hover:text-white" aria-label="Delete">
+            <button onClick={onDelete} className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Delete">
               ×
             </button>
           </>

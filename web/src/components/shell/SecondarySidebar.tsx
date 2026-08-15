@@ -10,7 +10,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { NotificationsPanel } from './NotificationsPanel';
 
 export function SecondarySidebar() {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const isSpaceContext = pathname.startsWith('/spaces/');
   const isDmContext = pathname.startsWith('/channels/@me');
   const isFeedContext = pathname === '/home';
@@ -25,11 +25,11 @@ function SidebarHeader({ title }: { title: string }) {
   const [notifOpen, setNotifOpen] = useState(false);
   return (
     <div className="relative flex items-center gap-2 px-[22px] pb-5 pt-[22px]">
-      <span className="h-[7px] w-[7px] shrink-0 rounded-full bg-gradient-to-br from-indigo-400 to-pink-400" />
+      <span className="h-[7px] w-[7px] shrink-0 rounded-full presence-fill" />
       <span className="truncate font-serif text-lg font-semibold">{title}</span>
       <button
         onClick={() => setNotifOpen((v) => !v)}
-        className="relative ml-auto flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.07] bg-neutral-900 text-neutral-400 hover:bg-neutral-800 hover:text-white"
+        className="relative ml-auto flex h-8 w-8 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
         aria-label="Notifications"
         aria-haspopup="true"
         aria-expanded={notifOpen}
@@ -45,13 +45,14 @@ function SidebarHeader({ title }: { title: string }) {
 function NotifDot() {
   const unread = useAppStore((s) => s.unreadNotifications);
   if (unread === 0) return null;
-  return <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-neutral-950 bg-pink-400" />;
+  return <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-[var(--color-void)] presence-fill" />;
 }
 
 function SpaceTopicList() {
-  const params = useParams<{ spaceId: string }>();
+  const params = useParams<{ spaceId: string }>()!;
   const spaceId = params.spaceId;
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
+  const unreadByChannel = useAppStore((s) => s.unreadByChannel);
   const { data: topics = [] } = useQuery({
     queryKey: ['space-topics', spaceId],
     queryFn: () => listSpaceTopics(spaceId!),
@@ -65,30 +66,39 @@ function SpaceTopicList() {
   }
 
   return (
-    <div className="flex w-[252px] shrink-0 flex-col border-r border-white/[0.07] bg-neutral-950">
+    <div className="flex w-[260px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)]">
       <SidebarHeader title="Space" />
       <div className="px-3.5">
-        <div className="px-2.5 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-500">
+        <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
           Topics
         </div>
         {topics.map((t) => {
           const href = `/spaces/${spaceId}/${t.id}`;
           const active = pathname === href;
+          const unread = unreadByChannel[t.id] ?? 0;
           return (
             <Link
               key={t.id}
               href={href}
-              className={`flex items-center gap-2 rounded-md px-3 py-2.5 text-[13.5px] font-medium ${
-                active ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:bg-neutral-900 hover:text-white'
+              className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
+                active
+                  ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]'
+                  : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)]/60 hover:text-[var(--color-ink)]'
               }`}
             >
-              <Hash size={14} className="text-neutral-500" /> {t.name}
+              <Hash size={14} className="text-[var(--color-ink-faint)]" />
+              <span className={unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : ''}>{t.name}</span>
+              {unread > 0 && (
+                <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full presence-fill px-1 font-mono text-[10px] font-bold text-black">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
             </Link>
           );
         })}
         <button
           onClick={handleAddTopic}
-          className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-[13.5px] text-neutral-500 hover:text-white"
+          className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
         >
           <Plus size={14} /> Add topic
         </button>
@@ -98,15 +108,22 @@ function SpaceTopicList() {
 }
 
 function DmList() {
+  const unreadByChannel = useAppStore((s) => s.unreadByChannel);
+  const hasAnyUnread = Object.values(unreadByChannel).some((n) => n > 0);
   return (
-    <div className="flex w-[252px] shrink-0 flex-col border-r border-white/[0.07] bg-neutral-950">
+    <div className="flex w-[260px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)]">
       <SidebarHeader title="PalSpace" />
       <div className="px-3.5">
-        <div className="px-2.5 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-500">
+        <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
           Direct Messages
         </div>
-        <p className="px-2.5 text-[12.5px] text-neutral-500">
-          Message a friend from their profile (<code className="text-neutral-400">/username</code>) to start a DM.
+        {hasAnyUnread && (
+          <p className="mb-2 px-2.5 font-mono text-[12px] font-medium text-[var(--presence-default-a)]">
+            {Object.values(unreadByChannel).reduce((a, b) => a + b, 0)} unread — open a conversation to catch up.
+          </p>
+        )}
+        <p className="px-2.5 text-[12.5px] text-[var(--color-ink-muted)]">
+          Message a friend from their profile (<code className="text-[var(--color-ink)]">/username</code>) to start a DM.
         </p>
       </div>
     </div>
@@ -115,11 +132,11 @@ function DmList() {
 
 function FeedFilters() {
   return (
-    <div className="flex w-[252px] shrink-0 flex-col border-r border-white/[0.07] bg-neutral-950">
+    <div className="flex w-[260px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)]">
       <SidebarHeader title="PalSpace" />
       <div className="px-3.5">
-        <div className="px-2.5 pb-2 pt-3 text-[10px] font-medium uppercase tracking-wider text-neutral-500">Feed</div>
-        <div className="rounded-md bg-neutral-800 px-3 py-2.5 text-[13.5px] font-medium text-white">For You</div>
+        <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">Feed</div>
+        <div className="rounded-xl bg-[var(--color-surface-raised)] px-3 py-2.5 text-[13.5px] font-medium text-[var(--color-ink)] presence-glow">For You</div>
       </div>
     </div>
   );
