@@ -1,11 +1,14 @@
-import { useParams, useNavigate } from '@tanstack/react-router';
+'use client';
+
+import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { getProfileByUsername } from '../lib/api/profile';
 import { createOrGetDM } from '../lib/api/channels';
 
 export function UserProfile() {
-  const { username } = useParams({ from: '/_app/$username' });
-  const navigate = useNavigate();
+  const params = useParams<{ username: string }>();
+  const username = params.username;
+  const router = useRouter();
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile', username],
     queryFn: () => getProfileByUsername(username),
@@ -13,7 +16,7 @@ export function UserProfile() {
 
   async function handleMessage() {
     const channelId = await createOrGetDM(username);
-    navigate({ to: '/channels/@me/$channelId', params: { channelId } });
+    router.push(`/channels/@me/${channelId}`);
   }
 
   if (isLoading) return null;
@@ -54,12 +57,8 @@ export function UserProfile() {
           Message
         </button>
 
-        {/* Instagram-style media grid: auto-sorts shared images from
-            chats this user is part of with you — a real query over
-            messages where media_type='image', not a placeholder grid.
-            Left as a follow-up slice since it needs a join across every
-            shared channel, which deserves its own paginated query rather
-            than being bolted on here. */}
+        {/* Instagram-style media grid: still a follow-up slice, not
+            stubbed here on purpose — see notes in the original component. */}
         <div className="mt-10 border-t border-white/[0.07] pt-6">
           <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-neutral-500">Shared Media</h2>
           <p className="text-sm text-neutral-500">Media grid — next slice, not stubbed here on purpose.</p>
