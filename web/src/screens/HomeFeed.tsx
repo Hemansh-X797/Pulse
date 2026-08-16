@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Flame, Heart, ImagePlus, MoreHorizontal, Pencil, Trash2, X, Send } from 'lucide-react';
+import { Heart, MessageCircle, Send, ImagePlus, MoreHorizontal, Pencil, Trash2, X, Share2 } from 'lucide-react';
 import {
   listFeed,
   createPost,
@@ -26,11 +27,11 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)}d`;
 }
 
-const REACTIONS: { emoji: string; icon?: typeof Flame; label?: string }[] = [
-  { emoji: '🔥', icon: Flame },
-  { emoji: '❤️', icon: Heart },
-  { emoji: '💯', label: '100' },
-];
+// Single-heart Instagram-style reaction — replaced the 3-emoji bar
+// (🔥/❤️/💯) you called out. `post.my_reactions` still comes back as an
+// array from the DB (any-emoji schema, unchanged — see migration 003),
+// this UI just only ever uses the ❤️ slot of it now.
+const LIKE_EMOJI = '❤️';
 
 export function HomeFeed() {
   const queryClient = useQueryClient();
@@ -201,6 +202,24 @@ function PostCard({ post }: { post: FeedItem }) {
     mutationFn: (emoji: string) => toggleReaction(post.id, emoji, post.my_reactions.includes(emoji)),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feed'] }),
   });
+  const liked = post.my_reactions.includes(LIKE_EMOJI);
+
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
+  async function handleShare() {
+    const url = `${window.location.origin}/${post.author_username}#post-${post.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ url, title: `${post.author_display_name} on PalSpace` });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setShareStatus('Link copied');
+      setTimeout(() => setShareStatus(null), 1800);
+    } catch {
+      // navigator.share throws if the user just cancels the native
+      // share sheet — that's not an error worth surfacing.
+    }
+  }
 
   const editMutation = useMutation({
     mutationFn: (body: string) => editPost(post.id, body),
@@ -232,20 +251,22 @@ function PostCard({ post }: { post: FeedItem }) {
   return (
     <div className="w-full max-w-[560px] rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5 transition-colors hover:border-[var(--color-hairline-strong)]">
       <div className="mb-3 flex items-center gap-2.5">
-        <Avatar
-          url={post.author_avatar_url}
-          name={post.author_display_name}
-          size={34}
-          accentTop={post.author_accent_top}
-          accentBottom={post.author_accent_bottom}
-        />
-        <div className="min-w-0 flex-1">
+        <Link href={`/${post.author_username}`} className="shrink-0">
+          <Avatar
+            url={post.author_avatar_url}
+            name={post.author_display_name}
+            size={34}
+            accentTop={post.author_accent_top}
+            accentBottom={post.author_accent_bottom}
+          />
+        </Link>
+        <Link href={`/${post.author_username}`} className="min-w-0 flex-1 hover:opacity-80">
           <div className="text-[13.5px] font-semibold">{post.author_display_name}</div>
           <div className="text-[11.5px] text-[var(--color-ink-muted)]">
             @{post.author_username} · {timeAgo(post.created_at)}
             {post.edited_at && ' · edited'}
           </div>
-        </div>
+        </Link>
 
         {isMine && (
           <div className="relative">
@@ -320,34 +341,41 @@ function PostCard({ post }: { post: FeedItem }) {
         </div>
       )}
 
-      <div className="flex items-center gap-1.5">
-        {REACTIONS.map(({ emoji, icon: Icon, label }) => {
-          const active = post.my_reactions.includes(emoji);
-          return (
-            <button
-              key={emoji}
-              onClick={() => reactMutation.mutate(emoji)}
-              disabled={reactMutation.isPending}
-              className={`flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11.5px] font-medium transition-colors ${
-                active
-                  ? 'border-[var(--presence-default-a)]/40 bg-[var(--presence-default-a)]/15 text-[var(--presence-default-a)]'
-                  : 'border-[var(--color-hairline)] bg-[var(--color-surface-raised)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-overlay)] hover:text-[var(--color-ink)]'
-              }`}
-              aria-pressed={active}
-            >
-              {Icon ? <Icon size={13} /> : <span className="font-mono text-[10.5px]">{label}</span>}
-            </button>
-          );
-        })}
-        {post.reaction_count > 0 && (
-          <span className="font-mono text-[11px] text-[var(--color-ink-muted)]">{post.reaction_count}</span>
-        )}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => reactMutation.mutate(LIKE_EMOJI)}
+          disabled={reactMutation.isPending}
+          className="group flex items-center gap-1.5"
+          aria-pressed={liked}
+          aria-label={liked ? 'Unlike' : 'Like'}
+        >
+          <Heart
+            size={22}
+            strokeWidth={2}
+            className={liked ? 'fill-red-500 text-red-500' : 'text-[var(--color-ink-muted)] group-hover:text-[var(--color-ink)]'}
+          />
+          {post.reaction_count > 0 && (
+            <span className={`font-mono text-[12px] ${liked ? 'font-semibold text-red-500' : 'text-[var(--color-ink-muted)]'}`}>
+              {post.reaction_count}
+            </span>
+          )}
+        </button>
+
         <button
           onClick={() => setCommentsOpen((v) => !v)}
-          className="ml-auto font-mono text-[11.5px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+          className="group flex items-center gap-1.5"
+          aria-label="Comments"
+          aria-expanded={commentsOpen}
         >
-          {post.comment_count} comment{post.comment_count === 1 ? '' : 's'}
+          <MessageCircle size={21} strokeWidth={2} className="text-[var(--color-ink-muted)] group-hover:text-[var(--color-ink)]" />
+          {post.comment_count > 0 && <span className="font-mono text-[12px] text-[var(--color-ink-muted)]">{post.comment_count}</span>}
         </button>
+
+        <button onClick={handleShare} className="group flex items-center" aria-label="Share">
+          <Share2 size={20} strokeWidth={2} className="text-[var(--color-ink-muted)] group-hover:text-[var(--color-ink)]" />
+        </button>
+
+        {shareStatus && <span className="text-[11px] text-[var(--color-ink-faint)]">{shareStatus}</span>}
       </div>
 
       {commentsOpen && (
@@ -420,13 +448,15 @@ function CommentRow({
 
   return (
     <div className="group mb-2.5 flex items-start gap-2">
-      <Avatar
-        url={comment.author_avatar_url}
-        name={comment.author_display_name}
-        size={24}
-        accentTop={comment.author_accent_top}
-        accentBottom={comment.author_accent_bottom}
-      />
+      <Link href={`/${comment.author_username}`} className="shrink-0">
+        <Avatar
+          url={comment.author_avatar_url}
+          name={comment.author_display_name}
+          size={24}
+          accentTop={comment.author_accent_top}
+          accentBottom={comment.author_accent_bottom}
+        />
+      </Link>
       <div className="min-w-0 flex-1">
         {editing ? (
           <div className="flex items-center gap-1.5">
@@ -449,7 +479,9 @@ function CommentRow({
           </div>
         ) : (
           <div className="text-[13px] leading-snug text-[var(--color-ink-muted)]">
-            <b className="font-semibold text-[var(--color-ink)]">{comment.author_display_name}</b>{' '}
+            <Link href={`/${comment.author_username}`} className="font-semibold text-[var(--color-ink)] hover:underline">
+              {comment.author_display_name}
+            </Link>{' '}
             <span className="text-[10.5px] text-[var(--color-ink-faint)]">@{comment.author_username} · {timeAgo(comment.created_at)}{comment.edited_at && ' · edited'}</span>
             <div>{comment.body_rendered}</div>
           </div>
