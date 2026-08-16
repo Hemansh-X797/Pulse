@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, MessageCircle, Camera, Plus } from 'lucide-react';
+import { Home, MessageCircle, Camera, Plus, Users } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppStore } from '../../store/useAppStore';
 import { listMySpaces, createSpace } from '../../lib/api/spaces';
@@ -101,6 +101,10 @@ export function GlobalNav() {
 
       <RailItem href="/stories" active={pathname === '/stories'} label="Stories">
         <Camera size={19} strokeWidth={2} />
+      </RailItem>
+
+      <RailItem href="/friends" active={pathname === '/friends'} label="Friends">
+        <Users size={19} strokeWidth={2} />
       </RailItem>
 
       <div className="my-2 h-px w-8 bg-[var(--color-hairline)]" role="separator" />
