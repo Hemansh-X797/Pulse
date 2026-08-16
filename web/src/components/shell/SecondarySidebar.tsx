@@ -3,16 +3,17 @@
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Hash, Plus, Bell } from 'lucide-react';
+import { Hash, Plus, Bell, Users } from 'lucide-react';
 import { useState } from 'react';
 import { listSpaceTopics, createSpaceTopic } from '../../lib/api/spaces';
+import { listMyDMs } from '../../lib/api/channels';
 import { useAppStore } from '../../store/useAppStore';
 import { NotificationsPanel } from './NotificationsPanel';
 
 export function SecondarySidebar() {
   const pathname = usePathname() ?? '';
   const isSpaceContext = pathname.startsWith('/spaces/');
-  const isDmContext = pathname.startsWith('/channels/@me');
+  const isDmContext = pathname.startsWith('/channels/@me') || pathname.startsWith('/channels/me') || pathname === '/friends';
   const isFeedContext = pathname === '/home';
 
   if (isSpaceContext) return <SpaceTopicList />;
@@ -108,33 +109,79 @@ function SpaceTopicList() {
 }
 
 function DmList() {
+  const pathname = usePathname() ?? '';
   const unreadByChannel = useAppStore((s) => s.unreadByChannel);
-  const hasAnyUnread = Object.values(unreadByChannel).some((n) => n > 0);
+  const { data: dms = [], isLoading } = useQuery({ queryKey: ['my-dms'], queryFn: listMyDMs });
+
   return (
     <div className="flex w-[260px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)]">
       <SidebarHeader title="PalSpace" />
       <div className="flex flex-1 flex-col px-3.5">
+        <Link
+          href="/friends"
+          className={`mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-medium transition-colors ${
+            pathname === '/friends' ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)]/60 hover:text-[var(--color-ink)]'
+          }`}
+        >
+          <Users size={16} /> Friends
+        </Link>
+
         <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
           Direct Messages
         </div>
-        {hasAnyUnread && (
-          <p className="mb-2 px-2.5 font-mono text-[12px] font-medium text-[var(--presence-default-a)]">
-            {Object.values(unreadByChannel).reduce((a, b) => a + b, 0)} unread — open a conversation to catch up.
-          </p>
+
+        {!isLoading && dms.length === 0 && (
+          <div className="mt-4 flex flex-1 flex-col items-center gap-3 px-2 text-center">
+            <img
+              src="/illustrations/empty-dms.svg"
+              alt=""
+              className="h-24 w-24 opacity-80"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+            <p className="text-[12.5px] text-[var(--color-ink-muted)]">
+              Add a friend, then message them from their profile or the Friends list.
+            </p>
+          </div>
         )}
-        <div className="mt-4 flex flex-1 flex-col items-center gap-3 px-2 text-center">
-          <img
-            src="/illustrations/empty-dms.svg"
-            alt=""
-            className="h-24 w-24 opacity-80"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-          <p className="text-[12.5px] text-[var(--color-ink-muted)]">
-            Message a friend from their profile (<code className="text-[var(--color-ink)]">/username</code>) to start a DM.
-          </p>
-        </div>
+
+        {dms.map((dm) => {
+          const href = `/channels/me/${dm.channel_id}`;
+          const active = pathname === href;
+          const unread = unreadByChannel[dm.channel_id] ?? 0;
+          return (
+            <Link
+              key={dm.channel_id}
+              href={href}
+              className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors ${
+                active ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)]/60 hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {dm.other_user.avatar_url ? (
+                <img src={dm.other_user.avatar_url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+              ) : (
+                <div
+                  style={{ ['--p-a' as string]: dm.other_user.accent_color_top, ['--p-b' as string]: dm.other_user.accent_color_bottom }}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black"
+                >
+                  {dm.other_user.display_name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className={`truncate text-[13px] ${unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : 'font-medium'}`}>
+                  {dm.other_user.display_name}
+                </div>
+                <div className="truncate text-[11.5px] text-[var(--color-ink-faint)]">{dm.last_message_preview}</div>
+              </div>
+              {unread > 0 && (
+                <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full presence-fill px-1 font-mono text-[10px] font-bold text-black">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
