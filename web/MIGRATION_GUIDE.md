@@ -238,3 +238,45 @@ never have found the files no matter what you did. Added
 `scripts/copy-assets.mjs`, wired into `predev`/`prebuild`, which mirrors
 `../assets/` into `public/` automatically on every build. See
 `public/ASSETS.md` for the exact mapping.
+
+## 8. Friends, account linking, unique usernames, Instagram-style feed
+
+See `plan.md` for the scoping rationale. Summary of what actually
+shipped in this pass (all verified with a real build, 10/10 routes):
+
+- **Friends system built from scratch** — there was no `friends` table
+  at all before this, not a UI gap. `supabase/migrations/004_friends_and_usernames.sql`
+  adds `friend_requests` + RLS + a `friends_view`, plus notification
+  triggers reusing the `friend_request`/`friend_accept` types already
+  added in migration 003. New `/friends` screen (All / Pending / Add
+  Friend tabs) and a real DM conversation list in the sidebar (previously
+  a permanent empty-state placeholder).
+- **Fixed a real bug while building the DM list**: `createOrGetDM` never
+  deduped — messaging the same friend twice silently created a second,
+  separate empty channel every time. Fixed by checking for an existing
+  1:1 channel first (RLS on `channel_members` naturally scopes the check
+  to shared channels, so no extra query needed).
+- **Unique, editable usernames** — added the missing UNIQUE index +
+  `is_username_available()` RPC, wired a debounced live check into
+  Settings (green check / red X while typing).
+- **Account linking** — `supabase.auth.linkIdentity()`/`unlinkIdentity()`
+  wired into a new Connected Accounts section in Settings, so Google +
+  Discord can live on one account instead of being separate sign-ups.
+  **Requires "Manual Linking" enabled in Supabase Dashboard →
+  Authentication → Providers** — off by default, this won't work until
+  you toggle it.
+- **Feed redesigned to the Instagram interaction model** — single heart
+  (turns red + fills when liked, click again to unlike) replacing the
+  3-emoji bar; comment button is now icon-only; added a share button
+  (native share sheet on mobile, copies a link otherwise).
+- **Fixed the profile-click bug** — post authors' names/avatars, and
+  comment authors' names/avatars, were never actually wrapped in a
+  `<Link>`. They looked clickable and weren't. Real bug, not a styling
+  gap.
+
+### Still queued (see plan.md)
+
+Stories (full feature: expiring media + upload + viewer — not stubbed
+in), and the Discord-style categorized Settings layout (the
+functionality added this pass needs a home in that structure, not
+retrofitted into the current single-scroll panel).
