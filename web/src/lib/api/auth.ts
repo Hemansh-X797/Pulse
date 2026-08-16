@@ -54,3 +54,31 @@ export async function getSession() {
   if (error) throw error;
   return data.session;
 }
+
+// ---- Connected accounts (link Google/Discord/email onto ONE account) ----
+// This is Supabase Auth's identity-linking API, not a second sign-up flow
+// — signInWithOAuth() above creates/logs into an account from scratch;
+// linkIdentity() instead attaches a new sign-in method to the account
+// you're *already signed into*, which is what "one account, multiple
+// ways in" actually requires. Needs "Manual Linking" turned on in
+// Supabase Dashboard → Authentication → Providers (off by default) — see
+// MIGRATION_GUIDE.md for the exact toggle.
+
+export async function getLinkedIdentities() {
+  const { data, error } = await supabase.auth.getUserIdentities();
+  if (error) throw error;
+  return data.identities;
+}
+
+export async function linkProvider(provider: 'google' | 'discord') {
+  const { error } = await supabase.auth.linkIdentity({
+    provider,
+    options: { redirectTo: `${window.location.origin}/settings` },
+  });
+  if (error) throw error;
+}
+
+export async function unlinkProvider(identity: Awaited<ReturnType<typeof getLinkedIdentities>>[number]) {
+  const { error } = await supabase.auth.unlinkIdentity(identity);
+  if (error) throw error;
+}
