@@ -14,10 +14,22 @@ export async function createOrGetDM(otherUsername: string): Promise<string> {
   if (otherError) throw otherError;
   if (!other) throw new Error('user not found');
 
-  // Simple approach: always create a fresh channel. A production version
-  // would check for an existing 1:1 channel between these two users
-  // first (same as the C++ version arguably should have — it didn't
-  // dedupe either, worth fixing in both places together).
+  // Check for an existing 1:1 channel first. This used to always create
+  // a fresh channel on every call — same bug the original C++ dm_open
+  // handler had, never deduped either — so messaging the same friend
+  // twice from their profile silently forked the conversation into a
+  // second empty channel. "members can view channel membership" RLS
+  // (schema.sql) already restricts channel_members rows to channels
+  // *I'm* also a member of, so this single query naturally resolves to
+  // the shared channel(s) between us — no separate intersection needed.
+  const { data: shared, error: sharedError } = await supabase
+    .from('channel_members')
+    .select('channel_id, channels!inner(is_group)')
+    .eq('user_id', other.id)
+    .eq('channels.is_group', false);
+  if (sharedError) throw sharedError;
+  if (shared && shared.length > 0) return shared[0].channel_id;
+
   const { data: channel, error: channelError } = await supabase
     .from('channels')
     .insert({ is_group: false })
@@ -34,6 +46,62 @@ export async function createOrGetDM(otherUsername: string): Promise<string> {
   if (memberError) throw memberError;
 
   return channel.id;
+}
+
+export interface DmSummary {
+  channel_id: string;
+  other_user: { id: string; username: string; display_name: string; avatar_url: string; accent_color_top: string; accent_color_bottom: string };
+  last_message_preview: string;
+  last_message_at: string | null;
+}
+
+export async function listMyDMs(): Promise<DmSummary[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  // Same RLS scoping as createOrGetDM: this only ever returns channels
+  // I'm actually a member of.
+  const { data: myChannels, error } = await supabase
+    .from('channel_members')
+    .select('channel_id, channels!inner(is_group)')
+    .eq('user_id', userData.user.id)
+    .eq('channels.is_group', false);
+  if (error) throw error;
+  const channelIds = (myChannels ?? []).map((r) => r.channel_id);
+  if (channelIds.length === 0) return [];
+
+  const { data: allMembers, error: membersError } = await supabase
+    .from('channel_members')
+    .select('channel_id, profiles!inner(id, username, display_name, avatar_url, accent_color_top, accent_color_bottom)')
+    .in('channel_id', channelIds)
+    .neq('user_id', userData.user.id);
+  if (membersError) throw membersError;
+
+  const { data: lastMessages } = await supabase
+    .from('messages')
+    .select('channel_id, body_rendered, media_type, created_at')
+    .in('channel_id', channelIds)
+    .order('created_at', { ascending: false });
+
+  const lastByChannel = new Map<string, { preview: string; at: string }>();
+  for (const m of lastMessages ?? []) {
+    if (!lastByChannel.has(m.channel_id)) {
+      lastByChannel.set(m.channel_id, { preview: m.media_type ? '📷 Photo' : m.body_rendered, at: m.created_at });
+    }
+  }
+
+  return (allMembers ?? [])
+    .map((row) => {
+      const other = row.profiles as unknown as DmSummary['other_user'];
+      const last = lastByChannel.get(row.channel_id);
+      return {
+        channel_id: row.channel_id,
+        other_user: other,
+        last_message_preview: last?.preview ?? 'No messages yet',
+        last_message_at: last?.at ?? null,
+      };
+    })
+    .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''));
 }
 
 export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string })[]> {
