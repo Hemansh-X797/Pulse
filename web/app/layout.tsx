@@ -49,6 +49,9 @@ export const metadata: Metadata = {
   creator: 'Hemansh Kumar Mishra',
   publisher: 'Hemansh Kumar Mishra',
   alternates: { canonical: SITE_URL },
+  verification: {
+    google: 'r8icM2TkcNldNPhM1_pU2T5bUn5lO1jXsOluwURfMLw',
+  },
   openGraph: {
     title: 'PalSpace | Chat, Feed, Spaces & Stories',
     description: 'PalSpace — chat, feed, spaces, and stories in one app.',
