@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { LogOut, X, Camera, Check } from 'lucide-react';
+import { LogOut, X, Camera, Check, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { uploadMedia, MediaUploadError } from '../lib/api/media';
 import { getMyProfile, updateProfile } from '../lib/api/profile';
+import { isUsernameAvailable } from '../lib/api/friends';
+import { getLinkedIdentities, linkProvider, unlinkProvider } from '../lib/api/auth';
 import { useAppStore } from '../store/useAppStore';
 
 const ACCENT_PRESETS: [string, string][] = [
@@ -45,6 +47,8 @@ export function Settings() {
   });
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
+  const [username, setUsername] = useState(profile?.username ?? '');
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid'>('idle');
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [pronouns, setPronouns] = useState(profile?.pronouns ?? '');
   const [statusText, setStatusText] = useState(profile?.status_text ?? '');
@@ -59,10 +63,41 @@ export function Settings() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
+  // Debounced availability check — skips the check entirely (and hides
+  // the indicator) when the field is unchanged from what's already
+  // saved, so you don't see a spurious "checking..." on page load.
+  useEffect(() => {
+    if (!profile || username === profile.username) {
+      setUsernameStatus('idle');
+      return;
+    }
+    const trimmed = username.trim();
+    if (trimmed.length < 3 || !/^[a-z0-9_]+$/i.test(trimmed)) {
+      setUsernameStatus('invalid');
+      return;
+    }
+    setUsernameStatus('checking');
+    const handle = setTimeout(() => {
+      isUsernameAvailable(trimmed)
+        .then((available) => setUsernameStatus(available ? 'available' : 'taken'))
+        .catch(() => setUsernameStatus('idle'));
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [username, profile]);
+
+  const { data: identities = [] } = useQuery({ queryKey: ['linked-identities'], queryFn: getLinkedIdentities });
+  const linkMutation = useMutation({ mutationFn: linkProvider });
+  const unlinkMutation = useMutation({
+    mutationFn: unlinkProvider,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['linked-identities'] }),
+  });
+  const linkedProviders = new Set(identities.map((i) => i.provider));
+
   const saveMutation = useMutation({
     mutationFn: () =>
       updateProfile({
         display_name: displayName.trim() || profile?.display_name || '',
+        username: usernameStatus === 'available' ? username.trim() : profile?.username,
         bio: bio.trim(),
         pronouns: pronouns.trim(),
         status_text: statusText.trim(),
@@ -99,6 +134,7 @@ export function Settings() {
   const dirty =
     profile &&
     (displayName !== profile.display_name ||
+      (username !== profile.username && usernameStatus === 'available') ||
       bio !== profile.bio ||
       pronouns !== profile.pronouns ||
       statusText !== profile.status_text ||
@@ -194,8 +230,22 @@ export function Settings() {
             </Field>
           </div>
 
-          <Field label="Username" hint="Not editable yet.">
-            <input value={profile ? `@${profile.username}` : ''} disabled className={`${inputClass} cursor-not-allowed opacity-60`} />
+          <Field label="Username" hint={usernameStatus === 'invalid' ? '3+ characters, letters/numbers/underscore only.' : undefined}>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[13.5px] text-[var(--color-ink-faint)]">@</span>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase())}
+                maxLength={32}
+                className={`${inputClass} pl-6 pr-8`}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                {usernameStatus === 'checking' && <Loader2 size={14} className="animate-spin text-[var(--color-ink-faint)]" />}
+                {usernameStatus === 'available' && <Check size={14} className="text-emerald-400" />}
+                {(usernameStatus === 'taken' || usernameStatus === 'invalid') && <X size={14} className="text-red-400" />}
+              </span>
+            </div>
+            {usernameStatus === 'taken' && <span className="mt-1 block text-[11px] text-red-400">That username is taken.</span>}
           </Field>
 
           <Field label="Status">
@@ -263,6 +313,48 @@ export function Settings() {
             {saveMutation.isPending ? 'Saving…' : saveMutation.isSuccess && !dirty ? 'Saved' : 'Save changes'}
           </button>
         </div>
+      </section>
+
+      <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
+        <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Connected accounts</h2>
+        <p className="mb-4 text-[13px] text-[var(--color-ink-muted)]">
+          Sign in with any of these — they're all the same PalSpace account, not separate ones.
+        </p>
+        <div className="space-y-2">
+          {(['google', 'discord'] as const).map((provider) => {
+            const identity = identities.find((i) => i.provider === provider);
+            const linked = Boolean(identity);
+            const isLastMethod = identities.length <= 1;
+            return (
+              <div
+                key={provider}
+                className="flex items-center justify-between rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-3.5 py-2.5"
+              >
+                <span className="text-[13px] font-medium capitalize">{provider}</span>
+                {linked ? (
+                  <button
+                    onClick={() => identity && unlinkMutation.mutate(identity)}
+                    disabled={isLastMethod || unlinkMutation.isPending}
+                    title={isLastMethod ? "Can't remove your only sign-in method" : undefined}
+                    className="text-[12px] text-[var(--color-ink-muted)] hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Disconnect
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => linkMutation.mutate(provider)}
+                    className="rounded-full bg-[var(--color-surface-overlay)] px-3 py-1 text-[12px] font-medium text-[var(--color-ink)] hover:bg-[var(--color-hairline-strong)]"
+                  >
+                    Connect
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-[11px] text-[var(--color-ink-faint)]">
+          Facebook and other providers need their own OAuth app set up first — ask if you want one added.
+        </p>
       </section>
 
       <section className="rounded-xl border border-red-500/20 bg-red-500/[0.04] p-5">
