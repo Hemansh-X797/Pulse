@@ -17,7 +17,7 @@ export async function getProfileByUsername(username: string): Promise<Profile | 
   return data;
 }
 
-export async function updateProfile(patch: Partial<Omit<Profile, 'id' | 'username' | 'created_at'>>): Promise<Profile> {
+export async function updateProfile(patch: Partial<Omit<Profile, 'id' | 'created_at'>>): Promise<Profile> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error('not authenticated');
 
