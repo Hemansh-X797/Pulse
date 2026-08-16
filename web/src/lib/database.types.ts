@@ -164,6 +164,19 @@ export interface Database {
         Update: { read?: boolean };
         Relationships: [];
       };
+      friend_requests: {
+        Row: {
+          id: number;
+          sender_id: string;
+          recipient_id: string;
+          status: 'pending' | 'accepted' | 'declined';
+          created_at: string;
+          responded_at: string | null;
+        };
+        Insert: { sender_id: string; recipient_id: string };
+        Update: { status?: 'pending' | 'accepted' | 'declined'; responded_at?: string };
+        Relationships: [];
+      };
     };
     Views: {
       feed_view: {
@@ -185,6 +198,10 @@ export interface Database {
         };
         Relationships: [];
       };
+      friends_view: {
+        Row: { user_id: string; friend_id: string; friends_since: string };
+        Relationships: [];
+      };
     };
     Functions: {
       channel_unread_counts: {
@@ -199,6 +216,10 @@ export interface Database {
         Args: { p_space_id: string };
         Returns: { deleted: boolean };
       };
+      is_username_available: {
+        Args: { p_username: string };
+        Returns: boolean;
+      };
     };
   };
 }
@@ -212,4 +233,5 @@ export type Message = Database['public']['Tables']['messages']['Row'];
 export type Post = Database['public']['Tables']['posts']['Row'];
 export type PostComment = Database['public']['Tables']['post_comments']['Row'];
 export type PalSpaceNotification = Database['public']['Tables']['notifications']['Row'];
+export type FriendRequest = Database['public']['Tables']['friend_requests']['Row'];
 export type FeedItem = Database['public']['Views']['feed_view']['Row'];
