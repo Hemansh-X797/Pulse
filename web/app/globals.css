@@ -65,6 +65,15 @@
       scroll-behavior: auto !important;
     }
   }
+  /* Manual override from Settings → Appearance, for anyone who wants
+     motion off within PalSpace specifically without changing their OS
+     setting (which the media query above already respects). */
+  html.force-reduced-motion *, html.force-reduced-motion *::before, html.force-reduced-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer utilities {
