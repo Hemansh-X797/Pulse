@@ -1,5 +1,5 @@
-import { Settings } from '../../../src/screens/Settings';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <Settings />;
+  redirect('/settings/profile');
 }
