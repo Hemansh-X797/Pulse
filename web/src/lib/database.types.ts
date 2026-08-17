@@ -177,6 +177,32 @@ export interface Database {
         Update: { status?: 'pending' | 'accepted' | 'declined'; responded_at?: string };
         Relationships: [];
       };
+      blocked_users: {
+        Row: { blocker_id: string; blocked_id: string; created_at: string };
+        Insert: { blocker_id: string; blocked_id: string };
+        Update: never;
+        Relationships: [];
+      };
+      notification_preferences: {
+        Row: {
+          user_id: string;
+          messages: boolean;
+          reactions: boolean;
+          comments: boolean;
+          friend_requests: boolean;
+          space_invites: boolean;
+          updated_at: string;
+        };
+        Insert: never; // row is created automatically by a signup trigger
+        Update: Partial<Pick<Database['public']['Tables']['notification_preferences']['Row'], 'messages' | 'reactions' | 'comments' | 'friend_requests' | 'space_invites' | 'updated_at'>>;
+        Relationships: [];
+      };
+      stories: {
+        Row: { id: number; author_id: string; media_url: string; created_at: string; expires_at: string };
+        Insert: { author_id: string; media_url: string };
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       feed_view: {
