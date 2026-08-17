@@ -1,68 +1,55 @@
-# plan.md — going wide: Settings depth, Stories, blocking, notifications
+# plan.md — nav cleanup, profile popover, real image cropper, emoji/GIF
 
-Building toward Discord's actual settings depth and Instagram's actual
-feed depth, not a single-page approximation of either. `app/` grows a
-lot in this pass — that's intentional, matching how Discord itself
-structures this (each settings category is its own real view, not a
-tab switch inside one component).
+## Quick, doing first
+1. Remove the separate Friends rail icon — Discord doesn't have one
+   either (see your own screenshot: Friends is a tab *inside* the DM
+   view, not its own app icon). Friends link already lives at the top
+   of the DM sidebar; the rail icon was redundant, removing it is the
+   actual "unify" fix.
+2. Sidebar header: swap the small gradient dot + "PalSpace" text for
+   just `logo.svg`, no text next to it.
+3. Appearance → **Compact mode** toggle (message density in chat) —
+   real, wired to actual spacing classes in ChatView, not a dead toggle.
 
-## New route surface
+## Profile popover (click name → small card; click avatar in card → full page)
+New `ProfileCard` popover component. Wiring it into the two highest-
+traffic spots first — feed post authors and DM/chat message senders —
+not literally everywhere in one pass (comments, space member lists,
+etc. can follow once this pattern is proven out).
 
-```
-app/(app)/settings/
-  layout.tsx          — the category shell (left nav, like your screenshot)
-  page.tsx             — redirects to /settings/profile
-  profile/page.tsx      — avatar/banner/bio/accent (what's already built, relocated)
-  account/page.tsx       — username, email, password, connected accounts
-  privacy/page.tsx        — who can friend-request/DM you, blocked users
-  notifications/page.tsx   — per-category notification toggles
-  appearance/page.tsx       — theme accent defaults, reduced motion
+## Real image cropper for avatar/banner upload
+Currently `uploadMedia()` gets called directly on file-select with no
+crop step — whatever aspect ratio you picked is what gets uploaded.
+Building a real crop modal (drag to pan, slider to zoom, circular mask
+for avatar / rect mask for banner) using a `<canvas>`, no external
+cropper library needed for something this scoped. Exports a cropped
+blob, *then* calls `uploadMedia()`.
 
-app/(app)/stories/
-  page.tsx             — tray + redirect into viewer
-  [username]/page.tsx   — full-screen viewer for one person's active stories
-```
+## Emoji picker
+`emoji.ts` already has a shortcode → emoji map (`:fire:` → 🔥) used for
+rendering — reusing that same map to build an actual picker grid in
+`ChatView`'s compose bar, rather than requiring people to remember
+shortcodes.
 
-## Features, in build order
+## GIF picker (Giphy)
+Real feature, and it can actually be free — Giphy's API has a genuine
+free tier (unlike SMS, there's no per-message carrier cost here). Needs
+`NEXT_PUBLIC_GIPHY_API_KEY` in your env — get one free at
+developers.giphy.com. Search-as-you-type grid, click to send as a
+message attachment. Skipping Tenor for this pass (one working
+integration beats two half-wired ones); flagging as an easy add-on
+later if wanted.
 
-1. **Settings restructure** — real category shell first, since
-   everything else in this pass needs a home in it. Moves what already
-   exists (profile editing, connected accounts) into the new structure
-   rather than bolting more onto the single-scroll panel.
+## Media upload in DMs
+Already existed before this message — `ChatView`'s attach-image button
+has worked since the Phase 2 pass. Confirmed still working, no change
+needed here.
 
-2. **Blocked users** — genuinely didn't exist. New `blocked_users`
-   table + RLS that also *filters* — blocking someone hides their posts
-   from your feed and stops them DMing/friend-requesting you, not just a
-   list with no teeth. Lives under Settings → Privacy.
-
-3. **Notification preferences** — per-type toggles (messages, reactions,
-   comments, friend requests, space invites) stored per-user, checked by
-   the existing notification trigger functions before they fire. Real
-   enforcement, not a UI that saves settings nothing reads.
-
-4. **Stories** — the thing called out twice now as "still doesn't
-   work." Real scope for this pass: image stories (no video — flagging
-   that cut honestly), 24h expiry via a view filter (no cron needed),
-   tray with gradient rings on the rail for friends with active stories,
-   tap-through full-screen viewer with progress bars. Seen-by lists and
-   story reactions are a further follow-up, not in this pass.
-
-5. **Appearance settings** — default accent-gradient presets editable
-   per-user beyond just profile color (this overlaps profile accent by
-   design — Discord does the same thing with theme vs. profile
-   accent), reduced-motion toggle wired to the `prefers-reduced-motion`
-   CSS already in globals.css so there's a manual override too.
-
-## Explicitly not in this pass (flagging, not hiding)
-
-- Voice/video channels — Discord-depth voice is its own infrastructure
-  project (WebRTC signaling, SFU or mesh, Render doesn't give you that
-  for free), not a Settings-page-sized feature. Would need a real scoping
-  conversation on its own.
-- Roles/permissions within a Space — meaningful chunk of schema + UI on
-  its own, queuing separately if wanted.
-- Search (posts/hashtags) — mentioned earlier in the conversation,
-  still queued, not in this pass either; flagging so it doesn't get lost.
-
-Building 1–4 now, 5 if there's room after. Reporting back with what's
-real before calling it done, same as every pass so far.
+## Discord-style profile edit (live preview panel, nameplate/banner-color/
+frame sections from your screenshot)
+**Not in this pass.** This is a real visual subsystem (decorative
+frames, nameplate assets, a live-updating preview card) layered on top
+of what Settings → Profile already does — cramming it in alongside
+everything else above risks the same "half-built" result you've pushed
+back on twice already. Flagging honestly rather than shipping a rushed
+version; tell me if you want this prioritized next and it goes first.
