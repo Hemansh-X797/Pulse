@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X } from 'lucide-react';
+import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker } from 'lucide-react';
 import {
   listMessages,
   sendMessage,
@@ -12,6 +12,10 @@ import {
   markRead,
 } from '../../lib/api/channels';
 import { uploadMedia } from '../../lib/api/media';
+import { useCompactMode } from '../../hooks/useCompactMode';
+import { EmojiPicker } from './EmojiPicker';
+import { GifPicker } from './GifPicker';
+import { ProfilePopover } from '../profile/ProfilePopover';
 import {
   subscribeToChannelMessages,
   subscribeToTyping,
@@ -37,6 +41,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const setActiveChannel = useAppStore((s) => s.setActiveChannel);
   const setUnreadByChannel = useAppStore((s) => s.setUnreadByChannel);
   const unreadByChannel = useAppStore((s) => s.unreadByChannel);
+  const compactMode = useCompactMode();
 
   // Tell useUnreadCounts "I'm looking at this channel right now" so its
   // global subscription stops incrementing this one, and clear whatever
@@ -62,6 +67,8 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const [recording, setRecording] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -221,6 +228,34 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
     }
   }
 
+  async function handleSendGif(gifUrl: string) {
+    if (!profile) return;
+    const clientRef = crypto.randomUUID();
+    const optimistic: DisplayMessage = {
+      id: -Date.now(),
+      channel_id: channelId,
+      sender_id: profile.id,
+      sender_username: profile.username,
+      body_raw: '',
+      body_rendered: '',
+      reply_to_id: null,
+      edited_at: null,
+      deleted: false,
+      client_ref: clientRef,
+      expires_at: null,
+      media_url: gifUrl,
+      media_type: 'image', // GIF is just an animated image — no separate media_type needed, <img> renders it natively
+      created_at: new Date().toISOString(),
+      pending: true,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    try {
+      await sendMessage(channelId, '', { clientRef, mediaUrl: gifUrl, mediaType: 'image' });
+    } catch (e) {
+      setAttachError(e instanceof Error ? e.message : 'Failed to send GIF.');
+    }
+  }
+
   async function toggleVoiceRecording() {
     if (recording) {
       mediaRecorderRef.current?.stop();
@@ -282,6 +317,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
               isMine={m.sender_id === profile?.id}
               isEditing={editingId === m.id}
               replySnippet={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : undefined}
+              compact={compactMode}
               onReply={() => setReplyTarget(m)}
               onEdit={() => startEdit(m)}
               onSaveEdit={(body) => saveEdit(m.id, body)}
@@ -389,6 +425,36 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
             className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none"
           />
 
+          <div className="relative">
+            <button
+              onClick={() => {
+                setEmojiPickerOpen((v) => !v);
+                setGifPickerOpen(false);
+              }}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              aria-label="Emoji"
+              aria-haspopup="true"
+            >
+              <Smile size={17} />
+            </button>
+            {emojiPickerOpen && <EmojiPicker onSelect={(emoji) => setInput((v) => v + emoji)} onClose={() => setEmojiPickerOpen(false)} />}
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => {
+                setGifPickerOpen((v) => !v);
+                setEmojiPickerOpen(false);
+              }}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+              aria-label="GIF"
+              aria-haspopup="true"
+            >
+              <Sticker size={17} />
+            </button>
+            {gifPickerOpen && <GifPicker onSelect={handleSendGif} onClose={() => setGifPickerOpen(false)} />}
+          </div>
+
           <button
             onClick={handleSend}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black transition-transform active:scale-90"
@@ -407,6 +473,7 @@ function MessageRow({
   isMine,
   isEditing,
   replySnippet,
+  compact,
   onReply,
   onEdit,
   onSaveEdit,
@@ -416,6 +483,7 @@ function MessageRow({
   isMine: boolean;
   isEditing: boolean;
   replySnippet?: DisplayMessage;
+  compact: boolean;
   onReply: () => void;
   onEdit: () => void;
   onSaveEdit: (body: string) => void;
@@ -425,7 +493,7 @@ function MessageRow({
 
   if (message.deleted) {
     return (
-      <div className={`flex gap-2.5 py-1.5 ${isMine ? 'flex-row-reverse' : ''}`}>
+      <div className={`flex gap-2.5 ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}>
         <div className="w-[30px] shrink-0" />
         <div className="rounded-2xl border border-dashed border-[var(--color-hairline-strong)] px-3.5 py-2 font-mono text-[13px] italic text-[var(--color-ink-muted)]">
           message deleted
@@ -436,6 +504,8 @@ function MessageRow({
 
   const initials = message.sender_username.slice(0, 2).toUpperCase();
   const isExpiring = !!message.expires_at;
+  const popoverAnchorRef = useRef<HTMLDivElement>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   return (
     <motion.div
@@ -444,17 +514,28 @@ function MessageRow({
       animate={{ opacity: message.pending ? 0.5 : 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className={`group flex gap-2.5 py-1.5 ${isMine ? 'flex-row-reverse' : ''}`}
+      className={`group flex gap-2.5 ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}
     >
-      <div className="mt-0.5 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black">
-        {initials}
-      </div>
-      <div className={`flex max-w-[70%] flex-col ${isMine ? 'items-end' : 'items-start'}`}>
-        <div className={`mb-0.5 flex items-baseline gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
-          <span className="text-[12.5px] font-semibold">{message.sender_username}</span>
+      {!compact && (
+        <button
+          onClick={() => setPopoverOpen((v) => !v)}
+          className="mt-0.5 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black"
+        >
+          {initials}
+        </button>
+      )}
+      {compact && <div className="w-[30px] shrink-0" />}
+      <div className={`relative flex max-w-[70%] flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+        <div ref={popoverAnchorRef} className={`mb-0.5 flex items-baseline gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
+          <button onClick={() => setPopoverOpen((v) => !v)} className="text-[12.5px] font-semibold hover:opacity-80">
+            {message.sender_username}
+          </button>
           {message.edited_at && <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">edited</span>}
           {isExpiring && <span className="font-mono text-[10px] text-[var(--presence-default-a)]">disappearing</span>}
         </div>
+        {popoverOpen && (
+          <ProfilePopover username={message.sender_username} anchorRef={popoverAnchorRef} onClose={() => setPopoverOpen(false)} />
+        )}
 
         {replySnippet && (
           <div className="mb-0.5 max-w-[320px] truncate font-mono text-[10.5px] text-[var(--color-ink-muted)]">
