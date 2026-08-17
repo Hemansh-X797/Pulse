@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getCompactModeSync, setCompactMode } from '../../hooks/useCompactMode';
 
 const STORAGE_KEY = 'palspace-reduced-motion';
 
@@ -19,6 +20,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 
 export function AppearanceSettings() {
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [compact, setCompact] = useState(false);
 
   // Reads/writes a plain in-memory + localStorage flag, not a data-*
   // attribute driving a global CSS override yet — the system
@@ -29,6 +31,7 @@ export function AppearanceSettings() {
   // full custom-theme system in this pass.
   useEffect(() => {
     setReducedMotion(localStorage.getItem(STORAGE_KEY) === 'true');
+    setCompact(getCompactModeSync());
   }, []);
 
   function toggle() {
@@ -38,9 +41,26 @@ export function AppearanceSettings() {
     document.documentElement.classList.toggle('force-reduced-motion', next);
   }
 
+  function toggleCompact() {
+    const next = !compact;
+    setCompact(next);
+    setCompactMode(next);
+  }
+
   return (
     <div>
       <h1 className="mb-6 font-serif text-2xl font-semibold">Appearance</h1>
+
+      <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
+        <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Chat display</h2>
+        <div className="mt-3 flex items-center justify-between">
+          <div>
+            <div className="text-[13.5px] font-medium">Compact mode</div>
+            <div className="text-[11.5px] text-[var(--color-ink-faint)]">Tighter message spacing, no avatars per line.</div>
+          </div>
+          <Toggle on={compact} onClick={toggleCompact} />
+        </div>
+      </section>
 
       <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Motion</h2>
