@@ -326,3 +326,44 @@ has real weight confirming it shipped).
 Voice/video channels (real infrastructure project on its own — flagged
 honestly rather than half-built), Space roles/permissions, post
 search/hashtags. None started.
+
+## 10. Nav unification, profile popover, real image cropper, emoji/GIF
+
+All verified with a real build (18/18 routes; `/home` and
+`/settings/profile` both grew in bundle size, confirming the popover and
+cropper actually shipped, not just typechecked).
+
+- **Nav unified** — removed the separate Friends rail icon (redundant
+  now that Friends lives at the top of the DM sidebar, matching how
+  Discord itself structures it — Friends is a tab inside the DM view,
+  not its own app icon).
+- **Logo** — sidebar header and rail both now show `logo.svg` instead of
+  a small gradient dot, with the "PalSpace" text removed next to it.
+- **Compact mode** — real toggle in Settings → Appearance, wired to
+  actual spacing/avatar-visibility changes in `ChatView`.
+- **Profile popover** — click a name/avatar on a feed post or a chat
+  message → compact card (avatar, bio line, Add Friend/Message). Click
+  the avatar *inside* the popover → full profile page. Wired into the
+  two highest-traffic spots (feed posts, chat messages) per plan.md;
+  comments and space member lists still use direct navigation and can
+  get the same treatment on request.
+- **Real image cropper** — avatar/banner upload now opens a crop modal
+  first (drag to pan, slider to zoom, circular guide for avatars / rect
+  for banners) instead of uploading whatever aspect ratio the original
+  file happened to be. Exports a real cropped blob via canvas, matching
+  Discord's own approach (square export, circular display via CSS).
+- **Emoji picker** — real grid reusing the existing shortcode map from
+  `emoji.ts` (the same one that already renders `:fire:` → 🔥), wired
+  into the chat compose bar.
+- **GIF picker** — real Giphy search integration, genuinely free tier.
+  Needs `NEXT_PUBLIC_GIPHY_API_KEY` (see `.env.local.example`) — shows a
+  clear message pointing at developers.giphy.com if it's not set, rather
+  than failing silently.
+- **Media upload in DMs** — confirmed already working (built in an
+  earlier pass), no change needed.
+
+### Still queued
+
+The Discord-style profile-edit live-preview panel (nameplate, banner
+color, decorative frame sections from your screenshot) — flagged as its
+own pass in plan.md rather than rushed alongside everything above.
