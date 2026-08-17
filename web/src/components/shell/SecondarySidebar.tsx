@@ -24,10 +24,17 @@ export function SecondarySidebar() {
 
 function SidebarHeader({ title }: { title: string }) {
   const [notifOpen, setNotifOpen] = useState(false);
+  const isBrand = title === 'PalSpace';
   return (
     <div className="relative flex items-center gap-2 px-[22px] pb-5 pt-[22px]">
-      <span className="h-[7px] w-[7px] shrink-0 rounded-full presence-fill" />
-      <span className="truncate font-serif text-lg font-semibold">{title}</span>
+      {isBrand ? (
+        <img src="/logo.svg" alt="PalSpace" className="h-7 w-7 shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+      ) : (
+        <>
+          <span className="h-[7px] w-[7px] shrink-0 rounded-full presence-fill" />
+          <span className="truncate font-serif text-lg font-semibold">{title}</span>
+        </>
+      )}
       <button
         onClick={() => setNotifOpen((v) => !v)}
         className="relative ml-auto flex h-8 w-8 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
