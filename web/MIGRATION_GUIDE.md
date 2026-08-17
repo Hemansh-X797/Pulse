@@ -280,3 +280,49 @@ Stories (full feature: expiring media + upload + viewer — not stubbed
 in), and the Discord-style categorized Settings layout (the
 functionality added this pass needs a home in that structure, not
 retrofitted into the current single-scroll panel).
+
+## 9. Discord/Instagram-depth pass — Settings restructure, Stories, blocking, notification prefs
+
+See `plan.md` for scoping. All verified with a real build (18/18 routes,
+`/settings` correctly shrunk to a 137B redirect, each new category page
+has real weight confirming it shipped).
+
+- **Settings restructured** into a real category shell
+  (`app/(app)/settings/{profile,account,privacy,notifications,appearance}/`)
+  matching your Discord screenshot's left-nav layout, instead of one
+  long scrolling page. `/settings` now just redirects to `/settings/profile`.
+- **Username editing** moved to Account (was on Profile), **Connected
+  accounts** stayed there too — both were built last pass, just relocated
+  to the structure that actually fits them.
+- **Blocked users, built for real, with enforcement** — new
+  `blocked_users` table + three DB triggers: `feed_view` excludes
+  blocked/blocking parties' posts, friend requests to/from a blocked
+  user are rejected at the trigger level, messages into a shared DM with
+  a blocked user are rejected too. Block/unblock lives both in Settings →
+  Privacy and directly on a person's profile page (⋯ menu).
+- **Notification preferences, actually enforced** — 5 toggles
+  (messages/reactions/comments/friend requests/space invites) in
+  Settings → Notifications, each one gated directly in the DB trigger
+  that would otherwise create that notification. A toggle nothing checks
+  isn't a real feature — same lesson as the original unread-counts bug,
+  applied proactively here instead of found as a bug later.
+- **Stories, actually built this time** — real 24h-expiring `stories`
+  table (RLS handles both the expiry filter and friend-visibility, no
+  cron needed), a tray at `/stories` with gradient rings around friends
+  who have an active story (your own ring shows a + when you don't),
+  upload flow reusing the same `uploadMedia()` as everywhere else, and a
+  full-screen viewer at `/stories/[username]` with tap-to-advance and
+  per-story progress bars — advances to the next friend's stories
+  automatically when yours run out, same as Instagram's tray behavior.
+  Video stories, seen-by lists, and story reactions are explicitly not
+  in this pass (flagged in plan.md, not silently missing).
+- **Appearance settings** — a manual reduced-motion override (on top of
+  the `prefers-reduced-motion` media query that was already respecting
+  the OS-level setting), and profile accent-gradient editing stayed on
+  the Profile page rather than being duplicated here.
+
+### Still queued
+
+Voice/video channels (real infrastructure project on its own — flagged
+honestly rather than half-built), Space roles/permissions, post
+search/hashtags. None started.
