@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Heart, MessageCircle, Send, ImagePlus, MoreHorizontal, Pencil, Trash2, X, Share2 } from 'lucide-react';
@@ -17,6 +17,7 @@ import {
 } from '../lib/api/feed';
 import { uploadMedia } from '../lib/api/media';
 import { useAppStore } from '../store/useAppStore';
+import { ProfilePopover } from '../components/profile/ProfilePopover';
 import type { FeedItem } from '../lib/database.types';
 
 function timeAgo(iso: string) {
@@ -248,10 +249,13 @@ function PostCard({ post }: { post: FeedItem }) {
     deleteMutation.mutate();
   }
 
+  const popoverAnchorRef = useRef<HTMLDivElement>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
   return (
     <div className="w-full max-w-[560px] rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5 transition-colors hover:border-[var(--color-hairline-strong)]">
-      <div className="mb-3 flex items-center gap-2.5">
-        <Link href={`/${post.author_username}`} className="shrink-0">
+      <div ref={popoverAnchorRef} className="relative mb-3 flex items-center gap-2.5">
+        <button onClick={() => setPopoverOpen((v) => !v)} className="shrink-0">
           <Avatar
             url={post.author_avatar_url}
             name={post.author_display_name}
@@ -259,14 +263,17 @@ function PostCard({ post }: { post: FeedItem }) {
             accentTop={post.author_accent_top}
             accentBottom={post.author_accent_bottom}
           />
-        </Link>
-        <Link href={`/${post.author_username}`} className="min-w-0 flex-1 hover:opacity-80">
+        </button>
+        <button onClick={() => setPopoverOpen((v) => !v)} className="min-w-0 flex-1 text-left hover:opacity-80">
           <div className="text-[13.5px] font-semibold">{post.author_display_name}</div>
           <div className="text-[11.5px] text-[var(--color-ink-muted)]">
             @{post.author_username} · {timeAgo(post.created_at)}
             {post.edited_at && ' · edited'}
           </div>
-        </Link>
+        </button>
+        {popoverOpen && (
+          <ProfilePopover username={post.author_username} anchorRef={popoverAnchorRef} onClose={() => setPopoverOpen(false)} />
+        )}
 
         {isMine && (
           <div className="relative">
