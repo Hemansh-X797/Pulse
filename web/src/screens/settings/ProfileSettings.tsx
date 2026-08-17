@@ -7,6 +7,7 @@ import { uploadMedia, MediaUploadError } from '../../lib/api/media';
 import { getMyProfile, updateProfile } from '../../lib/api/profile';
 import { useAppStore } from '../../store/useAppStore';
 import { Field, inputClass } from './shared';
+import { CropModal } from '../../components/settings/CropModal';
 
 const ACCENT_PRESETS: [string, string][] = [
   ['#2dd4bf', '#a78bfa'], // PalSpace default — teal → violet
@@ -35,6 +36,7 @@ export function ProfileSettings() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [cropTarget, setCropTarget] = useState<{ file: File; kind: 'avatar' | 'banner' } | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,6 +59,10 @@ export function ProfileSettings() {
   });
 
   async function handleImageUpload(file: File, kind: 'avatar' | 'banner') {
+    // File-select opens the crop modal first now (see CropModal) rather
+    // than uploading whatever aspect ratio the original file happened to
+    // be — this function now receives an already-cropped Blob from
+    // handleCropApply below, not the raw file-picker File.
     setUploadError(null);
     kind === 'avatar' ? setAvatarUploading(true) : setBannerUploading(true);
     try {
@@ -67,6 +73,13 @@ export function ProfileSettings() {
     } finally {
       kind === 'avatar' ? setAvatarUploading(false) : setBannerUploading(false);
     }
+  }
+
+  function handleCropApply(blob: Blob) {
+    if (!cropTarget) return;
+    const croppedFile = new File([blob], `${cropTarget.kind}.png`, { type: 'image/png' });
+    setCropTarget(null);
+    handleImageUpload(croppedFile, cropTarget.kind);
   }
 
   const dirty =
@@ -110,7 +123,7 @@ export function ProfileSettings() {
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) handleImageUpload(f, 'banner');
+              if (f) setCropTarget({ file: f, kind: 'banner' });
               e.target.value = '';
             }}
           />
@@ -141,7 +154,7 @@ export function ProfileSettings() {
               hidden
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleImageUpload(f, 'avatar');
+                if (f) setCropTarget({ file: f, kind: 'avatar' });
                 e.target.value = '';
               }}
             />
@@ -225,6 +238,15 @@ export function ProfileSettings() {
           </button>
         </div>
       </section>
+
+      {cropTarget && (
+        <CropModal
+          file={cropTarget.file}
+          kind={cropTarget.kind}
+          onCancel={() => setCropTarget(null)}
+          onApply={handleCropApply}
+        />
+      )}
     </div>
   );
 }
