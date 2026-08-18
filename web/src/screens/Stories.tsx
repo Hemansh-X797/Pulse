@@ -12,6 +12,7 @@ export function Stories() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const profile = useAppStore((s) => s.profile);
+  const session = useAppStore((s) => s.session);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +30,11 @@ export function Stories() {
     setError(null);
     setUploading(true);
     try {
-      const url = await uploadMedia(file);
+      // Pass the already-hydrated session's user id (see uploadMedia's
+      // knownUserId param) instead of trusting a fresh getUser() call —
+      // this was the fix for the "you must be signed in to upload
+      // media" bug reported on this page specifically.
+      const url = await uploadMedia(file, session?.user.id);
       await createMutation.mutateAsync(url);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed.');
