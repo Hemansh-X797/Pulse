@@ -246,6 +246,10 @@ export interface Database {
         Args: { p_username: string };
         Returns: boolean;
       };
+      create_dm_channel: {
+        Args: { other_user_id: string };
+        Returns: string;
+      };
     };
   };
 }
