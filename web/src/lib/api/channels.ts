@@ -30,22 +30,20 @@ export async function createOrGetDM(otherUsername: string): Promise<string> {
   if (sharedError) throw sharedError;
   if (shared && shared.length > 0) return shared[0].channel_id;
 
-  const { data: channel, error: channelError } = await supabase
-    .from('channels')
-    .insert({ is_group: false })
-    .select()
-    .single();
-  if (channelError) throw channelError;
+  // Creating the channel + both membership rows can't be done as two
+  // separate client-side inserts: "users can add themselves to a
+  // channel" (channel_members INSERT policy) only allows
+  // user_id = auth.uid(), so inserting the *other* user's membership
+  // row from the client is rejected by RLS every time, and the whole
+  // batch insert() fails with it. This RPC (006_fix_dm_creation_rls.sql)
+  // does both inserts atomically as SECURITY DEFINER, with the
+  // equivalent checks enforced inside the function body instead.
+  const { data: channelId, error: rpcError } = await supabase.rpc('create_dm_channel', {
+    other_user_id: other.id,
+  });
+  if (rpcError) throw rpcError;
 
-  const { error: memberError } = await supabase
-    .from('channel_members')
-    .insert([
-      { channel_id: channel.id, user_id: userData.user.id },
-      { channel_id: channel.id, user_id: other.id },
-    ]);
-  if (memberError) throw memberError;
-
-  return channel.id;
+  return channelId as string;
 }
 
 export interface DmSummary {
