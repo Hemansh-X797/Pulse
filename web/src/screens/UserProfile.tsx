@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MoreHorizontal, UserPlus, Check, ShieldOff, Shield } from 'lucide-react';
+import { MoreHorizontal, UserPlus, Check, ShieldOff, Shield, X } from 'lucide-react';
 import { getProfileByUsername } from '../lib/api/profile';
 import { createOrGetDM } from '../lib/api/channels';
 import { listFriends, listOutgoingRequests, sendFriendRequest } from '../lib/api/friends';
@@ -17,6 +17,7 @@ export function UserProfile() {
   const queryClient = useQueryClient();
   const myProfile = useAppStore((s) => s.profile);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile', username],
@@ -53,8 +54,13 @@ export function UserProfile() {
   });
 
   async function handleMessage() {
-    const channelId = await createOrGetDM(username);
-    router.push(`/channels/me/${channelId}`);
+    setMessageError(null);
+    try {
+      const channelId = await createOrGetDM(username);
+      router.push(`/channels/me/${channelId}`);
+    } catch (e) {
+      setMessageError(e instanceof Error ? e.message : 'Could not start conversation.');
+    }
   }
 
   if (isLoading) return null;
@@ -73,6 +79,14 @@ export function UserProfile() {
         }}
       />
       <div className="px-8 pb-8">
+        {messageError && (
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
+            {messageError}
+            <button onClick={() => setMessageError(null)} className="ml-3 text-red-400 hover:text-[var(--color-ink)]" aria-label="Dismiss">
+              <X size={13} />
+            </button>
+          </div>
+        )}
         <div className="flex items-end justify-between">
           <div
             className="-mt-10 mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[var(--color-void)] text-2xl font-bold text-black"
