@@ -37,6 +37,7 @@ const EPHEMERAL_OPTIONS = [
 export function ChatView({ channelId, channelLabel }: { channelId: string; channelLabel: string }) {
   const queryClient = useQueryClient();
   const profile = useAppStore((s) => s.profile);
+  const session = useAppStore((s) => s.session);
   const connectionStatus = useAppStore((s) => s.connectionStatus);
   const setActiveChannel = useAppStore((s) => s.setActiveChannel);
   const setUnreadByChannel = useAppStore((s) => s.setUnreadByChannel);
@@ -195,7 +196,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
     setAttachError(null);
     setUploadingImage(true);
     try {
-      const url = await uploadMedia(file);
+      const url = await uploadMedia(file, session?.user.id);
       const clientRef = crypto.randomUUID();
       const optimistic: DisplayMessage = {
         id: -Date.now(),
