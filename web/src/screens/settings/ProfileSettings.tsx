@@ -22,6 +22,7 @@ export function ProfileSettings() {
   const queryClient = useQueryClient();
   const storeProfile = useAppStore((s) => s.profile);
   const setStoreProfile = useAppStore((s) => s.setProfile);
+  const session = useAppStore((s) => s.session);
 
   const { data: profile } = useQuery({ queryKey: ['my-profile'], queryFn: getMyProfile, initialData: storeProfile ?? undefined });
 
@@ -66,7 +67,7 @@ export function ProfileSettings() {
     setUploadError(null);
     kind === 'avatar' ? setAvatarUploading(true) : setBannerUploading(true);
     try {
-      const url = await uploadMedia(file);
+      const url = await uploadMedia(file, session?.user.id);
       kind === 'avatar' ? setAvatarUrl(url) : setBannerUrl(url);
     } catch (e) {
       setUploadError(e instanceof MediaUploadError || e instanceof Error ? e.message : 'Upload failed.');
