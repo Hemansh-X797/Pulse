@@ -36,6 +36,7 @@ const LIKE_EMOJI = '❤️';
 
 export function HomeFeed() {
   const queryClient = useQueryClient();
+  const session = useAppStore((s) => s.session);
   const { data: posts = [], isLoading } = useQuery({ queryKey: ['feed'], queryFn: () => listFeed() });
 
   const [body, setBody] = useState('');
@@ -58,7 +59,7 @@ export function HomeFeed() {
     setComposeError(null);
     setUploading(true);
     try {
-      const url = await uploadMedia(file);
+      const url = await uploadMedia(file, session?.user.id);
       setPendingImage(url);
     } catch (e) {
       // Previously unhandled entirely — a failed upload just did nothing
