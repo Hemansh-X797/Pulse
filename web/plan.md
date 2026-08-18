@@ -55,7 +55,30 @@ all four call sites (`Stories.tsx`, `HomeFeed.tsx`, `ChatView.tsx`,
 
 No migration needed for this one, just the code change.
 
-## Needs your input before I build it
+## Also found and fixed: 42P17 infinite recursion on channel_members
+
+You hit this right after the message-button fix went live — real,
+separate pre-existing bug, not something migration 006 introduced.
+`001_initial_schema.sql`'s "members can view channel membership"
+SELECT policy on `channel_members` queried `channel_members` inside
+its own `USING` clause — a policy re-entering itself to evaluate
+itself, forever. Migration 006's new RPC was just the first thing that
+actually exercised a `SELECT` through that exact policy; it's been
+sitting there since the first migration.
+
+Fixed in `supabase/migrations/007_fix_channel_members_rls_recursion.sql`:
+moved the membership check into a `SECURITY DEFINER` helper function
+(`is_channel_member`), which bypasses RLS on the table it checks, so
+the policy calls that instead of querying itself. Checked the sibling
+policy on `channels` ("members can view their channels") for the same
+shape — it queries `channel_members` from a policy defined on a
+*different* table, which is a normal cross-table reference, not
+self-recursion, so it didn't need the same fix.
+
+**Run 006 and 007 in order** — 007 depends on 006 already having been
+applied (it's fixing a bug that got surfaced by it, not one it caused).
+
+
 
 ### "Spaces" section below Stories
 Looked at the current nav before guessing, per your instruction — and
