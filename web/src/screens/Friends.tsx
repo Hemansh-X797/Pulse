@@ -41,6 +41,7 @@ function Avatar({ profile, size = 34 }: { profile: FriendProfile; size?: number 
 export function Friends() {
   const [tab, setTab] = useState<Tab>('all');
   const [query, setQuery] = useState('');
+  const [messageError, setMessageError] = useState<string | null>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -72,8 +73,13 @@ export function Friends() {
   });
 
   async function handleMessage(username: string) {
-    const channelId = await createOrGetDM(username);
-    router.push(`/channels/me/${channelId}`);
+    setMessageError(null);
+    try {
+      const channelId = await createOrGetDM(username);
+      router.push(`/channels/me/${channelId}`);
+    } catch (e) {
+      setMessageError(e instanceof Error ? e.message : 'Could not start conversation.');
+    }
   }
 
   const pendingCount = incoming.length;
@@ -97,6 +103,15 @@ export function Friends() {
           </button>
         ))}
       </div>
+
+      {messageError && (
+        <div className="mx-7 mt-4 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
+          {messageError}
+          <button onClick={() => setMessageError(null)} className="ml-3 text-red-400 hover:text-[var(--color-ink)]" aria-label="Dismiss">
+            <X size={13} />
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-7 py-5">
         {tab === 'add' && (
