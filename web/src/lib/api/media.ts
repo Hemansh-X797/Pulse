@@ -43,7 +43,7 @@ function resolveMimeType(file: File): string | null {
   return fallback ?? null;
 }
 
-export async function uploadMedia(file: File): Promise<string> {
+export async function uploadMedia(file: File, knownUserId?: string): Promise<string> {
   const mimeType = resolveMimeType(file);
   if (!mimeType) {
     throw new MediaUploadError('Unsupported file type — use PNG, JPEG, WEBP, or GIF.');
@@ -52,13 +52,31 @@ export async function uploadMedia(file: File): Promise<string> {
     throw new MediaUploadError(`File too large — max ${Math.floor(MAX_BYTES / 1024 / 1024)}MB.`);
   }
 
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
-    throw new MediaUploadError('You need to be signed in to upload media.');
+  // Bug fix ("you must be signed in to upload media" on /stories):
+  // supabase.auth.getUser() doesn't just read the locally-cached
+  // session — it makes its own network round-trip to Supabase's auth
+  // server to revalidate the JWT. That's a second, independent source
+  // of "am I logged in" from the one the app already trusted to render
+  // this page at all (useAuthSync's getSession(), gating the whole
+  // (app) layout — see app/(app)/layout.tsx). If that revalidation
+  // request is slow, rate-limited, or races anything else on first
+  // paint, getUser() can transiently report no user even though the
+  // store already has a valid session. Callers that already know who's
+  // signed in (from useAppStore's session/profile, populated before
+  // this component could even mount) should pass that id directly and
+  // skip the redundant network call entirely. Falls back to getUser()
+  // for callers that don't have it handy yet.
+  let userId = knownUserId;
+  if (!userId) {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      throw new MediaUploadError('You need to be signed in to upload media.');
+    }
+    userId = userData.user.id;
   }
 
   const ext = file.name.split('.').pop() || mimeType.split('/')[1] || 'bin';
-  const path = `${userData.user.id}/${crypto.randomUUID()}.${ext}`;
+  const path = `${userId}/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await supabase.storage.from('media').upload(path, file, {
     contentType: mimeType,
