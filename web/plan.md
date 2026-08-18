@@ -1,55 +1,87 @@
-# plan.md — nav cleanup, profile popover, real image cropper, emoji/GIF
+# plan.md — bug fixes this pass + scoping for what's next
 
-## Quick, doing first
-1. Remove the separate Friends rail icon — Discord doesn't have one
-   either (see your own screenshot: Friends is a tab *inside* the DM
-   view, not its own app icon). Friends link already lives at the top
-   of the DM sidebar; the rail icon was redundant, removing it is the
-   actual "unify" fix.
-2. Sidebar header: swap the small gradient dot + "PalSpace" text for
-   just `logo.svg`, no text next to it.
-3. Appearance → **Compact mode** toggle (message density in chat) —
-   real, wired to actual spacing classes in ChatView, not a dead toggle.
+Previous plan.md (nav cleanup / popover / cropper / emoji-GIF pickers)
+is done — see HANDOVER.md items 8-12. Replacing it with this pass's
+scope, per the "write plan.md before building anything non-trivial"
+rule.
 
-## Profile popover (click name → small card; click avatar in card → full page)
-New `ProfileCard` popover component. Wiring it into the two highest-
-traffic spots first — feed post authors and DM/chat message senders —
-not literally everywhere in one pass (comments, space member lists,
-etc. can follow once this pattern is proven out).
+## Done this pass
 
-## Real image cropper for avatar/banner upload
-Currently `uploadMedia()` gets called directly on file-select with no
-crop step — whatever aspect ratio you picked is what gets uploaded.
-Building a real crop modal (drag to pan, slider to zoom, circular mask
-for avatar / rect mask for banner) using a `<canvas>`, no external
-cropper library needed for something this scoped. Exports a cropped
-blob, *then* calls `uploadMedia()`.
+### 1. "Message" button doing nothing (Friends list + profile page)
+Confirmed the RLS hypothesis from HANDOVER.md: `createOrGetDM()` was
+inserting two `channel_members` rows (me + the other user) in one
+`insert()` call. The "users can add themselves to a channel" policy
+only allows `user_id = auth.uid()`, so the second row was rejected —
+Supabase's insert is all-or-nothing, so the whole call threw, and
+nothing caught it.
 
-## Emoji picker
-`emoji.ts` already has a shortcode → emoji map (`:fire:` → 🔥) used for
-rendering — reusing that same map to build an actual picker grid in
-`ChatView`'s compose bar, rather than requiring people to remember
-shortcodes.
+Fix:
+- `supabase/migrations/006_fix_dm_creation_rls.sql` — a
+  `SECURITY DEFINER` RPC (`create_dm_channel`) that creates the channel
+  and both membership rows atomically, re-checks for an existing DM
+  server-side (race guard), and enforces blocking at the same layer as
+  everything else that checks `blocked_users`.
+- `src/lib/api/channels.ts` — `createOrGetDM` now calls the RPC instead
+  of doing the two-step insert client-side.
+- `src/screens/Friends.tsx` and `src/screens/UserProfile.tsx` — wrapped
+  `handleMessage()` in try/catch with a visible dismissible error
+  banner (same pattern as `HomeFeed.tsx`'s `composeError`), so this
+  bug class (async call throws, nobody's listening) can't reproduce
+  silently here again.
 
-## GIF picker (Giphy)
-Real feature, and it can actually be free — Giphy's API has a genuine
-free tier (unlike SMS, there's no per-message carrier cost here). Needs
-`NEXT_PUBLIC_GIPHY_API_KEY` in your env — get one free at
-developers.giphy.com. Search-as-you-type grid, click to send as a
-message attachment. Skipping Tenor for this pass (one working
-integration beats two half-wired ones); flagging as an easy add-on
-later if wanted.
+**You need to run `006_fix_dm_creation_rls.sql` against Supabase**
+before this fix takes effect — it's a new migration, not just a code
+change.
 
-## Media upload in DMs
-Already existed before this message — `ChatView`'s attach-image button
-has worked since the Phase 2 pass. Confirmed still working, no change
-needed here.
+### 2. Story upload: "you must be signed in to upload media"
+Root cause was the session-timing race flagged in HANDOVER.md, but not
+quite the hypothesis there — it wasn't that `/stories` skips waiting
+for session hydration (the `(app)` layout already gates all children
+behind `useAuthSync`'s `loading`). It's that `uploadMedia()` called
+`supabase.auth.getUser()`, which makes its **own separate network
+round-trip** to Supabase's auth server to revalidate the JWT — a
+second, independent "am I logged in" check from the one that already
+gated the page. If that revalidation request is slow or races anything
+else on first paint, it can transiently report no user even with a
+perfectly valid session already sitting in the store.
 
-## Discord-style profile edit (live preview panel, nameplate/banner-color/
-frame sections from your screenshot)
-**Not in this pass.** This is a real visual subsystem (decorative
-frames, nameplate assets, a live-updating preview card) layered on top
-of what Settings → Profile already does — cramming it in alongside
-everything else above risks the same "half-built" result you've pushed
-back on twice already. Flagging honestly rather than shipping a rushed
-version; tell me if you want this prioritized next and it goes first.
+Fix: `uploadMedia()` now takes an optional `knownUserId` — when the
+caller already has a hydrated session (which every real caller in this
+app does, since they're all inside the gated `(app)` layout), it's
+passed straight through and the redundant `getUser()` network call is
+skipped entirely. Falls back to `getUser()` if not provided. Updated
+all four call sites (`Stories.tsx`, `HomeFeed.tsx`, `ChatView.tsx`,
+`ProfileSettings.tsx`) to pass `session?.user.id` from the store.
+
+No migration needed for this one, just the code change.
+
+## Needs your input before I build it
+
+### "Spaces" section below Stories
+Looked at the current nav before guessing, per your instruction — and
+it's genuinely ambiguous, so asking rather than picking wrong again:
+**Spaces already render directly below Stories in the left rail**
+(`GlobalNav.tsx`: Home → DMs → Stories → separator → space icons →
+add-space button). So either:
+- (a) you mean something already exists and this was written before
+  you'd seen the current rail, or
+- (b) you want a *second* surfacing — e.g. a "Spaces" list section in
+  the main sidebar (`SecondarySidebar.tsx`, where Friends/DMs or Feed
+  filters currently render) so spaces are browsable with names, not
+  just as small icon initials in the rail.
+
+Let me know which (or something else) and I'll build it.
+
+## Deferred (unchanged from HANDOVER.md backlog, not started)
+- Post redesign (`HomeFeed.tsx`'s `PostCard`)
+- Full markdown support in posts/messages
+- Video stories (30s cap, `MediaRecorder`)
+- `manifest.json` / `robots.ts` / `sitemap.ts`
+- Local caching via Dexie
+- More OAuth providers (GitHub, Twitter/X, maybe Instagram)
+- Better onboarding flow
+- Tenor GIF support alongside Giphy
+- OpenGraph link cards
+- Profile popup redesign (nameplates/decorations — no assets yet)
+- Custom display-name styling
+- Premium tiers, WebRTC voice/video — explicitly not now, scoping only
