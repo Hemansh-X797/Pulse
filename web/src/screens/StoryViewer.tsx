@@ -7,7 +7,7 @@ import { X, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { listActiveStoryGroups, deleteStory } from '../lib/api/stories';
 import { useAppStore } from '../store/useAppStore';
 
-const STORY_DURATION_MS = 5000;
+const IMAGE_STORY_DURATION_MS = 5000;
 
 export function StoryViewer() {
   const params = useParams<{ username: string }>()!;
@@ -61,10 +61,19 @@ export function StoryViewer() {
 
   useEffect(() => {
     if (!group || paused) return;
-    const start = Date.now() - progress * STORY_DURATION_MS;
+    const currentStory = group.stories[storyIndex];
+    // Video stories run for their own recorded length (capped, same as
+    // the 30s recording cap) rather than the fixed image duration —
+    // otherwise a 20s video would get cut off at 5s or a 3s clip would
+    // sit on a black frame for 2 extra seconds.
+    const durationMs =
+      currentStory?.media_type === 'video' && currentStory.duration_seconds
+        ? currentStory.duration_seconds * 1000
+        : IMAGE_STORY_DURATION_MS;
+    const start = Date.now() - progress * durationMs;
     const interval = setInterval(() => {
       const elapsed = Date.now() - start;
-      const pct = Math.min(1, elapsed / STORY_DURATION_MS);
+      const pct = Math.min(1, elapsed / durationMs);
       setProgress(pct);
       if (pct >= 1) goNext();
     }, 50);
@@ -141,7 +150,19 @@ export function StoryViewer() {
         <ChevronRight size={28} />
       </button>
 
-      <img src={currentStory.media_url} alt="" className="max-h-full max-w-full object-contain" />
+      {currentStory.media_type === 'video' ? (
+        <video
+          key={currentStory.id}
+          src={currentStory.media_url}
+          autoPlay
+          playsInline
+          muted={false}
+          className="max-h-full max-w-full object-contain"
+          onEnded={() => goNext()}
+        />
+      ) : (
+        <img src={currentStory.media_url} alt="" className="max-h-full max-w-full object-contain" />
+      )}
     </div>
   );
 }
