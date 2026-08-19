@@ -198,8 +198,16 @@ export interface Database {
         Relationships: [];
       };
       stories: {
-        Row: { id: number; author_id: string; media_url: string; created_at: string; expires_at: string };
-        Insert: { author_id: string; media_url: string };
+        Row: {
+          id: number;
+          author_id: string;
+          media_url: string;
+          media_type: 'image' | 'video';
+          duration_seconds: number | null;
+          created_at: string;
+          expires_at: string;
+        };
+        Insert: { author_id: string; media_url: string; media_type?: 'image' | 'video'; duration_seconds?: number | null };
         Update: never;
         Relationships: [];
       };
