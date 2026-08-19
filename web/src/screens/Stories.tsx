@@ -3,10 +3,11 @@
 import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Video, Image as ImageIcon } from 'lucide-react';
 import { listActiveStoryGroups, createStory } from '../lib/api/stories';
 import { uploadMedia } from '../lib/api/media';
 import { useAppStore } from '../store/useAppStore';
+import { VideoRecorderModal } from '../components/stories/VideoRecorderModal';
 
 export function Stories() {
   const router = useRouter();
@@ -16,17 +17,20 @@ export function Stories() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [recorderOpen, setRecorderOpen] = useState(false);
 
   const { data: groups = [], isLoading } = useQuery({ queryKey: ['story-groups'], queryFn: listActiveStoryGroups });
   const myGroup = groups.find((g) => g.author.id === profile?.id);
   const otherGroups = groups.filter((g) => g.author.id !== profile?.id);
 
   const createMutation = useMutation({
-    mutationFn: createStory,
+    mutationFn: ({ url, mediaType, durationSeconds }: { url: string; mediaType: 'image' | 'video'; durationSeconds?: number }) =>
+      createStory(url, mediaType, durationSeconds),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['story-groups'] }),
   });
 
-  async function handleUpload(file: File) {
+  async function handleUpload(file: File, mediaType: 'image' | 'video' = 'image', durationSeconds?: number) {
     setError(null);
     setUploading(true);
     try {
@@ -35,7 +39,7 @@ export function Stories() {
       // this was the fix for the "you must be signed in to upload
       // media" bug reported on this page specifically.
       const url = await uploadMedia(file, session?.user.id);
-      await createMutation.mutateAsync(url);
+      await createMutation.mutateAsync({ url, mediaType, durationSeconds });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed.');
     } finally {
@@ -62,34 +66,60 @@ export function Stories() {
 
         <div className="flex flex-wrap gap-5">
           {/* Your own ring — always first, shows a + when you have none yet */}
-          <button
-            onClick={() => (myGroup ? router.push(`/stories/${profile?.username}`) : fileInputRef.current?.click())}
-            className="flex w-20 flex-col items-center gap-1.5"
-          >
-            <div
-              className={`relative flex h-16 w-16 items-center justify-center rounded-full p-[2.5px] ${myGroup ? 'presence-fill' : 'bg-[var(--color-hairline-strong)]'}`}
-              style={
-                myGroup
-                  ? { ['--p-a' as string]: profile?.accent_color_top, ['--p-b' as string]: profile?.accent_color_bottom }
-                  : undefined
-              }
+          <div className="relative flex w-20 flex-col items-center gap-1.5">
+            <button
+              onClick={() => (myGroup ? router.push(`/stories/${profile?.username}`) : setAddMenuOpen((v) => !v))}
+              className="flex flex-col items-center gap-1.5"
             >
-              <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-void)] p-0.5">
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-surface-raised)] text-sm font-bold">
-                    {profile?.display_name.slice(0, 2).toUpperCase()}
-                  </div>
+              <div
+                className={`relative flex h-16 w-16 items-center justify-center rounded-full p-[2.5px] ${myGroup ? 'presence-fill' : 'bg-[var(--color-hairline-strong)]'}`}
+                style={
+                  myGroup
+                    ? { ['--p-a' as string]: profile?.accent_color_top, ['--p-b' as string]: profile?.accent_color_bottom }
+                    : undefined
+                }
+              >
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-void)] p-0.5">
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-surface-raised)] text-sm font-bold">
+                      {profile?.display_name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                {!myGroup && (
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--presence-default-a)] text-black">
+                    {uploading ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-black/30 border-t-black" /> : <Plus size={12} />}
+                  </span>
                 )}
               </div>
-              {!myGroup && (
-                <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--presence-default-a)] text-black">
-                  {uploading ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-black/30 border-t-black" /> : <Plus size={12} />}
-                </span>
-              )}
-            </div>
-            <span className="text-[11.5px] text-[var(--color-ink-muted)]">{myGroup ? 'Your story' : 'Add story'}</span>
+              <span className="text-[11.5px] text-[var(--color-ink-muted)]">{myGroup ? 'Your story' : 'Add story'}</span>
+            </button>
+
+            {addMenuOpen && !myGroup && (
+              <div className="absolute left-1/2 top-full z-20 mt-1.5 w-40 -translate-x-1/2 overflow-hidden rounded-xl border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] shadow-xl">
+                <button
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[13px] hover:bg-[var(--color-surface-raised)]"
+                >
+                  <ImageIcon size={14} /> Upload photo
+                </button>
+                <button
+                  onClick={() => {
+                    setAddMenuOpen(false);
+                    setRecorderOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 border-t border-[var(--color-hairline)] px-3 py-2.5 text-left text-[13px] hover:bg-[var(--color-surface-raised)]"
+                >
+                  <Video size={14} /> Record video
+                </button>
+              </div>
+            )}
+
             <input
               ref={fileInputRef}
               type="file"
@@ -97,11 +127,11 @@ export function Stories() {
               hidden
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) handleUpload(f);
+                if (f) handleUpload(f, 'image');
                 e.target.value = '';
               }}
             />
-          </button>
+          </div>
 
           {otherGroups.map((g) => (
             <button key={g.author.id} onClick={() => router.push(`/stories/${g.author.username}`)} className="flex w-20 flex-col items-center gap-1.5">
@@ -130,6 +160,16 @@ export function Stories() {
           </p>
         )}
       </div>
+
+      {recorderOpen && (
+        <VideoRecorderModal
+          onClose={() => setRecorderOpen(false)}
+          onCapture={(file, durationSeconds) => {
+            setRecorderOpen(false);
+            handleUpload(file, 'video', durationSeconds);
+          }}
+        />
+      )}
     </div>
   );
 }
