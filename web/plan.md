@@ -95,16 +95,92 @@ add-space button). So either:
 
 Let me know which (or something else) and I'll build it.
 
-## Deferred (unchanged from HANDOVER.md backlog, not started)
-- Post redesign (`HomeFeed.tsx`'s `PostCard`)
-- Full markdown support in posts/messages
-- Video stories (30s cap, `MediaRecorder`)
-- `manifest.json` / `robots.ts` / `sitemap.ts`
-- Local caching via Dexie
-- More OAuth providers (GitHub, Twitter/X, maybe Instagram)
-- Better onboarding flow
-- Tenor GIF support alongside Giphy
-- OpenGraph link cards
-- Profile popup redesign (nameplates/decorations — no assets yet)
-- Custom display-name styling
-- Premium tiers, WebRTC voice/video — explicitly not now, scoping only
+## Also done, this continued pass
+
+### Backlog items shipped and build-tested
+- **`manifest.json` / `robots.ts` / `sitemap.ts`** — standard Next.js
+  metadata files. Uses `public/logo.svg` as the manifest icon (no
+  dedicated PNG icon set exists yet — flagged in the file's own
+  comment; fine for Chrome/Android install prompts, not sufficient for
+  a proper iOS home-screen icon).
+- **Tenor GIF support alongside Giphy** — `GifPicker.tsx` rewritten to
+  support both providers behind `NEXT_PUBLIC_TENOR_API_KEY` /
+  `NEXT_PUBLIC_GIPHY_API_KEY`; shows a tab switcher only when both are
+  configured, otherwise silently uses whichever one is.
+- **Full markdown support** — new `src/lib/markdown.tsx`. Renders
+  directly to React elements, never to an HTML string, so there's no
+  `dangerouslySetInnerHTML` anywhere and nothing to sanitize — a
+  hostile input just prints back as literal text. Covers everything in
+  the original spec: headers, bold/italic/underline/strikethrough,
+  `@mention`, `||spoiler||` (click-to-reveal), `--faint--`, code
+  blocks, blockquotes, ordered/unordered lists, `[text](link)`. Wired
+  into posts, comments, and chat messages. Emoji shortcodes are
+  unaffected — those still convert to literal unicode at send time via
+  the existing `emoji.ts`, before this renderer ever sees the text.
+- **OpenGraph link cards** — `app/api/link-preview/route.ts` (Route
+  Handler; has to be server-side since browsers block cross-origin
+  reads of arbitrary sites' HTML) with an SSRF guard against
+  private/internal hosts, a 5s timeout, a capped read (stops after
+  `</head>` or 100KB, whichever's first), and a 30-minute in-memory
+  cache. `LinkPreviewCard.tsx` renders it in both chat and feed when a
+  URL is detected in the text and there's no image already attached.
+- **Video stories** — `009_video_stories.sql` adds `media_type` /
+  `duration_seconds` to `stories`; `010_widen_media_bucket_for_video.sql`
+  raises the shared media bucket to 40MB and allows `video/webm` +
+  `video/mp4` (images stay capped at 10MB client-side — the bucket
+  limit went up to fit video, not to quietly let images get bigger
+  too). New `VideoRecorderModal.tsx` uses `MediaRecorder`, force-stops
+  at exactly 30s via `setTimeout` (not just validated after the fact),
+  picks whichever mime type the browser actually supports instead of
+  assuming WebM everywhere. `Stories.tsx` now shows a small
+  photo-vs-video menu instead of jumping straight to the file picker;
+  `StoryViewer.tsx` renders `<video>` for video stories and times the
+  progress bar off the story's actual recorded length instead of the
+  fixed 5s image duration.
+
+**Run migrations 009 and 010** (in addition to 006/007/008 from
+earlier) for video stories to work end to end.
+
+### Also fixed in passing
+Copied your `008_fix_space_members_dms_resolve` upload into the repo
+as `supabase/migrations/008_fix_space_members_rls_recursion.sql` —
+same `42P17` self-reference bug as bug #1's fix, on `space_members`
+this time (`servers`/`server_members` pre-rename). Checked every other
+membership-table policy in the schema for the same shape; nothing else
+had it.
+
+## Deferred — honestly, not silently skipped
+
+These are all real, sizeable pieces of work on their own (new user
+flows, asset/registration dependencies on you, or open design
+questions), and rushing them isn't worth it just to check a box:
+
+- **More OAuth providers (GitHub, Twitter/X)** — the *code* pattern is
+  small (mirrors the existing `linkProvider()`/`unlinkProvider()` +
+  Connected Accounts UI), but each one needs a real OAuth app
+  registered with that provider and enabled in the Supabase dashboard
+  first — that's a you-shaped step, not a code-shaped one. Say the
+  word once you've registered one and I'll wire the button in same-day.
+  Instagram: still unclear if Supabase Auth supports it directly or
+  only via Facebook Login — need to check current docs before
+  promising it.
+- **Better onboarding flow** — no current flow exists beyond bare
+  signup; needs actual UX decisions (steps? interests? starter space
+  templates?) I shouldn't make unilaterally.
+- **Post redesign** — you called the current one "shit" but the ask
+  needs specifics (spacing? typography? card structure? image
+  handling?) to redesign toward something, not just away from
+  something.
+- **Profile popup redesign / nameplates / avatar decorations** — no
+  assets exist for these yet (confirmed again in `public/ASSETS.md`).
+  Building the structure with placeholder assets is possible if you'd
+  rather do that than wait — say so and I will.
+- **Custom display-name styling** — unclear scope (font? color? both?
+  presets or free-form?).
+- **Local caching via Dexie** — you asked to weigh lag/bandwidth cost
+  first, and to be careful not to cache RLS-sensitive data without
+  thinking through staleness. That's a real design pass, not a quick
+  add.
+
+Premium tiers and WebRTC voice/video remain intentionally not-built,
+per your own earlier instruction.
