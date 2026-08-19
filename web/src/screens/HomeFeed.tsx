@@ -16,6 +16,8 @@ import {
   deleteComment,
 } from '../lib/api/feed';
 import { uploadMedia } from '../lib/api/media';
+import { renderMarkdown } from '../lib/markdown';
+import { extractFirstUrl, LinkPreviewCard } from '../components/shared/LinkPreviewCard';
 import { useAppStore } from '../store/useAppStore';
 import { ProfilePopover } from '../components/profile/ProfilePopover';
 import type { FeedItem } from '../lib/database.types';
@@ -340,7 +342,14 @@ function PostCard({ post }: { post: FeedItem }) {
           </div>
         </div>
       ) : (
-        <div className="mb-3.5 whitespace-pre-wrap text-[15px] leading-relaxed">{post.body_rendered}</div>
+        <>
+          <div className="mb-3.5 text-[15px] leading-relaxed">{renderMarkdown(post.body_rendered)}</div>
+          {!post.media_url && extractFirstUrl(post.body_rendered) && (
+            <div className="mb-3.5">
+              <LinkPreviewCard url={extractFirstUrl(post.body_rendered)!} />
+            </div>
+          )}
+        </>
       )}
 
       {post.media_url && (
@@ -491,7 +500,7 @@ function CommentRow({
               {comment.author_display_name}
             </Link>{' '}
             <span className="text-[10.5px] text-[var(--color-ink-faint)]">@{comment.author_username} · {timeAgo(comment.created_at)}{comment.edited_at && ' · edited'}</span>
-            <div>{comment.body_rendered}</div>
+            <div className="text-[13.5px] leading-relaxed">{renderMarkdown(comment.body_rendered)}</div>
           </div>
         )}
       </div>
