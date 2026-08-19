@@ -12,6 +12,8 @@ import {
   markRead,
 } from '../../lib/api/channels';
 import { uploadMedia } from '../../lib/api/media';
+import { renderMarkdown } from '../../lib/markdown';
+import { extractFirstUrl, LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { useCompactMode } from '../../hooks/useCompactMode';
 import { EmojiPicker } from './EmojiPicker';
 import { GifPicker } from './GifPicker';
@@ -578,8 +580,11 @@ function MessageRow({
                     : 'rounded-bl-md border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink)]'
                 }`}
               >
-                {message.body_rendered}
+                {renderMarkdown(message.body_rendered)}
               </div>
+            )}
+            {message.body_rendered && extractFirstUrl(message.body_rendered) && (
+              <LinkPreviewCard url={extractFirstUrl(message.body_rendered)!} />
             )}
           </>
         )}
