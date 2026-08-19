@@ -7,23 +7,29 @@ import { supabase } from '../supabase';
 // local disk to run out of space on, and it's served from a CDN.
 //
 // Setup: the bucket + its RLS policies are codified in
-// supabase/migrations/003_storage_and_engagement_fixes.sql — run that
-// (as the project owner, in the SQL editor) rather than clicking through
-// the dashboard by hand. That migration also sets the bucket's own
-// server-side file_size_limit to 10MB, matching MAX_BYTES below; if you
-// change one, change the other, or uploads between the two limits will
-// fail with a confusing storage-side error instead of this client-side
-// one.
+// supabase/migrations/003_storage_and_engagement_fixes.sql, widened
+// for video in 010_widen_media_bucket_for_video.sql — run both (as the
+// project owner, in the SQL editor) rather than clicking through the
+// dashboard by hand. The bucket's own server-side file_size_limit must
+// match MAX_BYTES_BY_KIND below; if you change one, change the other,
+// or uploads between the two limits fail with a confusing storage-side
+// error instead of this client-side one.
 
-const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'video/webm', 'video/mp4']);
 const EXT_TO_MIME: Record<string, string> = {
   png: 'image/png',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   webp: 'image/webp',
   gif: 'image/gif',
+  webm: 'video/webm',
+  mp4: 'video/mp4',
 };
-const MAX_BYTES = 10 * 1024 * 1024; // matches the bucket's file_size_limit — see migration 003
+// Images stay capped at 10MB (unchanged) — the bucket's overall limit
+// went up to 40MB (see migration 010) specifically to fit a ~30s video
+// clip, not to quietly let images get 4x bigger too.
+const MAX_BYTES_IMAGE = 10 * 1024 * 1024;
+const MAX_BYTES_VIDEO = 40 * 1024 * 1024;
 
 export class MediaUploadError extends Error {}
 
@@ -46,10 +52,12 @@ function resolveMimeType(file: File): string | null {
 export async function uploadMedia(file: File, knownUserId?: string): Promise<string> {
   const mimeType = resolveMimeType(file);
   if (!mimeType) {
-    throw new MediaUploadError('Unsupported file type — use PNG, JPEG, WEBP, or GIF.');
+    throw new MediaUploadError('Unsupported file type — use PNG, JPEG, WEBP, GIF, WEBM, or MP4.');
   }
-  if (file.size > MAX_BYTES) {
-    throw new MediaUploadError(`File too large — max ${Math.floor(MAX_BYTES / 1024 / 1024)}MB.`);
+  const isVideo = mimeType.startsWith('video/');
+  const maxBytes = isVideo ? MAX_BYTES_VIDEO : MAX_BYTES_IMAGE;
+  if (file.size > maxBytes) {
+    throw new MediaUploadError(`File too large — max ${Math.floor(maxBytes / 1024 / 1024)}MB.`);
   }
 
   // Bug fix ("you must be signed in to upload media" on /stories):
@@ -91,7 +99,7 @@ export async function uploadMedia(file: File, knownUserId?: string): Promise<str
     // real-world cause of this failing.
     throw new MediaUploadError(
       `Upload failed: ${error.message}. If this keeps happening, confirm the "media" storage bucket and its ` +
-        'policies are set up (see supabase/migrations/003_storage_and_engagement_fixes.sql).'
+        'policies are set up (see supabase/migrations/003_storage_and_engagement_fixes.sql and 010_widen_media_bucket_for_video.sql).'
     );
   }
 
