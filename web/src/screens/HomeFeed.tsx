@@ -21,6 +21,7 @@ import { extractFirstUrl, LinkPreviewCard } from '../components/shared/LinkPrevi
 import { useAppStore } from '../store/useAppStore';
 import { ProfilePopover } from '../components/profile/ProfilePopover';
 import type { FeedItem } from '../lib/database.types';
+import { PostDetailModal } from '../components/PostDetailModal';
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -190,8 +191,7 @@ function PostCard({ post }: { post: FeedItem }) {
   const profile = useAppStore((s) => s.profile);
   const isMine = profile?.id === post.author_id;
 
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [commentBody, setCommentBody] = useState('');
+  const [detailOpen, setDetailOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(post.body_rendered);
@@ -199,7 +199,7 @@ function PostCard({ post }: { post: FeedItem }) {
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ['comments', post.id],
     queryFn: () => listComments(post.id),
-    enabled: commentsOpen,
+    enabled: detailOpen,
   });
 
   const reactMutation = useMutation({
@@ -236,15 +236,6 @@ function PostCard({ post }: { post: FeedItem }) {
   const deleteMutation = useMutation({
     mutationFn: () => deletePost(post.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feed'] }),
-  });
-
-  const commentMutation = useMutation({
-    mutationFn: () => addComment(post.id, commentBody),
-    onSuccess: () => {
-      setCommentBody('');
-      queryClient.invalidateQueries({ queryKey: ['comments', post.id] });
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-    },
   });
 
   function handleDelete() {
@@ -343,7 +334,9 @@ function PostCard({ post }: { post: FeedItem }) {
         </div>
       ) : (
         <>
-          <div className="mb-3.5 text-[15px] leading-relaxed">{renderMarkdown(post.body_rendered)}</div>
+          <div className="mb-3.5 cursor-pointer text-[15px] leading-relaxed" onClick={() => setDetailOpen(true)}>
+            {renderMarkdown(post.body_rendered)}
+          </div>
           {!post.media_url && extractFirstUrl(post.body_rendered) && (
             <div className="mb-3.5">
               <LinkPreviewCard url={extractFirstUrl(post.body_rendered)!} />
@@ -353,7 +346,10 @@ function PostCard({ post }: { post: FeedItem }) {
       )}
 
       {post.media_url && (
-        <div className="-mt-1 mb-3.5 overflow-hidden rounded-xl border border-[var(--color-hairline)]">
+        <div
+          className="-mt-1 mb-3.5 cursor-pointer overflow-hidden rounded-xl border border-[var(--color-hairline)]"
+          onClick={() => setDetailOpen(true)}
+        >
           <img src={post.media_url} alt="" className="max-h-[480px] w-full object-cover" />
         </div>
       )}
@@ -379,10 +375,9 @@ function PostCard({ post }: { post: FeedItem }) {
         </button>
 
         <button
-          onClick={() => setCommentsOpen((v) => !v)}
+          onClick={() => setDetailOpen(true)}
           className="group flex items-center gap-1.5"
           aria-label="Comments"
-          aria-expanded={commentsOpen}
         >
           <MessageCircle size={21} strokeWidth={2} className="text-[var(--color-ink-muted)] group-hover:text-[var(--color-ink)]" />
           {post.comment_count > 0 && <span className="font-mono text-[12px] text-[var(--color-ink-muted)]">{post.comment_count}</span>}
@@ -395,132 +390,24 @@ function PostCard({ post }: { post: FeedItem }) {
         {shareStatus && <span className="text-[11px] text-[var(--color-ink-faint)]">{shareStatus}</span>}
       </div>
 
-      {commentsOpen && (
-        <div className="mt-3.5 border-t border-[var(--color-hairline)] pt-3">
-          {commentsLoading && <div className="mb-2 text-[13px] text-[var(--color-ink-muted)]">Loading comments…</div>}
-          {!commentsLoading && comments.length === 0 && (
-            <div className="mb-2 text-[13px] text-[var(--color-ink-muted)]">No comments yet — say something.</div>
-          )}
-          {comments.map((c) => (
-            <CommentRow key={c.id} comment={c} postId={post.id} />
-          ))}
-          <div className="mt-2 flex items-center gap-2">
-            <Avatar
-              url={profile?.avatar_url}
-              name={profile?.display_name ?? '?'}
-              size={24}
-              accentTop={profile?.accent_color_top}
-              accentBottom={profile?.accent_color_bottom}
-            />
-            <input
-              value={commentBody}
-              onChange={(e) => setCommentBody(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && commentBody.trim() && commentMutation.mutate()}
-              placeholder="Write a comment..."
-              className="flex-1 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-3.5 py-2 text-xs text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none"
-            />
-            <button
-              onClick={() => commentMutation.mutate()}
-              disabled={!commentBody.trim() || commentMutation.isPending}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-black disabled:opacity-40"
-              aria-label="Send comment"
-            >
-              <Send size={12} />
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function CommentRow({
-  comment,
-  postId,
-}: {
-  comment: { id: number; author_id: string; author_username: string; author_display_name: string; author_avatar_url: string; author_accent_top: string; author_accent_bottom: string; body_rendered: string; edited_at: string | null; created_at: string };
-  postId: number;
-}) {
-  const queryClient = useQueryClient();
-  const profile = useAppStore((s) => s.profile);
-  const isMine = profile?.id === comment.author_id;
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(comment.body_rendered);
-
-  const editMutation = useMutation({
-    mutationFn: (body: string) => editComment(comment.id, body),
-    onSuccess: () => {
-      setEditing(false);
-      queryClient.invalidateQueries({ queryKey: ['comments', postId] });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteComment(comment.id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', postId] });
-      queryClient.invalidateQueries({ queryKey: ['feed'] });
-    },
-  });
-
-  return (
-    <div className="group mb-2.5 flex items-start gap-2">
-      <Link href={`/${comment.author_username}`} className="shrink-0">
-        <Avatar
-          url={comment.author_avatar_url}
-          name={comment.author_display_name}
-          size={24}
-          accentTop={comment.author_accent_top}
-          accentBottom={comment.author_accent_bottom}
+      {detailOpen && (
+        <PostDetailModal
+          post={post}
+          comments={comments}
+          commentsLoading={commentsLoading}
+          liked={liked}
+          onToggleLike={() => reactMutation.mutate(LIKE_EMOJI)}
+          onShare={handleShare}
+          onClose={() => setDetailOpen(false)}
+          onSubmitComment={async (body) => {
+            await addComment(post.id, body);
+            queryClient.invalidateQueries({ queryKey: ['comments', post.id] });
+            queryClient.invalidateQueries({ queryKey: ['feed'] });
+          }}
+          isMine={isMine}
+          onEdit={isMine ? () => { setEditing(true); setDetailOpen(false); } : undefined}
+          onDelete={isMine ? () => { setDetailOpen(false); handleDelete(); } : undefined}
         />
-      </Link>
-      <div className="min-w-0 flex-1">
-        {editing ? (
-          <div className="flex items-center gap-1.5">
-            <input
-              autoFocus
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && value.trim() && editMutation.mutate(value)}
-              className="min-w-[160px] flex-1 rounded-full border border-[var(--presence-default-b)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-[12.5px] text-[var(--color-ink)] outline-none"
-            />
-            <button
-              onClick={() => editMutation.mutate(value)}
-              className="text-[11px] font-semibold text-[var(--color-ink)]"
-            >
-              Save
-            </button>
-            <button onClick={() => setEditing(false)} className="text-[11px] text-[var(--color-ink-muted)]">
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <div className="text-[13px] leading-snug text-[var(--color-ink-muted)]">
-            <Link href={`/${comment.author_username}`} className="font-semibold text-[var(--color-ink)] hover:underline">
-              {comment.author_display_name}
-            </Link>{' '}
-            <span className="text-[10.5px] text-[var(--color-ink-faint)]">@{comment.author_username} · {timeAgo(comment.created_at)}{comment.edited_at && ' · edited'}</span>
-            <div className="text-[13.5px] leading-relaxed">{renderMarkdown(comment.body_rendered)}</div>
-          </div>
-        )}
-      </div>
-      {isMine && !editing && (
-        <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            onClick={() => setEditing(true)}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-            aria-label="Edit comment"
-          >
-            <Pencil size={11} />
-          </button>
-          <button
-            onClick={() => window.confirm('Delete this comment?') && deleteMutation.mutate()}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:text-red-400"
-            aria-label="Delete comment"
-          >
-            <Trash2 size={11} />
-          </button>
-        </div>
       )}
     </div>
   );
