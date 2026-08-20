@@ -86,7 +86,7 @@ export function Friends() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-[62px] shrink-0 items-center gap-1 border-b border-[var(--color-hairline)] px-7">
+      <div className="flex h-[62px] shrink-0 items-center gap-1 border-b border-[var(--color-hairline)] px-4 md:px-7">
         <h2 className="mr-4 font-serif text-lg font-semibold">Friends</h2>
         {(['all', 'pending', 'add'] as Tab[]).map((t) => (
           <button
@@ -113,7 +113,7 @@ export function Friends() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-7 py-5">
+      <div className="flex-1 overflow-y-auto px-4 py-4 md:px-7 md:py-5">
         {tab === 'add' && (
           <div className="mx-auto max-w-lg">
             <div className="relative mb-6">
