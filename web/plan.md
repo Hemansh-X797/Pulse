@@ -184,3 +184,85 @@ questions), and rushing them isn't worth it just to check a box:
 
 Premium tiers and WebRTC voice/video remain intentionally not-built,
 per your own earlier instruction.
+
+## Also done, this continued pass (mobile, onboarding, GitHub, spaces)
+
+### Mobile responsiveness — the actual fix for "friends on phone can't use it"
+Root cause: `AppShell.tsx` rendered rail (76px) + sidebar (260px) +
+main content in a fixed three-column row, always, with no responsive
+behavior at all — on a ~375px phone that's negative space left for
+content before it even starts. Fixed with a single-pane-at-a-time
+layout below the `md` breakpoint, chosen from the route itself (no
+extra state to desync):
+- A DM/space *list* route with nothing open shows the sidebar
+  full-screen, standing in for `main`.
+- Opening an actual chat hides both the rail and sidebar so the whole
+  screen is the conversation (added a mobile-only back button to
+  `ChatView.tsx`'s header to get back out — the sidebar isn't visible
+  to tap back into).
+- Everywhere else shows `main` full-screen with the rail as a bottom
+  tab bar (`GlobalNav.tsx` — same component, `fixed bottom-0` + row
+  layout on mobile, unchanged vertical rail on desktop via `md:`).
+- `SettingsShell.tsx` got the same treatment — `/settings` no longer
+  redirects straight into Profile *before checking viewport size*
+  (that would have made the mobile category list unreachable and
+  turned its own back button into a redirect loop); it only
+  auto-redirects on desktop now.
+- Tightened `px-7` header/content padding down to `px-4` on mobile
+  across Home, Friends, Stories, Discover, and chat (was fine on
+  desktop, just needlessly cramped on a phone).
+
+The rail's joined-spaces icon list and the desktop-style "+ create
+space" button are desktop-only now (no room for a scrollable icon
+strip in a 6-item bottom bar — Discord's own mobile app doesn't put
+that in the tab bar either) — Discover got a "Yours" tab, mobile-only,
+so joined spaces stay reachable without it.
+
+**This is the part I'd actually ask your friends to re-test first** —
+tell me what's still broken for them specifically, since I can't see
+real devices from here and this was built against the same viewport
+sizes, not a phone lab.
+
+### GitHub OAuth
+Fully wired end to end, since you'd already enabled it in Supabase:
+`signInWithGithub()` in `auth.ts`, a real button in `Login.tsx`, and
+GitHub added to Connected Accounts in `AccountSettings.tsx` (that part
+really was a one-line change — the UI already looped over a provider
+array generically).
+
+### Onboarding
+New signups now go through `/onboarding` before `/home`: interest tags
+→ optional avatar upload → suggested public spaces matching those
+interests (falls back to all public spaces if no tag overlap yet) →
+finish. Existing accounts were backfilled to skip it. Hard-gated in
+`(app)/layout.tsx` so it can't be bypassed by navigating straight to
+`/home` (closed tab mid-flow, OAuth signup landing elsewhere, etc.),
+not just relying on the signup button's own redirect.
+
+### Private/public spaces + Discover + global search
+Spaces are private by default (invite-link only, unchanged from
+before); creating one now has a real toggle to make it public +
+taggable, joinable from a new `/discover` page or via search, no
+invite code needed. New `CreateSpaceModal.tsx` replaced the old
+`window.prompt` placeholder entirely — it now also has a Join tab that
+accepts either a bare invite code or a full pasted invite link.
+`SearchModal.tsx` searches people and public spaces together, opened
+from a new search icon in the rail.
+
+This also resolves the long-open "Spaces below Stories" nav question
+from earlier — added a Discover (compass icon) entry directly below
+Stories in the rail, literal placement as originally asked; your
+already-joined spaces still render below that in their own section on
+desktop, unchanged.
+
+**Run migration 011** (`011_onboarding_and_public_spaces.sql`) for
+onboarding and public spaces to work.
+
+## Still not started
+
+Unchanged from the list above — message context-menu parity (copy
+text, mark unread, forward, reply, and whatever else Discord's menu
+has that this doesn't), the feed-opens-as-a-widget-with-comments
+redesign, making posts "more X-like," nameplate SVGs, terms/privacy
+legal pages, and the profile popup redesign matching your reference
+screenshot. Custom display-name styling you said to leave for now.
