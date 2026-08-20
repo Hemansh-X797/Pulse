@@ -4,14 +4,24 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft } from 'lucide-react';
+import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft, MoreHorizontal } from 'lucide-react';
 import {
   listMessages,
   sendMessage,
   editMessage,
   deleteMessage,
   markRead,
+  markUnreadFrom,
+  listMessageReactions,
+  toggleMessageReaction,
+  listPinnedMessages,
+  pinMessage,
+  unpinMessage,
+  type MessageReactionSummary,
+  type PinnedMessage,
 } from '../../lib/api/channels';
+import { MessageContextMenu } from './MessageContextMenu';
+import { ForwardMessageModal } from './ForwardMessageModal';
 import { uploadMedia } from '../../lib/api/media';
 import { renderMarkdown } from '../../lib/markdown';
 import { extractFirstUrl, LinkPreviewCard } from '../shared/LinkPreviewCard';
@@ -36,6 +46,11 @@ const EPHEMERAL_OPTIONS = [
   { label: '1m', seconds: 60 },
   { label: '1h', seconds: 3600 },
 ];
+
+// Hover quick-react row's fixed shortlist — mirrors the small "recent
+// reactions" strip pattern from Discord/Slack rather than opening the
+// full EmojiPicker for the common case of a single quick reaction.
+const QUICK_REACT_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
 export function ChatView({ channelId, channelLabel }: { channelId: string; channelLabel: string }) {
   const router = useRouter();
@@ -74,6 +89,11 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const [attachError, setAttachError] = useState<string | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [gifPickerOpen, setGifPickerOpen] = useState(false);
+  const [reactionsByMessage, setReactionsByMessage] = useState<Record<number, MessageReactionSummary[]>>({});
+  const [pinnedIds, setPinnedIds] = useState<Set<number>>(new Set());
+  const [pinsBarOpen, setPinsBarOpen] = useState(false);
+  const [pinnedList, setPinnedList] = useState<PinnedMessage[]>([]);
+  const [forwardTarget, setForwardTarget] = useState<(Message & { sender_username: string }) | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,6 +108,37 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
   useEffect(() => {
     if (history) setMessages(history);
+  }, [history]);
+
+  // Reactions + pins load once per channel switch, then get patched
+  // in-place by their own handlers below rather than a full refetch on
+  // every click — a full-channel reaction refetch on every tap would
+  // be wasteful and would visibly flicker the whole list.
+  useEffect(() => {
+    let cancelled = false;
+    listPinnedMessages(channelId)
+      .then((pins) => {
+        if (cancelled) return;
+        setPinnedList(pins);
+        setPinnedIds(new Set(pins.map((p) => p.message_id)));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [channelId]);
+
+  useEffect(() => {
+    if (!history || history.length === 0) return;
+    let cancelled = false;
+    listMessageReactions(history.map((m) => m.id))
+      .then((r) => {
+        if (!cancelled) setReactionsByMessage(r);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [history]);
 
   // Realtime: new messages + edits/deletes (UPDATE covers both, since
@@ -303,6 +354,101 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
     await deleteMessage(id);
   }
 
+  async function handleReact(messageId: number, emoji: string) {
+    const current = reactionsByMessage[messageId] ?? [];
+    const existing = current.find((r) => r.emoji === emoji);
+    const reactedByMe = existing?.reactedByMe ?? false;
+
+    // Optimistic patch — same pattern as everywhere else that touches
+    // reaction-shaped state in this app (see toggleReaction's callers
+    // in HomeFeed.tsx), reconciled for real by toggleMessageReaction()
+    // below; if that throws, the catch reverts it.
+    setReactionsByMessage((prev) => {
+      const list = prev[messageId] ?? [];
+      const idx = list.findIndex((r) => r.emoji === emoji);
+      if (idx === -1) {
+        return { ...prev, [messageId]: [...list, { emoji, count: 1, reactedByMe: true }] };
+      }
+      const nextCount = reactedByMe ? list[idx].count - 1 : list[idx].count + 1;
+      const nextList =
+        nextCount <= 0
+          ? list.filter((_, i) => i !== idx)
+          : list.map((r, i) => (i === idx ? { ...r, count: nextCount, reactedByMe: !reactedByMe } : r));
+      return { ...prev, [messageId]: nextList };
+    });
+
+    try {
+      await toggleMessageReaction(messageId, emoji, reactedByMe);
+    } catch {
+      listMessageReactions([messageId])
+        .then((r) => setReactionsByMessage((prev) => ({ ...prev, [messageId]: r[messageId] ?? [] })))
+        .catch(() => {});
+    }
+  }
+
+  async function handleTogglePin(message: DisplayMessage) {
+    const isPinned = pinnedIds.has(message.id);
+    try {
+      if (isPinned) {
+        await unpinMessage(message.id);
+        setPinnedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(message.id);
+          return next;
+        });
+        setPinnedList((prev) => prev.filter((p) => p.message_id !== message.id));
+      } else {
+        await pinMessage(channelId, message.id);
+        setPinnedIds((prev) => new Set(prev).add(message.id));
+        setPinnedList((prev) => [
+          { message_id: message.id, pinned_at: new Date().toISOString(), pinned_by_username: profile?.username ?? '' },
+          ...prev,
+        ]);
+      }
+    } catch (e) {
+      setAttachError(e instanceof Error ? e.message : 'Could not update pin.');
+    }
+  }
+
+  async function handleMarkUnread(message: DisplayMessage) {
+    try {
+      await markUnreadFrom(channelId, message.id);
+      // Recompute this channel's badge count locally rather than
+      // re-fetching every channel's count from the server — it's just
+      // "everything from here to the newest message in this channel".
+      const idx = messages.findIndex((m) => m.id === message.id);
+      const newlyUnread = idx === -1 ? 1 : messages.length - idx;
+      setUnreadByChannel({ ...unreadByChannel, [channelId]: newlyUnread });
+    } catch (e) {
+      setAttachError(e instanceof Error ? e.message : 'Could not mark unread.');
+    }
+  }
+
+  function handleCopyText(message: DisplayMessage) {
+    navigator.clipboard.writeText(message.body_raw || message.body_rendered).catch(() => {});
+  }
+
+  function handleCopyLink(message: DisplayMessage) {
+    const url = `${window.location.origin}${window.location.pathname}#msg-${message.id}`;
+    navigator.clipboard.writeText(url).catch(() => {});
+  }
+
+  // Deep-link scroll: opening a copied message link jumps to and
+  // briefly highlights that message, instead of the link just being a
+  // no-op pointer to the channel in general.
+  useEffect(() => {
+    if (!messages.length) return;
+    const hash = window.location.hash;
+    if (!hash.startsWith('#msg-')) return;
+    const el = document.getElementById(hash.slice(1));
+    if (el) {
+      el.scrollIntoView({ block: 'center' });
+      el.classList.add('message-link-highlight');
+      const t = setTimeout(() => el.classList.remove('message-link-highlight'), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [messages]);
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-[62px] shrink-0 items-baseline gap-2.5 border-b border-[var(--color-hairline)] px-4 md:px-7">
@@ -314,11 +460,42 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
           <ArrowLeft size={18} />
         </button>
         <h2 className="font-serif text-lg font-semibold"># {channelLabel}</h2>
+        {pinnedList.length > 0 && (
+          <button
+            onClick={() => setPinsBarOpen((v) => !v)}
+            className="flex items-center gap-1 rounded-full border border-[var(--color-hairline)] px-2 py-0.5 text-[11px] text-[var(--color-ink-muted)] hover:border-[var(--color-hairline-strong)] hover:text-[var(--color-ink)]"
+          >
+            📌 {pinnedList.length}
+          </button>
+        )}
         <span
           className={`ml-auto h-1.5 w-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400' : 'bg-[var(--color-ink-faint)]'}`}
           title={connectionStatus}
         />
       </div>
+
+      {pinsBarOpen && pinnedList.length > 0 && (
+        <div className="max-h-32 overflow-y-auto border-b border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-2 md:px-7">
+          {pinnedList.map((pin) => {
+            const pinnedMessage = messages.find((m) => m.id === pin.message_id);
+            return (
+              <button
+                key={pin.message_id}
+                onClick={() => {
+                  setPinsBarOpen(false);
+                  document.getElementById(`msg-${pin.message_id}`)?.scrollIntoView({ block: 'center' });
+                }}
+                className="flex w-full items-start gap-1.5 rounded-lg px-1.5 py-1 text-left text-[12px] hover:bg-[var(--color-surface-raised)]"
+              >
+                <span className="shrink-0 text-[var(--color-ink-faint)]">📌</span>
+                <span className="truncate text-[var(--color-ink-muted)]">
+                  {pinnedMessage ? `${pinnedMessage.sender_username}: ${pinnedMessage.body_rendered || '(attachment)'}` : `message #${pin.message_id}`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 md:px-7 md:py-6">
         <AnimatePresence initial={false}>
@@ -334,6 +511,14 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
               onEdit={() => startEdit(m)}
               onSaveEdit={(body) => saveEdit(m.id, body)}
               onDelete={() => handleDelete(m.id)}
+              reactions={reactionsByMessage[m.id] ?? []}
+              onReact={(emoji) => handleReact(m.id, emoji)}
+              isPinned={pinnedIds.has(m.id)}
+              onTogglePin={() => handleTogglePin(m)}
+              onMarkUnread={() => handleMarkUnread(m)}
+              onCopyText={() => handleCopyText(m)}
+              onCopyLink={() => handleCopyLink(m)}
+              onForward={() => setForwardTarget(m)}
             />
           ))}
         </AnimatePresence>
@@ -476,6 +661,8 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
           </button>
         </div>
       </div>
+
+      {forwardTarget && <ForwardMessageModal message={forwardTarget} onClose={() => setForwardTarget(null)} />}
     </div>
   );
 }
@@ -490,6 +677,14 @@ function MessageRow({
   onEdit,
   onSaveEdit,
   onDelete,
+  reactions,
+  onReact,
+  isPinned,
+  onTogglePin,
+  onMarkUnread,
+  onCopyText,
+  onCopyLink,
+  onForward,
 }: {
   message: DisplayMessage;
   isMine: boolean;
@@ -500,12 +695,22 @@ function MessageRow({
   onEdit: () => void;
   onSaveEdit: (body: string) => void;
   onDelete: () => void;
+  reactions: MessageReactionSummary[];
+  onReact: (emoji: string) => void;
+  isPinned: boolean;
+  onTogglePin: () => void;
+  onMarkUnread: () => void;
+  onCopyText: () => void;
+  onCopyLink: () => void;
+  onForward: () => void;
 }) {
   const [editValue, setEditValue] = useState(message.body_rendered);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [quickReactOpen, setQuickReactOpen] = useState(false);
 
   if (message.deleted) {
     return (
-      <div className={`flex gap-2.5 ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}>
+      <div id={`msg-${message.id}`} className={`flex gap-2.5 ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}>
         <div className="w-[30px] shrink-0" />
         <div className="rounded-2xl border border-dashed border-[var(--color-hairline-strong)] px-3.5 py-2 font-mono text-[13px] italic text-[var(--color-ink-muted)]">
           message deleted
@@ -521,12 +726,13 @@ function MessageRow({
 
   return (
     <motion.div
+      id={`msg-${message.id}`}
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: message.pending ? 0.5 : 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className={`group flex gap-2.5 ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}
+      className={`group flex gap-2.5 rounded-lg ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}
     >
       {!compact && (
         <button
@@ -595,23 +801,79 @@ function MessageRow({
             {message.body_rendered && extractFirstUrl(message.body_rendered) && (
               <LinkPreviewCard url={extractFirstUrl(message.body_rendered)!} />
             )}
+            {reactions.length > 0 && (
+              <div className={`mt-1 flex flex-wrap gap-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
+                {reactions.map((r) => (
+                  <button
+                    key={r.emoji}
+                    onClick={() => onReact(r.emoji)}
+                    className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11.5px] transition-colors ${
+                      r.reactedByMe
+                        ? 'border-[var(--presence-default-a)] bg-[var(--presence-default-a)]/15'
+                        : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
+                    }`}
+                  >
+                    <span>{r.emoji}</span>
+                    <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">{r.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
 
-      <div className={`flex items-center gap-1 self-center opacity-0 transition-opacity group-hover:opacity-100 ${isMine ? 'order-first' : ''}`}>
+      <div className={`relative flex items-center gap-1 self-center opacity-0 transition-opacity group-hover:opacity-100 ${isMine ? 'order-first' : ''}`}>
+        <button
+          onClick={() => setQuickReactOpen((v) => !v)}
+          className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+          aria-label="Add reaction"
+        >
+          <Smile size={12} />
+        </button>
+        {quickReactOpen && (
+          <div className="absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] p-1 shadow-xl">
+            {QUICK_REACT_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => {
+                  onReact(emoji);
+                  setQuickReactOpen(false);
+                }}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-[var(--color-surface-raised)]"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
         <button onClick={onReply} className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Reply">
           <Reply size={12} />
         </button>
-        {isMine && (
-          <>
-            <button onClick={onEdit} className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Edit">
-              <Pencil size={12} />
-            </button>
-            <button onClick={onDelete} className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Delete">
-              ×
-            </button>
-          </>
+        <button
+          onClick={() => setMenuOpen((v) => !v)}
+          className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
+          aria-label="More"
+        >
+          <MoreHorizontal size={12} />
+        </button>
+        {menuOpen && (
+          <div className={`absolute top-full z-20 mt-1 ${isMine ? 'right-0' : 'left-0'}`}>
+            <MessageContextMenu
+              onClose={() => setMenuOpen(false)}
+              onCopyText={onCopyText}
+              onCopyLink={onCopyLink}
+              onMarkUnread={onMarkUnread}
+              onForward={onForward}
+              onPin={onTogglePin}
+              isPinned={isPinned}
+              onReact={() => setQuickReactOpen(true)}
+              onReply={onReply}
+              onEdit={isMine ? onEdit : undefined}
+              onDelete={isMine ? onDelete : undefined}
+              isMine={isMine}
+            />
+          </div>
         )}
       </div>
     </motion.div>
