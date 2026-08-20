@@ -21,6 +21,13 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
   const reset = useAppStore((s) => s.reset);
   const [confirmingLogout, setConfirmingLogout] = useState(false);
 
+  // Same list/detail split as the main AppShell, for the same reason:
+  // a 240px settings nav plus real content doesn't fit on a phone
+  // screen. /settings itself (the bare root) shows the category list
+  // full-width; picking a category shows just that page with a back
+  // link, mirroring how the chat back button works.
+  const isSettingsRoot = pathname === '/settings';
+
   async function handleConfirmLogout() {
     await supabase.auth.signOut();
     reset();
@@ -28,10 +35,15 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-full">
-      <nav className="flex w-[240px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] px-3 py-6">
-        <div className="mb-4 px-2 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
-          User Settings
+    <div className="flex h-full flex-col md:flex-row">
+      <nav
+        className={`${isSettingsRoot ? 'flex' : 'hidden'} w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] px-3 py-6 md:flex md:w-[240px]`}
+      >
+        <div className="mb-4 flex items-center justify-between px-2">
+          <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">User Settings</span>
+          <Link href="/home" className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] md:hidden" aria-label="Close settings">
+            <X size={16} />
+          </Link>
         </div>
         {CATEGORIES.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
@@ -72,15 +84,25 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
         )}
       </nav>
 
-      <div className="relative flex-1 overflow-y-auto">
-        <Link
-          href="/home"
-          className="absolute right-6 top-6 flex h-9 w-9 items-center justify-center rounded-full border border-[var(--color-hairline)] text-[var(--color-ink-muted)] hover:border-[var(--color-hairline-strong)] hover:text-[var(--color-ink)]"
+      <div className={`relative flex-1 overflow-y-auto ${isSettingsRoot ? 'hidden md:block' : 'block'}`}>
+        <button
+          onClick={() => (isSettingsRoot ? router.push('/home') : router.push('/settings'))}
+          className="absolute right-6 top-6 hidden h-9 w-9 items-center justify-center rounded-full border border-[var(--color-hairline)] text-[var(--color-ink-muted)] hover:border-[var(--color-hairline-strong)] hover:text-[var(--color-ink)] md:flex"
           aria-label="Close settings"
         >
           <X size={16} />
-        </Link>
-        <div className="mx-auto max-w-xl px-8 py-9">{children}</div>
+        </button>
+        {/* Mobile-only back-to-categories link, since the desktop X
+            above (which exits settings entirely) isn't the right
+            action here — going back one level, not leaving settings,
+            is what "back" should mean once you're inside a category. */}
+        <button
+          onClick={() => router.push('/settings')}
+          className="mb-2 flex items-center gap-1.5 px-4 pt-4 text-[13px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] md:hidden"
+        >
+          ← Settings
+        </button>
+        <div className="mx-auto max-w-xl px-5 py-4 md:px-8 md:py-9">{children}</div>
       </div>
     </div>
   );
