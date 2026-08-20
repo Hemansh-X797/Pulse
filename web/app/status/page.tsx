@@ -200,7 +200,7 @@ export default function StatusDashboard() {
         {/* METRICS & GRAPH DASHBOARD */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
           
-          <!-- Graph Card 1: Global Response Time -->
+
           <div className="bg-[#0c0d0f] border border-neutral-800/80 rounded-2xl p-5 space-y-4 relative overflow-hidden">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-mono text-neutral-400 uppercase tracking-wider">
@@ -213,7 +213,7 @@ export default function StatusDashboard() {
             <SystemLatencyChart />
           </div>
 
-          <!-- Metric Card 2: Realtime Gateway Throughput -->
+
           <div className="bg-[#0c0d0f] border border-neutral-800/80 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-mono text-neutral-400 uppercase tracking-wider">
@@ -231,7 +231,6 @@ export default function StatusDashboard() {
             </div>
           </div>
 
-          <!-- Metric Card 3: Database Connection Pool -->
           <div className="bg-[#0c0d0f] border border-neutral-800/80 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-xs font-mono text-neutral-400 uppercase tracking-wider">
@@ -278,7 +277,6 @@ export default function StatusDashboard() {
             </div>
           </div>
 
-          <!-- Service List Rows -->
           <div className="space-y-4">
             {filteredServices.map((service) => (
               <div key={service.id} className="bg-[#0c0d0f] border border-neutral-800/80 rounded-2xl p-5 space-y-4 hover:border-neutral-700 transition-colors">
@@ -346,7 +344,6 @@ export default function StatusDashboard() {
           
           <div className="bg-[#0c0d0f] border border-neutral-800/80 rounded-2xl p-6 space-y-6">
             
-            <!-- Incident Entry 1 -->
             <div className="relative pl-6 border-l-2 border-amber-500 space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <span className="text-sm font-semibold text-amber-400">Media CDN Attachment Upload Latency</span>
@@ -357,7 +354,6 @@ export default function StatusDashboard() {
               </p>
             </div>
 
-            <!-- Incident Entry 2 -->
             <div className="relative pl-6 border-l-2 border-emerald-500 space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <span className="text-sm font-semibold text-emerald-400">Scheduled Database Maintenance & Index Tuning</span>
