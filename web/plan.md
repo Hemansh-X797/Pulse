@@ -260,9 +260,47 @@ onboarding and public spaces to work.
 
 ## Still not started
 
-Unchanged from the list above — message context-menu parity (copy
-text, mark unread, forward, reply, and whatever else Discord's menu
-has that this doesn't), the feed-opens-as-a-widget-with-comments
-redesign, making posts "more X-like," nameplate SVGs, terms/privacy
-legal pages, and the profile popup redesign matching your reference
-screenshot. Custom display-name styling you said to leave for now.
+Unchanged from the list above — nameplate SVGs and the profile popup
+redesign matching your reference screenshot. Custom display-name
+styling you said to leave for now.
+
+## This continued pass
+
+### Message context-menu parity — already done, found while auditing
+Turned out `MessageContextMenu.tsx`, real pin/mark-unread/copy/forward
+handlers in `ChatView.tsx`, `ForwardMessageModal.tsx`, and migration
+`012_message_reactions_fix_and_pins.sql` (real DB-backed pins and
+per-user read-state, not fake toggles) already existed from earlier in
+this session. Ran the actual build-test pass on it per rule #1 and
+caught two real bugs it had never been checked against before —
+`QUICK_REACT_EMOJIS` and `MoreHorizontal` were referenced but never
+defined/imported, which would've broken the build outright. Both
+fixed. **Run migration 012** if you haven't yet.
+
+### Feed post → widget with side-by-side comments
+New `PostDetailModal.tsx` — clicking a post's body/image or its
+comment icon now opens the post in a modal (post left, comments in
+their own scrollable column on the right, stacks vertically on mobile)
+with an X to close, replacing the old expand-inline-below-the-post
+behavior entirely. Extracted `CommentRow` (with its real edit/delete)
+and `Avatar`/`timeAgo` out of `HomeFeed.tsx` into their own files so
+the modal could reuse them without a circular import between the two
+files — caught and fixed that during the build-test pass, not
+guessed around.
+
+### Terms of Service + Privacy Policy
+Real pages at `/terms` and `/privacy` — written to match what
+PalSpace actually does and stores (not generic placeholder text):
+covers Supabase as the data processor, the OAuth providers you've
+actually wired (Google/Discord/GitHub), Giphy/Tenor, and the
+link-preview fetcher. Both flagged clearly as a starting template, not
+legal advice — have an actual lawyer review before treating either as
+final, especially the liability/termination sections and anything
+GDPR/CCPA-specific if you ever have EU or California users. Linked
+from the signup form's fine print and from Settings → Account, and
+added to `sitemap.ts`.
+
+## Still not started (updated)
+
+Nameplate SVGs, the profile popup redesign matching your reference
+screenshot, and custom display-name styling (left for now, per you).
