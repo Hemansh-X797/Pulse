@@ -3,6 +3,7 @@ import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 // Previously loaded via a <link> tag in the old Vite index.html — that
 // file has no Next.js equivalent, so these fonts were silently never
@@ -119,6 +120,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${fraunces.variable} ${inter.variable} ${plexMono.variable}`}>
       <body>
         <AppGraph />
+        <Analytics />
+        <SpeedInsights />
         <Providers>{children}</Providers>
       </body>
     </html>
