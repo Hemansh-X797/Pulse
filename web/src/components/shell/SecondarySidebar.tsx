@@ -74,7 +74,7 @@ function SpaceTopicList() {
   }
 
   return (
-    <div className="flex w-[260px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)]">
+    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
       <SidebarHeader title="Space" />
       <div className="px-3.5">
         <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
@@ -121,7 +121,7 @@ function DmList() {
   const { data: dms = [], isLoading } = useQuery({ queryKey: ['my-dms'], queryFn: listMyDMs });
 
   return (
-    <div className="flex w-[260px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)]">
+    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
       <SidebarHeader title="PalSpace" />
       <div className="flex flex-1 flex-col px-3.5">
         <Link
@@ -196,7 +196,7 @@ function DmList() {
 
 function FeedFilters() {
   return (
-    <div className="flex w-[260px] shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)]">
+    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
       <SidebarHeader title="PalSpace" />
       <div className="px-3.5">
         <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">Feed</div>
