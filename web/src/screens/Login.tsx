@@ -6,6 +6,7 @@
 // MIGRATION_GUIDE.md — so it's intentionally not changed here yet.
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInWithPassword, signUpWithPassword, signInWithGoogle, signInWithDiscord, signInWithGithub } from '../lib/api/auth';
 
@@ -99,6 +100,20 @@ export function Login() {
             {mode === 'signup' ? 'Create account' : "Let's go"}
           </button>
           <div className="mt-3.5 min-h-[16px] text-center text-xs text-red-400">{error}</div>
+
+          {mode === 'signup' && (
+            <p className="mx-auto mt-2 max-w-[280px] text-center text-[11px] leading-relaxed text-[var(--color-ink-faint)]">
+              By creating an account you agree to PalSpace&apos;s{' '}
+              <Link href="/terms" target="_blank" className="underline hover:text-[var(--color-ink-muted)]">
+                Terms
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" target="_blank" className="underline hover:text-[var(--color-ink-muted)]">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          )}
 
           <div className="my-8 flex items-center gap-3 text-[11.5px] text-[var(--color-ink-muted)]">
             <span className="h-px flex-1 bg-white/[0.07]" />
