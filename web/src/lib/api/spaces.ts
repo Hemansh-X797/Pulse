@@ -9,7 +9,10 @@ import type { Space, Topic } from '../database.types';
 // (also used for DMs) keeps its DB name; only the space-scoped rows in
 // it are now labeled "Topic" in the UI and types layer.
 
-export async function createSpace(name: string, accentTop?: string, accentBottom?: string): Promise<Space> {
+export async function createSpace(
+  name: string,
+  opts?: { accentTop?: string; accentBottom?: string; isPrivate?: boolean; tags?: string[] }
+): Promise<Space> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error('not authenticated');
 
@@ -21,13 +24,58 @@ export async function createSpace(name: string, accentTop?: string, accentBottom
     .insert({
       name,
       owner_id: userData.user.id,
-      accent_color_top: accentTop ?? '#6366f1',
-      accent_color_bottom: accentBottom ?? '#ec4899',
+      accent_color_top: opts?.accentTop ?? '#6366f1',
+      accent_color_bottom: opts?.accentBottom ?? '#ec4899',
+      // Private by default — matches how every space before this
+      // feature existed (invite-only), so opting into public/Explore
+      // visibility has to be a deliberate choice, not an accidental
+      // default.
+      is_private: opts?.isPrivate ?? true,
+      tags: opts?.tags ?? [],
     })
     .select()
     .single();
   if (error) throw error;
   return data;
+}
+
+/**
+ * Public spaces for the Explore page / onboarding's starter-space
+ * suggestions. RLS (011_onboarding_and_public_spaces.sql) already
+ * restricts what comes back to is_private = false rows, so this
+ * doesn't need to (and shouldn't) filter that client-side too.
+ */
+export async function listPublicSpaces(matchTags?: string[]): Promise<Space[]> {
+  let query = supabase.from('spaces').select('*').eq('is_private', false);
+  if (matchTags && matchTags.length > 0) {
+    // overlaps: any shared tag counts as a match. Falls back to "all
+    // public spaces" below if this returns nothing, rather than
+    // showing an empty Explore page to someone whose interests don't
+    // overlap with any tagged space yet.
+    query = query.overlaps('tags', matchTags);
+  }
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) throw error;
+  if ((data ?? []).length === 0 && matchTags && matchTags.length > 0) {
+    return listPublicSpaces();
+  }
+  return data ?? [];
+}
+
+/**
+ * Join a public space directly (no invite code needed) — from Explore
+ * or onboarding's suggestions. The space_members INSERT policy only
+ * ever checked `user_id = auth.uid()` (see 001_initial_schema.sql), so
+ * this doesn't need a new RLS policy or RPC: the same self-insert
+ * permission that makes joinSpaceByInvite work below already covers
+ * this, since the caller only ever got the target space's id from a
+ * query RLS already scoped to is_private = false rows.
+ */
+export async function joinPublicSpace(spaceId: string): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error('not authenticated');
+  const { error } = await supabase.from('space_members').insert({ space_id: spaceId, user_id: userData.user.id, role: 'member' });
+  if (error) throw error;
 }
 
 export async function listMySpaces(): Promise<Space[]> {
