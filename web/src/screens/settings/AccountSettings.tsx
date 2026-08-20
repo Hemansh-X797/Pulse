@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, X, Loader2 } from 'lucide-react';
 import { getMyProfile, updateProfile } from '../../lib/api/profile';
@@ -129,6 +130,18 @@ export function AccountSettings() {
         <p className="mt-3 text-[11px] text-[var(--color-ink-faint)]">
           Facebook and other providers need their own OAuth app set up first — ask if you want one added.
         </p>
+      </section>
+
+      <section>
+        <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Legal</h2>
+        <div className="flex gap-4 text-[13px]">
+          <Link href="/terms" target="_blank" className="text-[var(--color-ink-muted)] underline hover:text-[var(--color-ink)]">
+            Terms of Service
+          </Link>
+          <Link href="/privacy" target="_blank" className="text-[var(--color-ink-muted)] underline hover:text-[var(--color-ink)]">
+            Privacy Policy
+          </Link>
+        </div>
       </section>
     </div>
   );
