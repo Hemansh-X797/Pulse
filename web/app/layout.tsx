@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import { Analytics } from "@vercel/analytics/next";
 
 // Previously loaded via a <link> tag in the old Vite index.html — that
 // file has no Next.js equivalent, so these fonts were silently never
