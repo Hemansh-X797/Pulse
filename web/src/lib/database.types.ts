@@ -21,6 +21,8 @@ export interface Database {
           accent_color_top: string;
           accent_color_bottom: string;
           created_at: string;
+          interests: string[];
+          onboarding_completed: boolean;
         };
         Insert: Partial<Database['public']['Tables']['profiles']['Row']> & { id: string; username: string; display_name: string };
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
@@ -36,6 +38,8 @@ export interface Database {
           owner_id: string;
           invite_code: string;
           created_at: string;
+          is_private: boolean;
+          tags: string[];
         };
         Insert: Partial<Database['public']['Tables']['spaces']['Row']> & { name: string; owner_id: string };
         Update: Partial<Database['public']['Tables']['spaces']['Row']>;
