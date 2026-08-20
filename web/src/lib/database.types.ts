@@ -117,6 +117,12 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['read_receipts']['Row']>;
         Relationships: [];
       };
+      pinned_messages: {
+        Row: { message_id: number; channel_id: string; pinned_by: string; pinned_at: string };
+        Insert: { message_id: number; channel_id: string; pinned_by: string };
+        Update: never;
+        Relationships: [];
+      };
       posts: {
         Row: {
           id: number;
