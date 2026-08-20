@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker } from 'lucide-react';
+import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft } from 'lucide-react';
 import {
   listMessages,
   sendMessage,
@@ -37,6 +38,7 @@ const EPHEMERAL_OPTIONS = [
 ];
 
 export function ChatView({ channelId, channelLabel }: { channelId: string; channelLabel: string }) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const profile = useAppStore((s) => s.profile);
   const session = useAppStore((s) => s.session);
@@ -303,7 +305,14 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-[62px] shrink-0 items-baseline gap-2.5 border-b border-[var(--color-hairline)] px-7">
+      <div className="flex h-[62px] shrink-0 items-baseline gap-2.5 border-b border-[var(--color-hairline)] px-4 md:px-7">
+        <button
+          onClick={() => router.back()}
+          aria-label="Back"
+          className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)] md:hidden"
+        >
+          <ArrowLeft size={18} />
+        </button>
         <h2 className="font-serif text-lg font-semibold"># {channelLabel}</h2>
         <span
           className={`ml-auto h-1.5 w-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400' : 'bg-[var(--color-ink-faint)]'}`}
@@ -311,7 +320,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         />
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-7 py-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 md:px-7 md:py-6">
         <AnimatePresence initial={false}>
           {messages.map((m) => (
             <MessageRow
@@ -330,7 +339,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         </AnimatePresence>
       </div>
 
-      <div className={`px-7 text-[11.5px] text-[var(--color-ink-muted)] transition-opacity ${typingUser ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`px-4 md:px-7 text-[11.5px] text-[var(--color-ink-muted)] transition-opacity ${typingUser ? 'opacity-100' : 'opacity-0'}`}>
         {typingUser && `${typingUser} is typing…`}
       </div>
 
@@ -356,7 +365,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         </div>
       )}
 
-      <div className="px-7 pb-6 pt-3">
+      <div className="px-4 pb-4 pt-3 md:px-7 md:pb-6">
         <div className="flex items-center gap-2 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] py-1.5 pl-4 pr-1.5">
           <button
             onClick={() => fileInputRef.current?.click()}
