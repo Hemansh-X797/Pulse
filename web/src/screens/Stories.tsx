@@ -49,12 +49,12 @@ export function Stories() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-[62px] shrink-0 items-baseline gap-2.5 border-b border-[var(--color-hairline)] px-7">
+      <div className="flex h-[62px] shrink-0 items-baseline gap-2.5 border-b border-[var(--color-hairline)] px-4 md:px-7">
         <h2 className="font-serif text-lg font-semibold">Stories</h2>
         <span className="text-xs text-[var(--color-ink-muted)]">visible to friends for 24 hours</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-7 py-6">
+      <div className="flex-1 overflow-y-auto px-4 py-5 md:px-7 md:py-6">
         {error && (
           <div className="mb-4 flex max-w-md items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
             {error}
