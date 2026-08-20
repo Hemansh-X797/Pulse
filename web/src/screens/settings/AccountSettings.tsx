@@ -98,7 +98,7 @@ export function AccountSettings() {
           Sign in with any of these — they're all the same PalSpace account, not separate ones.
         </p>
         <div className="space-y-2">
-          {(['google', 'discord'] as const).map((provider) => {
+          {(['google', 'discord', 'github'] as const).map((provider) => {
             const identity = identities.find((i) => i.provider === provider);
             const linked = Boolean(identity);
             const isLastMethod = identities.length <= 1;
