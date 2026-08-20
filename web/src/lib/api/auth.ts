@@ -44,6 +44,20 @@ export async function signInWithDiscord() {
   if (error) throw error;
 }
 
+export async function signInWithGithub() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+    // Same redirectTo as Google/Discord above — new accounts created
+    // via OAuth land here too, but the (app) layout's onboarding gate
+    // (app/(app)/layout.tsx) catches them and bounces to /onboarding
+    // automatically since new profile rows default
+    // onboarding_completed to false, so this doesn't need its own
+    // special-cased redirect target.
+    options: { redirectTo: `${window.location.origin}/home` },
+  });
+  if (error) throw error;
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
@@ -70,7 +84,7 @@ export async function getLinkedIdentities() {
   return data.identities;
 }
 
-export async function linkProvider(provider: 'google' | 'discord') {
+export async function linkProvider(provider: 'google' | 'discord' | 'github') {
   const { error } = await supabase.auth.linkIdentity({
     provider,
     options: { redirectTo: `${window.location.origin}/settings` },
