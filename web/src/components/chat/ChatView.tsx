@@ -29,6 +29,7 @@ import { useCompactMode } from '../../hooks/useCompactMode';
 import { EmojiPicker } from './EmojiPicker';
 import { GifPicker } from './GifPicker';
 import { ProfilePopover } from '../profile/ProfilePopover';
+import { NameStyle, type NameStyleData } from '../NameStyle';
 import {
   subscribeToChannelMessages,
   subscribeToTyping,
@@ -38,7 +39,7 @@ import {
 import { useAppStore } from '../../store/useAppStore';
 import type { Message } from '../../lib/database.types';
 
-type DisplayMessage = (Message & { sender_username: string }) & { pending?: boolean };
+type DisplayMessage = (Message & { sender_username: string; sender_display_name: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null }) & { pending?: boolean };
 
 const EPHEMERAL_OPTIONS = [
   { label: 'Off', seconds: 0 },
@@ -93,7 +94,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const [pinnedIds, setPinnedIds] = useState<Set<number>>(new Set());
   const [pinsBarOpen, setPinsBarOpen] = useState(false);
   const [pinnedList, setPinnedList] = useState<PinnedMessage[]>([]);
-  const [forwardTarget, setForwardTarget] = useState<(Message & { sender_username: string }) | null>(null);
+  const [forwardTarget, setForwardTarget] = useState<(Message & { sender_username: string; sender_display_name: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null }) | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -156,13 +157,22 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
             const idx = prev.findIndex((m) => m.pending && m.client_ref === incoming.client_ref);
             if (idx !== -1) {
               const next = [...prev];
-              next[idx] = { ...incoming, sender_username: prev[idx].sender_username, pending: false };
+              next[idx] = { ...incoming, sender_username: prev[idx].sender_username, sender_display_name: prev[idx].sender_display_name, sender_name_style: prev[idx].sender_name_style, pending: false };
               return next;
             }
           }
           if (prev.some((m) => m.id === incoming.id)) return prev;
-          const senderUsername = incoming.sender_id === profile?.id ? profile.username : '…';
-          return [...prev, { ...incoming, sender_username: senderUsername }];
+          // Other people's realtime messages arrive as bare row data (no
+          // joined profile) — same placeholder gap that already existed
+          // for sender_username before this change; see the B1
+          // performance item in plan.md for the real fix (refetching or
+          // caching sender profiles so this doesn't show a placeholder
+          // at all). Not solving that here, just not making it worse.
+          const isMe = incoming.sender_id === profile?.id;
+          const senderUsername = isMe ? profile.username : '…';
+          const senderDisplayName = isMe ? profile.display_name : '…';
+          const senderNameStyle = isMe ? (profile.name_style as DisplayMessage['sender_name_style']) : null;
+          return [...prev, { ...incoming, sender_username: senderUsername, sender_display_name: senderDisplayName, sender_name_style: senderNameStyle }];
         });
       },
       (updated) => {
@@ -215,6 +225,8 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       channel_id: channelId,
       sender_id: profile.id,
       sender_username: profile.username,
+      sender_display_name: profile.display_name,
+      sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
       body_raw: body,
       body_rendered: body, // rendered for real once the emoji lib runs in sendMessage; good enough for the instant local paint
       reply_to_id: replyTarget?.id ?? null,
@@ -258,6 +270,8 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         channel_id: channelId,
         sender_id: profile.id,
         sender_username: profile.username,
+        sender_display_name: profile.display_name,
+        sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
         body_raw: '',
         body_rendered: '',
         reply_to_id: null,
@@ -292,6 +306,8 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       channel_id: channelId,
       sender_id: profile.id,
       sender_username: profile.username,
+      sender_display_name: profile.display_name,
+      sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
       body_raw: '',
       body_rendered: '',
       reply_to_id: null,
@@ -746,7 +762,7 @@ function MessageRow({
       <div className={`relative flex max-w-[70%] flex-col ${isMine ? 'items-end' : 'items-start'}`}>
         <div ref={popoverAnchorRef} className={`mb-0.5 flex items-baseline gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
           <button onClick={() => setPopoverOpen((v) => !v)} className="text-[12.5px] font-semibold hover:opacity-80">
-            {message.sender_username}
+            <NameStyle name={message.sender_display_name} style={message.sender_name_style as NameStyleData} />
           </button>
           {message.edited_at && <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">edited</span>}
           {isExpiring && <span className="font-mono text-[10px] text-[var(--presence-default-a)]">disappearing</span>}
