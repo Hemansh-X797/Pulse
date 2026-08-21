@@ -2,12 +2,14 @@
 
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Camera, Check, X } from 'lucide-react';
+import { Camera, Check, X, Sparkles } from 'lucide-react';
 import { uploadMedia, MediaUploadError } from '../../lib/api/media';
 import { getMyProfile, updateProfile } from '../../lib/api/profile';
 import { useAppStore } from '../../store/useAppStore';
 import { Field, inputClass } from './shared';
 import { CropModal } from '../../components/settings/CropModal';
+import { NameStyle, type NameStyleData } from '../../components/NameStyle';
+import { NameStyleModal } from '../../components/NameStyleModal';
 
 const ACCENT_PRESETS: [string, string][] = [
   ['#2dd4bf', '#a78bfa'], // PalSpace default — teal → violet
@@ -27,6 +29,7 @@ export function ProfileSettings() {
   const { data: profile } = useQuery({ queryKey: ['my-profile'], queryFn: getMyProfile, initialData: storeProfile ?? undefined });
 
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
+  const [nameStyleOpen, setNameStyleOpen] = useState(false);
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [pronouns, setPronouns] = useState(profile?.pronouns ?? '');
   const [statusText, setStatusText] = useState(profile?.status_text ?? '');
@@ -179,6 +182,22 @@ export function ProfileSettings() {
             </Field>
           </div>
 
+          <button
+            onClick={() => setNameStyleOpen(true)}
+            className="flex w-full items-center justify-between rounded-lg border border-[var(--color-hairline)] px-3.5 py-2.5 text-left hover:border-[var(--color-hairline-strong)]"
+          >
+            <div>
+              <div className="flex items-center gap-1.5 text-[13px] font-medium">
+                <Sparkles size={13} className="text-[var(--presence-default-a)]" />
+                Display name style
+              </div>
+              <div className="mt-0.5 text-[16px] font-bold">
+                <NameStyle name={displayName || profile?.display_name || 'YourName'} style={profile?.name_style as NameStyleData} />
+              </div>
+            </div>
+            <span className="text-[11px] text-[var(--color-ink-muted)]">Edit</span>
+          </button>
+
           <Field label="Status">
             <input value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={80} placeholder="What are you up to?" className={inputClass} />
           </Field>
@@ -246,6 +265,19 @@ export function ProfileSettings() {
           kind={cropTarget.kind}
           onCancel={() => setCropTarget(null)}
           onApply={handleCropApply}
+        />
+      )}
+
+      {nameStyleOpen && (
+        <NameStyleModal
+          displayName={displayName || profile?.display_name || ''}
+          initial={(profile?.name_style as NameStyleData) ?? null}
+          onClose={() => setNameStyleOpen(false)}
+          onSave={async (style) => {
+            const updated = await updateProfile({ name_style: style });
+            setStoreProfile(updated);
+            queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+          }}
         />
       )}
     </div>
