@@ -22,6 +22,7 @@ import { useAppStore } from '../store/useAppStore';
 import { ProfilePopover } from '../components/profile/ProfilePopover';
 import type { FeedItem } from '../lib/database.types';
 import { PostDetailModal } from '../components/PostDetailModal';
+import { NameStyle, type NameStyleData } from '../components/NameStyle';
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -82,7 +83,7 @@ export function HomeFeed() {
       </div>
 
       <div className="flex flex-1 flex-col items-center gap-3 overflow-y-auto px-4 py-5 md:px-7 md:py-7">
-        <div className="w-full max-w-[560px] rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4.5">
+        <div className="composer-round w-full max-w-[560px] rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4.5">
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -259,7 +260,7 @@ function PostCard({ post }: { post: FeedItem }) {
           />
         </button>
         <button onClick={() => setPopoverOpen((v) => !v)} className="min-w-0 flex-1 text-left hover:opacity-80">
-          <div className="text-[13.5px] font-semibold">{post.author_display_name}</div>
+          <div className="text-[13.5px] font-semibold"><NameStyle name={post.author_display_name} style={post.author_name_style as NameStyleData} /></div>
           <div className="text-[11.5px] text-[var(--color-ink-muted)]">
             @{post.author_username} · {timeAgo(post.created_at)}
             {post.edited_at && ' · edited'}
