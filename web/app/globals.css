@@ -102,3 +102,137 @@
     -webkit-backdrop-filter: blur(20px) saturate(140%);
   }
 }
+
+/*
+  BESPOKE THEME — the new default look, per explicit direction (round
+  corners "look AI"; reference: Bespoke*.html demos). Applied via
+  html[data-theme='bespoke'], set by default in app/layout.tsx and
+  switchable back to the original rounded look ("Classic") from
+  Settings → Appearance.
+
+  Mechanism: redefine the SAME --color-* custom properties every
+  component already reads via bg-[var(--color-surface)] etc — so the
+  entire color system flips without touching component code. Corner
+  radius can't be swapped that way (Tailwind's rounded-* utilities emit
+  literal border-radius values, not a variable), so this instead
+  targets those utility classes directly, scoped under the theme
+  attribute, and force them flat — with explicit, deliberate exceptions
+  for the things that should stay round even in Bespoke: avatars
+  (.rounded-full), pill/badge shapes (unread counts, tags — .pill-shape),
+  the message-compose box specifically (asked for rounder even here —
+  .composer-round), and chat bubbles' asymmetric "tail" corner
+  (.bubble-shape), which the Bespoke reference itself keeps soft
+  (rounded-xl rounded-bl-sm/br-sm) rather than fully square.
+*/
+html[data-theme='bespoke'] {
+  --color-void: #000000;
+  --color-surface: #080808;
+  --color-surface-raised: #111112;
+  --color-surface-overlay: #1a1a1b;
+  --color-hairline: #1c1c1c;
+  --color-hairline-strong: #333333;
+  --color-ink: #f0f0f0;
+  --color-ink-muted: #888888;
+  --color-ink-faint: #444444;
+}
+
+html[data-theme='bespoke'] :focus-visible {
+  border-radius: 2px;
+}
+
+html[data-theme='bespoke']
+  :is(.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl):not(
+    .rounded-full,
+    .pill-shape,
+    .composer-round,
+    .bubble-shape
+  ) {
+  border-radius: 2px;
+}
+
+/* Bespoke's signature small crosshair accent on the top-right corner of
+   elevated cards/panels — opt-in per element via this class, not forced
+   globally, since it reads as decoration and belongs on card-like
+   surfaces specifically (post cards, modals), not on every button. */
+html[data-theme='bespoke'] .bespoke-corner {
+  position: relative;
+}
+html[data-theme='bespoke'] .bespoke-corner::before,
+html[data-theme='bespoke'] .bespoke-corner::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: var(--color-ink-muted);
+  z-index: 1;
+}
+html[data-theme='bespoke'] .bespoke-corner::before {
+  width: 12px;
+  height: 1px;
+}
+html[data-theme='bespoke'] .bespoke-corner::after {
+  width: 1px;
+  height: 12px;
+}
+
+/* ---------- Custom display-name styling (Settings → Profile) ---------- */
+/* Fonts */
+.name-font-serif { font-family: var(--font-serif); }
+.name-font-gothic { font-family: 'UnifrakturMaguntia', var(--font-serif); letter-spacing: 0.5px; }
+.name-font-pixel { font-family: '"Press Start 2P"', var(--font-mono); letter-spacing: -0.5px; }
+
+/* Effects — each reads its colors from --name-c1 / --name-c2 (and
+   --name-c3..7 for Prism), set inline per-profile from the person's
+   saved style, never hardcoded here. */
+.name-effect-gradient {
+  background: linear-gradient(90deg, var(--name-c1, #fff), var(--name-c2, #fff));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.name-effect-neon {
+  color: var(--name-c2, #fff);
+  text-shadow:
+    0 0 2px var(--name-c2, #fff),
+    0 0 6px var(--name-c1, #fff),
+    0 0 14px var(--name-c1, #fff),
+    0 0 28px var(--name-c1, #fff);
+}
+.name-effect-toon {
+  color: var(--name-c1, #fff);
+  -webkit-text-stroke: 1px #000;
+  filter: drop-shadow(2px 2px 0px #000);
+}
+.name-effect-prism {
+  background: linear-gradient(
+    90deg,
+    var(--name-c1, #ff0000),
+    var(--name-c2, #ff9900),
+    var(--name-c3, #ffee00),
+    var(--name-c4, #33ff00),
+    var(--name-c5, #00d0ff),
+    var(--name-c6, #6600ff),
+    var(--name-c7, #ff00d4),
+    var(--name-c1, #ff0000)
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: name-prism-shift 6s linear infinite;
+}
+@keyframes name-prism-shift {
+  from { background-position: 0% 50%; }
+  to { background-position: 300% 50%; }
+}
+/* Gummy: exactly 2 colors, alternating per letter — applied by the
+   renderer wrapping each character in a span and toggling
+   --name-letter-c between --name-c1/--name-c2, not by CSS alone (CSS
+   has no clean "every other character" selector for arbitrary text
+   nodes), see NameStyle.tsx. This class just supplies the shared glossy
+   3D look each letter-span gets. */
+.name-effect-gummy-letter {
+  color: var(--name-letter-c, #fff);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 2px 2px rgba(0, 0, 0, 0.35);
+  -webkit-text-stroke: 0.4px rgba(255, 255, 255, 0.25);
+}
