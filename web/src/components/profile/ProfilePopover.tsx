@@ -9,6 +9,7 @@ import { createOrGetDM } from '../../lib/api/channels';
 import { listFriends, listOutgoingRequests, sendFriendRequest } from '../../lib/api/friends';
 import { useAppStore } from '../../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../NameStyle';
+import { isValidNameplateId, nameplateSrc } from '../../lib/nameplates';
 
 export function ProfilePopover({ username, anchorRef, onClose }: { username: string; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void }) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -85,7 +86,15 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
                 : `linear-gradient(150deg, ${profile.accent_color_top}, ${profile.accent_color_bottom})`,
             }}
           />
-          <div className="px-4 pb-4">
+          <div className="relative px-4 pb-4">
+            {isValidNameplateId(profile.equipped_nameplate) && (
+              <img
+                src={nameplateSrc(profile.equipped_nameplate)}
+                alt=""
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-24 w-full object-cover object-bottom"
+              />
+            )}
+            <div className="relative">
             {/* Click enlarges the avatar in place (lightbox), per your
                 screenshot — it no longer navigates away on click.
                 "View Full Profile" below is the new, explicit way to
@@ -146,6 +155,7 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
             >
               View Full Profile
             </button>
+            </div>
           </div>
         </>
       )}
