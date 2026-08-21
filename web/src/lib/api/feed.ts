@@ -80,10 +80,10 @@ export async function toggleReaction(postId: number, emoji: string, currentlyRea
   }
 }
 
-export async function listComments(postId: number): Promise<(PostComment & { author_username: string; author_display_name: string; author_avatar_url: string; author_accent_top: string; author_accent_bottom: string })[]> {
+export async function listComments(postId: number): Promise<(PostComment & { author_username: string; author_display_name: string; author_avatar_url: string; author_accent_top: string; author_accent_bottom: string; author_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
   const { data, error } = await supabase
     .from('post_comments')
-    .select('*, profiles!post_comments_author_id_fkey(username, display_name, avatar_url, accent_color_top, accent_color_bottom)')
+    .select('*, profiles!post_comments_author_id_fkey(username, display_name, avatar_url, accent_color_top, accent_color_bottom, name_style)')
     .eq('post_id', postId)
     .order('id', { ascending: true });
   if (error) throw error;
@@ -92,7 +92,7 @@ export async function listComments(postId: number): Promise<(PostComment & { aut
   // components expect (same flattening the C++ server did in SQL with a
   // JOIN, done here in JS since PostgREST returns nested objects).
   return (data ?? []).map((row) => {
-    const profile = row.profiles as unknown as { username: string; display_name: string; avatar_url: string; accent_color_top: string; accent_color_bottom: string } | null;
+    const profile = row.profiles as unknown as { username: string; display_name: string; avatar_url: string; accent_color_top: string; accent_color_bottom: string; name_style: { font?: string; effect?: string; colors?: string[] } | null } | null;
     return {
       ...row,
       author_username: profile?.username ?? '?',
@@ -100,6 +100,7 @@ export async function listComments(postId: number): Promise<(PostComment & { aut
       author_avatar_url: profile?.avatar_url ?? '',
       author_accent_top: profile?.accent_color_top ?? '',
       author_accent_bottom: profile?.accent_color_bottom ?? '',
+      author_name_style: profile?.name_style ?? null,
     };
   });
 }
