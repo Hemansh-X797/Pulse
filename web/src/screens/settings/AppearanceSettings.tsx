@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getCompactModeSync, setCompactMode } from '../../hooks/useCompactMode';
+import { getThemeSync, setTheme, type ThemeName } from '../../hooks/useTheme';
 
 const STORAGE_KEY = 'palspace-reduced-motion';
 
@@ -21,6 +22,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 export function AppearanceSettings() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [compact, setCompact] = useState(false);
+  const [themeName, setThemeName] = useState<ThemeName>('bespoke');
 
   // Reads/writes a plain in-memory + localStorage flag, not a data-*
   // attribute driving a global CSS override yet — the system
@@ -32,6 +34,7 @@ export function AppearanceSettings() {
   useEffect(() => {
     setReducedMotion(localStorage.getItem(STORAGE_KEY) === 'true');
     setCompact(getCompactModeSync());
+    setThemeName(getThemeSync());
   }, []);
 
   function toggle() {
@@ -50,6 +53,33 @@ export function AppearanceSettings() {
   return (
     <div>
       <h1 className="mb-6 font-serif text-2xl font-semibold">Appearance</h1>
+
+      <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
+        <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Theme</h2>
+        <p className="mb-3 text-[11.5px] text-[var(--color-ink-faint)]">Bespoke is the default look. Classic is the original rounded style, kept as an option.</p>
+        <div className="grid grid-cols-2 gap-2.5">
+          {(['bespoke', 'classic'] as ThemeName[]).map((name) => (
+            <button
+              key={name}
+              onClick={() => {
+                setThemeName(name);
+                setTheme(name);
+              }}
+              className={`rounded-lg border p-3 text-left transition-colors ${
+                themeName === name
+                  ? 'border-[var(--presence-default-a)] bg-[var(--presence-default-a)]/10'
+                  : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
+              }`}
+            >
+              <div className="mb-1.5 flex gap-1">
+                <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${name === 'bespoke' ? '' : 'rounded-full'}`} style={{ background: name === 'bespoke' ? '#0a0a0a' : '#1a1a22' }} />
+                <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${name === 'bespoke' ? '' : 'rounded-full'}`} style={{ background: name === 'bespoke' ? '#161616' : '#212129' }} />
+              </div>
+              <div className="text-[13px] font-medium capitalize">{name}</div>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Chat display</h2>
