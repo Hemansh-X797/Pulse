@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { X, Heart, Share2, Pencil, Trash2 } from 'lucide-react';
 import { renderMarkdown } from '../lib/markdown';
-import { extractFirstUrl, LinkPreviewCard } from '../components/shared/LinkPreviewCard';
+import { extractFirstUrl, LinkPreviewCard } from './shared/LinkPreviewCard';
 import { useAppStore } from '../store/useAppStore';
-import { CommentRow } from '../components/CommentRow';
+import { CommentRow } from './CommentRow';
+import { NameStyle, type NameStyleData } from './NameStyle';
 import type { FeedItem, PostComment } from '../lib/database.types';
 
 type FeedComment = PostComment & {
@@ -14,6 +15,7 @@ type FeedComment = PostComment & {
   author_avatar_url: string;
   author_accent_top: string;
   author_accent_bottom: string;
+  author_name_style?: { font?: string; effect?: string; colors?: string[] } | null;
 };
 
 const LIKE_EMOJI = '❤️';
@@ -105,7 +107,7 @@ export function PostDetailModal({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[13.5px] font-semibold">{post.author_display_name}</div>
+              <div className="text-[13.5px] font-semibold"><NameStyle name={post.author_display_name} style={post.author_name_style as NameStyleData} /></div>
               <div className="text-[11.5px] text-[var(--color-ink-muted)]">@{post.author_username}</div>
             </div>
             {isMine && (
@@ -168,25 +170,7 @@ export function PostDetailModal({
             )}
             <div className="space-y-3">
               {comments.map((c) => (
-                <div key={c.id} className="flex gap-2">
-                  <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-black presence-fill"
-                    style={{ ['--p-a' as string]: c.author_accent_top, ['--p-b' as string]: c.author_accent_bottom }}
-                  >
-                    {c.author_avatar_url ? (
-                      <img src={c.author_avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
-                    ) : (
-                      c.author_display_name.slice(0, 2).toUpperCase()
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[12.5px]">
-                      <span className="font-semibold">{c.author_display_name}</span>{' '}
-                      <span className="text-[10.5px] text-[var(--color-ink-faint)]">{c.author_username}</span>
-                    </div>
-                    <div className="text-[13px] leading-snug">{renderMarkdown(c.body_rendered)}</div>
-                  </div>
-                </div>
+                <CommentRow key={c.id} comment={c} postId={post.id} />
               ))}
             </div>
           </div>
