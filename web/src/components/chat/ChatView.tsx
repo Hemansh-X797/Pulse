@@ -789,7 +789,7 @@ function MessageRow({
             )}
             {message.body_rendered && (
               <div
-                className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                className={`bubble-shape rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
                   isMine
                     ? 'rounded-br-md presence-fill font-medium text-black'
                     : 'rounded-bl-md border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink)]'
