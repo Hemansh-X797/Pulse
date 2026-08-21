@@ -367,3 +367,196 @@ chat message name-style plumbing, notification chime + prefs
 (DMs-always-on-if-enabled), follow system, tab/taskbar unread badge,
 and the performance/lag audit. Profile/PFP effects and frames still
 waiting on your assets, per your own note.
+
+## MASTER PLAN — everything from the big screenshot-driven request
+
+Explicit instruction: finish Part A (pending, above) first, THEN start
+Part B. Both parts are large; this doc is the source of truth for
+scope/order across however many passes it takes. Nothing here is
+"done" until it's in a "Done" section with a build-test note.
+
+### Part A — pending from before (do first)
+1. Chat message name-style plumbing
+2. Nameplate SVGs
+3. Rest of Bespoke reskin (real per-screen layout vs. your demos)
+4. Notification chime + master disable toggle (DMs always-on if
+   notifs enabled at all — folds in the new ask for this too)
+5. Follow system (separate from Friends)
+6. Tab/taskbar unread badge
+7. Performance/lag audit
+
+### Part B — new, in build order
+
+**B1. Real-time speed fix (the actual bug)**
+"DM takes 2 minutes to appear in my list" / same for new spaces means
+a subscription gap somewhere — the DM sidebar list isn't getting
+pushed "a new channel now includes you," so it's sitting on a stale
+fetch until something else forces a refetch. Root-causing this
+properly (Realtime channel/table subscription audit across
+channels.ts, spaces.ts, the sidebar hooks) rather than papering over it
+with polling.
+
+**B2. Friends**
+- New channel auto-appears in DM list the instant a friend request is
+  accepted (real-time, not next reload) — depends on B1's fix.
+- Mutual friends count + list on profile popover and full profile.
+- Fix simultaneous-friend-request bug: A requests B, B independently
+  requests A before accepting — should resolve to "already friends"
+  with a clear inline message, not a confusing duplicate-request state.
+
+**B3. Analytics & observability**
+- Google Analytics (their measurement ID) + Vercel Analytics + Speed
+  Insights, wired in app/layout.tsx.
+- `/status` page: per-service health (DB, Auth, Storage, Realtime) as
+  colored status boxes + basic latency/uptime graphs, backed by real
+  periodic checks, not hardcoded "all green."
+- Privacy Policy updated to disclose Google Analytics.
+
+**B4. Auth persistence**
+Verify (not assume) Supabase's refresh-token persistence is actually
+configured correctly for "log in once, stay logged in" — check
+`supabase.ts` client config and session storage.
+
+**B5. New pages**
+- Real 404 page using the logo.
+- `/status` (B3).
+
+**B6. Presence**
+Online / Do Not Disturb / Offline / Invisible — schema + UI + realtime
+broadcast, shown wherever presence already renders (avatars, DM list,
+profile).
+
+**B7. Explore overhaul**
+Tabs: Spaces / Feed. Search bar + relevance-ranked "top choices."
+Hashtag search across both.
+
+**B8. Homepage redesign**
+`app/page.tsx` (the logged-out landing page, NOT the in-app feed at
+`app/(app)/page.tsx`) — real design pass, not the current placeholder.
+
+**B9. Notifications**
+Master on/off toggle in Settings (folds into Part A item 4 — building
+these together since they're the same settings section).
+
+**B10. Voice calls (WebRTC)**
+Confirmed buildable without a VM: signaling via Supabase Realtime
+broadcast channels (free), STUN via public Google servers (free), TURN
+via a free-tier third-party relay (Metered/OpenRelay or Cloudflare
+Calls — free tier, no VM). DM 1:1 calls + small-group voice channels in
+spaces, mesh topology (every participant connects to every other
+participant directly) — this works well and free up to a small group
+size; capping voice channels around 6 concurrent participants and
+showing that cap in the UI, since mesh quality degrades hard past that
+and a real SFU (the VM-requiring path) is explicitly what's being
+deferred. This is genuinely the largest single item in this whole plan
+— treating it as its own multi-pass effort, not a bolt-on.
+
+**B11. Spaces upgrade — the "HUGE" one, screenshots-driven**
+Broken into concrete sub-pieces, referencing your 7 screenshots:
+- **Spaces section in nav**: grouped/expandable, not the current
+  jagged icon strip — click to reveal all your spaces.
+- **Space settings panel**: matching the Discord reference structure —
+  Server Profile (name, icon, banner, description, traits),
+  Members, Roles, Invites, and a Safety/Access section. Space
+  description as a real field alongside title, shown in the settings
+  profile card and Explore.
+- **Roles & permissions**: one default Admin role auto-created with
+  the space (owner), everyone else is a plain member by default; space
+  admins can create additional roles and assign a real permission set
+  (manage channels/topics, manage roles, kick/ban, manage messages,
+  create invites, etc. — will define the exact permission list before
+  building the schema, not guess it mid-migration).
+- **Right-click context menu** on a space (from your screenshot: Mark
+  as Read, Invite, Mute, Notification Settings, Hide Muted Channels,
+  Server Settings, Privacy Settings, Edit Per-server Profile, Create
+  Channel/Category/Event, Copy Server ID).
+- **Invites upgrade**: show the space's ID on the invite, not just a
+  bare code.
+- **Topics**: reordering (move up/down within their category), and
+  dropping the literal `#` prefix in the UI — noted as an intentional
+  visual departure from Discord, not an oversight.
+- **Voice channels + categories**: categories group topics/voice
+  channels the way Discord's do; voice channels are the space-side
+  half of B10.
+
+**B12. Chat bubble toggle**
+Settings toggle: bubbles (current look) vs. flat/direct text (per your
+screenshot reference) — both need to keep every existing feature
+(reactions, reply, edit, markdown, link previews, etc.), this only
+changes the container styling, not the functionality underneath.
+
+**B13. Channel creation modal — visual pass**
+Cooler/more considered version of the current create-channel modal,
+matching your reference screenshot's structure (type picker, name,
+private toggle) but with real visual intention, not a copy.
+
+**B14. Two more UI theme options**
+Alongside Bespoke (default) and Classic — two additional selectable
+looks, chosen during onboarding (a new onboarding step) as well as
+switchable later in Settings → Appearance, same mechanism as the
+existing theme system. Needs your direction on what the two new looks
+actually are before I design tokens for them (same as Bespoke needed
+your demos) — will ask when this item comes up.
+
+**B15. Onboarding additions**
+- Theme picker (B14).
+- Date of birth field (+ whatever else field, confirm scope when this
+  item comes up).
+
+**B16. Feed suggestions**
+Suggested posts/accounts in the feed based on interests/follows —
+scope to be defined when this item comes up (algorithmic ranking vs.
+simple interest-tag matching).
+
+---
+Given the size of Part B, this will span many passes. Each pass will
+update this doc with what actually got built + build-tested, same
+discipline as everything above it.
+
+## Part A progress — items 1, 2, 4 done, build-tested
+
+### 1. Chat message name-style plumbing — done
+### 2. Nameplate SVGs — done
+(both covered in the previous pass's notes above)
+
+### 4. Notification chime + master disable toggle — done
+Migration `016_master_notifications_toggle.sql`: added
+`notifications_enabled` to `notification_preferences`, and — per your
+exact spec — DMs are no longer individually toggleable at all; the
+`notify_channel_message` trigger now only checks the master switch,
+not the old `messages` column (left in place, unused, so nothing
+mid-deploy breaks). The other three notification triggers
+(comment/reaction/friend-request) now check master-switch AND their
+own category, so turning the master off silences everything, and
+turning it on restores each category to whatever it was individually
+set to — except DMs, which just always fire.
+
+Chime: `src/lib/notificationSound.ts`, a synthesized two-note tone via
+WebAudio (no audio file, no licensing question), gated behind the
+browser's real autoplay-unlock rule (waits for a genuine first
+pointer/keyboard event before the AudioContext is even created — not
+just muted, actually not constructible yet, same as any browser would
+enforce). Wired into the *existing* `useUnreadCounts` hook's realtime
+message subscription (same "not mine, not the channel I'm already
+looking at" condition already used for the unread badge), which also
+means it respects both the new master toggle and its own
+Settings-level sound-only toggle.
+
+**Found while wiring this**: `subscribeToNotifications()` in
+`realtime.ts` has existed for a while but was never actually called
+anywhere — the notifications panel only ever did a one-time fetch, no
+live updates. Didn't fix that in this pass (real scope, belongs with
+B1's broader real-time audit), just flagging it clearly rather than
+letting it hide.
+
+**Run migration 016** for the master toggle to take effect.
+
+## Still not done in Part A
+3. Rest of the Bespoke reskin (per-screen layout vs. your demos)
+5. Follow system
+6. Tab/taskbar unread badge
+7. Performance/lag audit (this now clearly includes: the
+   `subscribeToNotifications` gap above, and whatever's causing the
+   DM/space-creation slowness described in Part B's B1 — likely related
+   but confirming by tracing it properly, not assuming, when that item
+   comes up)
