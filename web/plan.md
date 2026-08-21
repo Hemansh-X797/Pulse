@@ -304,3 +304,66 @@ added to `sitemap.ts`.
 
 Nameplate SVGs, the profile popup redesign matching your reference
 screenshot, and custom display-name styling (left for now, per you).
+
+## This continued pass — Bespoke theme + name styling + profile popup fix
+
+### Theme infrastructure — Bespoke is now the default
+Per your answer, confirmed: Bespoke (hard edges, near-black surfaces,
+hairline borders) is the new default look everywhere, Classic (the
+original rounded style) is the opt-out in Settings → Appearance.
+Mechanism: `html[data-theme='bespoke']` redefines the same `--color-*`
+custom properties every component already reads, so colors flip
+app-wide with zero component changes; corner radius can't work that
+way (Tailwind's `rounded-*` utilities emit literal values, not a
+variable), so that's a global override that flattens every
+`rounded-*` class to 2px *except* explicitly marked exceptions —
+avatars (`.rounded-full`), the feed composer (tagged `.composer-round`,
+since you specifically asked for that one to stay round even in
+Bespoke), and chat bubble tails (`.bubble-shape`). A blocking
+pre-hydration script in `layout.tsx` reads the stored preference before
+first paint so Classic users don't see a flash of Bespoke on load.
+
+**What this pass does NOT include yet**: rewriting each screen's actual
+layout/structure to match your Bespoke HTML demos — this is theme
+infrastructure (colors + corners), not a full component-by-component
+reskin. The demos also show things like crosshair corner accents on
+cards; I added the CSS for that (`.bespoke-corner`) but haven't gone
+through and applied it to every card yet.
+
+### Custom display-name styling — fully built and live
+Migration `013_display_name_style.sql` (profiles.name_style jsonb),
+`NameStyle.tsx` (renders all 6 effects to your exact spec — Solid,
+Gradient, Neon, Toon/Pop, Prism, Gummy with exactly 2 alternating
+colors per your answer), the 4 fonts from your ProfileEdit demo
+(Sans/Serif/Gothic/Pixel), and `NameStyleModal.tsx` (live preview,
+correct color-picker count per effect), wired into Settings → Profile.
+
+Also plumbed through to everywhere a name actually renders, not just
+the settings preview: feed posts (`014_feed_view_name_style.sql` adds
+it to the view), post comments, the post detail modal, the full
+profile page, and the profile popover.
+
+**Deliberately not done yet: chat messages.** Chat currently only
+ever shows `sender_username`, never `display_name` — wiring
+`name_style` in means touching ~8 spots in a realtime-sensitive file
+(the subscription handler, 3 separate optimistic-send paths, pin/reply/
+forward previews) and I didn't want to rush that into a file where a
+mistake means broken realtime messaging. Doing this properly next.
+
+### Profile popover — fixed to match your screenshots
+Clicking the avatar inside the popover now enlarges it in place
+(lightbox), instead of navigating to the full profile page like it did
+before — that was a deliberate design decision from an earlier pass
+that your screenshots directly contradict, so I changed it rather than
+defending the old behavior. Added an explicit "View Full Profile" link
+(matching the Discord reference) as the new way to reach the full page,
+since clicking the avatar no longer does that.
+
+## Still not started
+
+Nameplate SVGs, the rest of the Bespoke reskin (per-screen layout
+changes matching your demos, not just the color/corner infrastructure),
+chat message name-style plumbing, notification chime + prefs
+(DMs-always-on-if-enabled), follow system, tab/taskbar unread badge,
+and the performance/lag audit. Profile/PFP effects and frames still
+waiting on your assets, per your own note.
