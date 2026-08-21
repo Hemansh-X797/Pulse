@@ -23,6 +23,7 @@ export interface Database {
           created_at: string;
           interests: string[];
           onboarding_completed: boolean;
+          name_style: { font?: string; effect?: string; colors?: string[] } | null;
         };
         Insert: Partial<Database['public']['Tables']['profiles']['Row']> & { id: string; username: string; display_name: string };
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
@@ -232,6 +233,7 @@ export interface Database {
           author_avatar_url: string;
           author_accent_top: string;
           author_accent_bottom: string;
+          author_name_style: { font?: string; effect?: string; colors?: string[] } | null;
           body_rendered: string;
           media_url: string;
           created_at: string;
