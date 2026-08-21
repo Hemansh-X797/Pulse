@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120" width="340" height="120">
+  <defs>
+    <radialGradient id="frostGlow" cx="20%" cy="85%" r="65%">
+      <stop offset="0%" stop-color="#05d9e8" stop-opacity="0.5"/>
+      <stop offset="55%" stop-color="#3a86ff" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#3a86ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="frostStreak" x1="100%" y1="100%" x2="30%" y2="10%">
+      <stop offset="0%" stop-color="#caf0f8" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#caf0f8" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="340" height="120" fill="url(#frostGlow)"/>
+  <path d="M340,120 L340,65 C280,35 220,100 160,60 C110,30 50,65 0,25 L0,120 Z" fill="url(#frostStreak)"/>
+  <path d="M340,120 L340,90 C260,65 200,105 130,80 C80,63 40,90 0,72 L0,120 Z" fill="#05d9e8" opacity="0.16"/>
+</svg>
