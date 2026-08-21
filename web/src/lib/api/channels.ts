@@ -102,10 +102,10 @@ export async function listMyDMs(): Promise<DmSummary[]> {
     .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''));
 }
 
-export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string })[]> {
+export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string; sender_display_name: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
   const { data, error } = await supabase
     .from('messages')
-    .select('*, profiles!messages_sender_id_fkey(username)')
+    .select('*, profiles!messages_sender_id_fkey(username, display_name, name_style)')
     .eq('channel_id', channelId)
     .order('id', { ascending: false })
     .limit(limit);
@@ -113,8 +113,13 @@ export async function listMessages(channelId: string, limit = 50): Promise<(Mess
 
   return (data ?? [])
     .map((row) => {
-      const profile = row.profiles as unknown as { username: string } | null;
-      return { ...row, sender_username: profile?.username ?? '?' };
+      const profile = row.profiles as unknown as { username: string; display_name: string; name_style: { font?: string; effect?: string; colors?: string[] } | null } | null;
+      return {
+        ...row,
+        sender_username: profile?.username ?? '?',
+        sender_display_name: profile?.display_name ?? profile?.username ?? '?',
+        sender_name_style: profile?.name_style ?? null,
+      };
     })
     .reverse();
 }
