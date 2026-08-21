@@ -1,19 +1,21 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { UserPlus, Check } from 'lucide-react';
+import { UserPlus, Check, X } from 'lucide-react';
 import { getProfileByUsername } from '../../lib/api/profile';
 import { createOrGetDM } from '../../lib/api/channels';
 import { listFriends, listOutgoingRequests, sendFriendRequest } from '../../lib/api/friends';
 import { useAppStore } from '../../store/useAppStore';
+import { NameStyle, type NameStyleData } from '../NameStyle';
 
 export function ProfilePopover({ username, anchorRef, onClose }: { username: string; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void }) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
   const myProfile = useAppStore((s) => s.profile);
+  const [avatarLightboxOpen, setAvatarLightboxOpen] = useState(false);
 
   const { data: profile, isLoading } = useQuery({ queryKey: ['profile', username], queryFn: () => getProfileByUsername(username) });
   const { data: friends = [] } = useQuery({ queryKey: ['friends'], queryFn: listFriends });
@@ -38,7 +40,12 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
       }
     }
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key !== 'Escape') return;
+      if (avatarLightboxOpen) {
+        setAvatarLightboxOpen(false);
+        return;
+      }
+      onClose();
     }
     document.addEventListener('mousedown', handleClick);
     document.addEventListener('keydown', handleKey);
@@ -46,7 +53,7 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [anchorRef, onClose]);
+  }, [anchorRef, onClose, avatarLightboxOpen]);
 
   async function handleMessage() {
     if (!profile) return;
@@ -79,24 +86,27 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
             }}
           />
           <div className="px-4 pb-4">
-            {/* Clicking the avatar here — and only here — goes to the full
-                profile page, per your spec: popover first, full page on a
-                second, deliberate click. */}
+            {/* Click enlarges the avatar in place (lightbox), per your
+                screenshot — it no longer navigates away on click.
+                "View Full Profile" below is the new, explicit way to
+                reach the full page. */}
             <button
-              onClick={handleOpenFullProfile}
+              onClick={() => profile.avatar_url && setAvatarLightboxOpen(true)}
               className="-mt-7 mb-2 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[var(--color-surface-overlay)] text-base font-bold text-black"
               style={{
                 background: profile.avatar_url
                   ? `url(${profile.avatar_url}) center/cover`
                   : `linear-gradient(150deg, ${profile.accent_color_top}, ${profile.accent_color_bottom})`,
               }}
-              aria-label="Open full profile"
-              title="Open full profile"
+              aria-label={profile.avatar_url ? 'Enlarge profile photo' : undefined}
+              title={profile.avatar_url ? 'Enlarge profile photo' : undefined}
             >
               {!profile.avatar_url && profile.display_name.slice(0, 2).toUpperCase()}
             </button>
 
-            <div className="text-[14.5px] font-semibold text-[var(--color-ink)]">{profile.display_name}</div>
+            <div className="text-[14.5px] font-semibold text-[var(--color-ink)]">
+              <NameStyle name={profile.display_name} style={profile.name_style as NameStyleData} />
+            </div>
             <div className="mb-2 text-[12px] text-[var(--color-ink-muted)]">
               @{profile.username} {profile.pronouns && `· ${profile.pronouns}`}
             </div>
@@ -129,8 +139,36 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
                 </button>
               </div>
             )}
+
+            <button
+              onClick={handleOpenFullProfile}
+              className="mt-3 text-[11.5px] font-medium text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:underline"
+            >
+              View Full Profile
+            </button>
           </div>
         </>
+      )}
+
+      {avatarLightboxOpen && profile?.avatar_url && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-6"
+          onClick={() => setAvatarLightboxOpen(false)}
+        >
+          <button
+            onClick={() => setAvatarLightboxOpen(false)}
+            className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+          <img
+            src={profile.avatar_url}
+            alt={`${profile.display_name}'s profile photo`}
+            className="max-h-[80vh] max-w-[80vw] rounded-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );
