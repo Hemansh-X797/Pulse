@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120" width="340" height="120">
+  <defs>
+    <radialGradient id="emberGlow" cx="78%" cy="85%" r="65%">
+      <stop offset="0%" stop-color="#ff6a00" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#ff2a2a" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#ff2a2a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="emberStreak" x1="0%" y1="100%" x2="60%" y2="0%">
+      <stop offset="0%" stop-color="#ffb703" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#ffb703" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="340" height="120" fill="url(#emberGlow)"/>
+  <path d="M0,120 L0,70 C60,40 120,95 180,55 C230,25 290,60 340,20 L340,120 Z" fill="url(#emberStreak)"/>
+  <path d="M0,120 L0,95 C80,70 140,110 210,85 C260,68 300,95 340,75 L340,120 Z" fill="#ff2a2a" opacity="0.18"/>
+</svg>
