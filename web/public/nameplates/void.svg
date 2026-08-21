@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120" width="340" height="120">
+  <defs>
+    <radialGradient id="voidGlow" cx="50%" cy="100%" r="70%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.5"/>
+      <stop offset="60%" stop-color="#6d28d9" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#6d28d9" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="340" height="120" fill="url(#voidGlow)"/>
+  <circle cx="170" cy="140" r="55" fill="#a78bfa" opacity="0.14"/>
+  <circle cx="170" cy="140" r="85" fill="#7c3aed" opacity="0.10"/>
+  <circle cx="170" cy="140" r="115" fill="#4c1d95" opacity="0.08"/>
+</svg>
