@@ -9,6 +9,7 @@ import { createOrGetDM } from '../lib/api/channels';
 import { listFriends, listOutgoingRequests, sendFriendRequest } from '../lib/api/friends';
 import { listBlockedUsers, blockUser, unblockUser } from '../lib/api/blocking';
 import { useAppStore } from '../store/useAppStore';
+import { NameStyle, type NameStyleData } from '../components/NameStyle';
 
 export function UserProfile() {
   const params = useParams<{ username: string }>()!;
@@ -155,7 +156,7 @@ export function UserProfile() {
           )}
         </div>
 
-        <h1 className="font-serif text-2xl font-semibold">{profile.display_name}</h1>
+        <h1 className="font-serif text-2xl font-semibold"><NameStyle name={profile.display_name} style={profile.name_style as NameStyleData} /></h1>
         <p className="mb-1 text-sm text-[var(--color-ink-muted)]">
           @{profile.username} {profile.pronouns && `· ${profile.pronouns}`}
         </p>
