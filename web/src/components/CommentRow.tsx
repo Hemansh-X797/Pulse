@@ -7,6 +7,7 @@ import { Pencil, Trash2 } from 'lucide-react';
 import { editComment, deleteComment } from '../lib/api/feed';
 import { renderMarkdown } from '../lib/markdown';
 import { useAppStore } from '../store/useAppStore';
+import { NameStyle, type NameStyleData } from './NameStyle';
 
 export function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -66,6 +67,7 @@ export function CommentRow({
     author_avatar_url: string;
     author_accent_top: string;
     author_accent_bottom: string;
+    author_name_style?: { font?: string; effect?: string; colors?: string[] } | null;
     body_rendered: string;
     edited_at: string | null;
     created_at: string;
@@ -125,7 +127,7 @@ export function CommentRow({
         ) : (
           <div className="text-[13px] leading-snug text-[var(--color-ink-muted)]">
             <Link href={`/${comment.author_username}`} className="font-semibold text-[var(--color-ink)] hover:underline">
-              {comment.author_display_name}
+              <NameStyle name={comment.author_display_name} style={comment.author_name_style as NameStyleData} />
             </Link>{' '}
             <span className="text-[10.5px] text-[var(--color-ink-faint)]">
               @{comment.author_username} · {timeAgo(comment.created_at)}
