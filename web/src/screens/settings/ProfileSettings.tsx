@@ -10,6 +10,7 @@ import { Field, inputClass } from './shared';
 import { CropModal } from '../../components/settings/CropModal';
 import { NameStyle, type NameStyleData } from '../../components/NameStyle';
 import { NameStyleModal } from '../../components/NameStyleModal';
+import { NAMEPLATES, nameplateSrc } from '../../lib/nameplates';
 
 const ACCENT_PRESETS: [string, string][] = [
   ['#2dd4bf', '#a78bfa'], // PalSpace default — teal → violet
@@ -197,6 +198,42 @@ export function ProfileSettings() {
             </div>
             <span className="text-[11px] text-[var(--color-ink-muted)]">Edit</span>
           </button>
+
+          <div>
+            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+              Nameplate <span className="normal-case text-[var(--color-ink-faint)]">(shows behind your name on your profile)</span>
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              <button
+                onClick={async () => {
+                  const updated = await updateProfile({ equipped_nameplate: null });
+                  setStoreProfile(updated);
+                  queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+                }}
+                className={`flex h-12 items-center justify-center rounded-lg border text-[10.5px] text-[var(--color-ink-muted)] ${
+                  !profile?.equipped_nameplate ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
+                }`}
+              >
+                None
+              </button>
+              {NAMEPLATES.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={async () => {
+                    const updated = await updateProfile({ equipped_nameplate: n.id });
+                    setStoreProfile(updated);
+                    queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+                  }}
+                  title={n.label}
+                  className={`h-12 overflow-hidden rounded-lg border bg-[var(--color-void)] ${
+                    profile?.equipped_nameplate === n.id ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
+                  }`}
+                >
+                  <img src={nameplateSrc(n.id)} alt={n.label} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
 
           <Field label="Status">
             <input value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={80} placeholder="What are you up to?" className={inputClass} />
