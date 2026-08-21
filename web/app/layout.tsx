@@ -2,8 +2,6 @@ import type { Metadata } from 'next';
 import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 
 // Previously loaded via a <link> tag in the old Vite index.html — that
 // file has no Next.js equivalent, so these fonts were silently never
@@ -115,13 +113,29 @@ function AppGraph() {
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />;
 }
 
+// Blocking pre-hydration script: reads the stored theme preference and
+// sets data-theme before first paint, so returning visitors who picked
+// Classic don't see a flash of the (new default) Bespoke theme before
+// JS catches up. Runs synchronously because it's a plain <script> tag
+// in <head>, not a React effect — same reasoning as any dark-mode
+// flash-prevention script.
+const THEME_INIT_SCRIPT = `
+try {
+  var t = localStorage.getItem('palspace-theme');
+  document.documentElement.setAttribute('data-theme', t === 'classic' ? 'classic' : 'bespoke');
+} catch (e) {
+  document.documentElement.setAttribute('data-theme', 'bespoke');
+}
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${inter.variable} ${plexMono.variable}`}>
+    <html lang="en" data-theme="bespoke" className={`${fraunces.variable} ${inter.variable} ${plexMono.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>
         <AppGraph />
-        <Analytics />
-        <SpeedInsights />
         <Providers>{children}</Providers>
       </body>
     </html>
