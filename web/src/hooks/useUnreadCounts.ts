@@ -1,7 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { getUnreadCounts } from '../lib/api/channels';
 import { subscribeToAllMessages, unsubscribe } from '../lib/realtime';
 import { useAppStore } from '../store/useAppStore';
+import { playNotificationChime } from '../lib/notificationSound';
+import { getNotificationPreferences } from '../lib/api/notification-prefs';
 import type { Session } from '@supabase/supabase-js';
 
 /**
@@ -15,12 +17,21 @@ import type { Session } from '@supabase/supabase-js';
  */
 export function useUnreadCounts(session: Session | null) {
   const setUnreadByChannel = useAppStore((s) => s.setUnreadByChannel);
+  // Cached in a ref rather than component state — read inside the
+  // realtime callback below, doesn't need to trigger re-renders itself.
+  const notifsEnabledRef = useRef(true);
 
   useEffect(() => {
     if (!session) {
       setUnreadByChannel({});
       return;
     }
+
+    getNotificationPreferences()
+      .then((prefs) => {
+        notifsEnabledRef.current = prefs?.notifications_enabled ?? true;
+      })
+      .catch(() => {});
 
     let cancelled = false;
     getUnreadCounts()
@@ -42,6 +53,15 @@ export function useUnreadCounts(session: Session | null) {
       // arrived while this channel happened to be open").
       if (message.sender_id === state.profile?.id) return;
       if (message.channel_id === state.activeChannelId) return;
+
+      // Chime on a genuinely new incoming DM — same "not mine, not the
+      // channel I'm already looking at" condition as the unread badge
+      // above, since a chime for a message you're actively reading
+      // would be redundant. Respects both the master notifications
+      // toggle (Settings → Notifications) and the local sound-only
+      // toggle (playNotificationChime no-ops if that's off, or if audio
+      // hasn't been unlocked by a user gesture yet).
+      if (notifsEnabledRef.current) playNotificationChime();
 
       useAppStore.setState((s) => ({
         unreadByChannel: {
