@@ -10,6 +10,7 @@ import { listFriends, listOutgoingRequests, sendFriendRequest } from '../lib/api
 import { listBlockedUsers, blockUser, unblockUser } from '../lib/api/blocking';
 import { useAppStore } from '../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../components/NameStyle';
+import { isValidNameplateId, nameplateSrc } from '../lib/nameplates';
 
 export function UserProfile() {
   const params = useParams<{ username: string }>()!;
@@ -88,6 +89,14 @@ export function UserProfile() {
             </button>
           </div>
         )}
+        <div className="relative">
+          {isValidNameplateId(profile.equipped_nameplate) && (
+            <img
+              src={nameplateSrc(profile.equipped_nameplate)}
+              alt=""
+              className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-28 w-full object-cover object-bottom"
+            />
+          )}
         <div className="flex items-end justify-between">
           <div
             className="-mt-10 mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[var(--color-void)] text-2xl font-bold text-black"
@@ -160,6 +169,7 @@ export function UserProfile() {
         <p className="mb-1 text-sm text-[var(--color-ink-muted)]">
           @{profile.username} {profile.pronouns && `· ${profile.pronouns}`}
         </p>
+        </div>
         {profile.bio && <p className="mt-3 max-w-lg text-[14px] text-[var(--color-ink)]/80">{profile.bio}</p>}
 
         {/* Instagram-style media grid: still a follow-up slice, not
