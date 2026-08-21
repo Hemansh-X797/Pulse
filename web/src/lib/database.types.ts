@@ -24,6 +24,7 @@ export interface Database {
           interests: string[];
           onboarding_completed: boolean;
           name_style: { font?: string; effect?: string; colors?: string[] } | null;
+          equipped_nameplate: string | null;
         };
         Insert: Partial<Database['public']['Tables']['profiles']['Row']> & { id: string; username: string; display_name: string };
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
@@ -202,10 +203,11 @@ export interface Database {
           comments: boolean;
           friend_requests: boolean;
           space_invites: boolean;
+          notifications_enabled: boolean;
           updated_at: string;
         };
         Insert: never; // row is created automatically by a signup trigger
-        Update: Partial<Pick<Database['public']['Tables']['notification_preferences']['Row'], 'messages' | 'reactions' | 'comments' | 'friend_requests' | 'space_invites' | 'updated_at'>>;
+        Update: Partial<Pick<Database['public']['Tables']['notification_preferences']['Row'], 'messages' | 'reactions' | 'comments' | 'friend_requests' | 'space_invites' | 'notifications_enabled' | 'updated_at'>>;
         Relationships: [];
       };
       stories: {
