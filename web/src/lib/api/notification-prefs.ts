@@ -12,7 +12,7 @@ export async function getNotificationPreferences(): Promise<Prefs | null> {
 }
 
 export async function updateNotificationPreferences(
-  patch: Partial<Pick<Prefs, 'messages' | 'reactions' | 'comments' | 'friend_requests' | 'space_invites'>>
+  patch: Partial<Pick<Prefs, 'messages' | 'reactions' | 'comments' | 'friend_requests' | 'space_invites' | 'notifications_enabled'>>
 ) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error('not authenticated');
