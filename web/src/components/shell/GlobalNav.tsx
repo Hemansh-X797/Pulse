@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Home, MessageCircle, Camera, Plus, Compass, Search } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store/useAppStore';
 import { listMySpaces, createSpace, joinSpaceByInvite } from '../../lib/api/spaces';
 import { CreateSpaceModal } from './CreateSpaceModal';
@@ -66,6 +66,7 @@ export function GlobalNav() {
   const unreadChannels = useAppStore((s) => s.totalUnreadChannels());
   const [createOpen, setCreateOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: spaces = [] } = useQuery({
     queryKey: ['spaces'],
@@ -76,12 +77,18 @@ export function GlobalNav() {
   async function handleCreateSpace(opts: { name: string; isPrivate: boolean; tags: string[] }) {
     const space = await createSpace(opts.name, { isPrivate: opts.isPrivate, tags: opts.tags });
     setCreateOpen(false);
+    // Immediate, deterministic refresh for your own action — don't wait
+    // on the realtime round-trip (useMembershipSync also invalidates
+    // this on the incoming space_members INSERT event, which is what
+    // covers *other* people adding you to something).
+    queryClient.invalidateQueries({ queryKey: ['spaces'] });
     router.push(`/spaces/${space.id}`);
   }
 
   async function handleJoinSpace(inviteCode: string) {
     const space = await joinSpaceByInvite(inviteCode);
     setCreateOpen(false);
+    queryClient.invalidateQueries({ queryKey: ['spaces'] });
     router.push(`/spaces/${space.id}`);
   }
 
