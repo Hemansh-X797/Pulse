@@ -204,10 +204,18 @@ export interface Database {
           friend_requests: boolean;
           space_invites: boolean;
           notifications_enabled: boolean;
+          follow_posts: boolean;
+          friend_posts: boolean;
           updated_at: string;
         };
         Insert: never; // row is created automatically by a signup trigger
-        Update: Partial<Pick<Database['public']['Tables']['notification_preferences']['Row'], 'messages' | 'reactions' | 'comments' | 'friend_requests' | 'space_invites' | 'notifications_enabled' | 'updated_at'>>;
+        Update: Partial<Pick<Database['public']['Tables']['notification_preferences']['Row'], 'messages' | 'reactions' | 'comments' | 'friend_requests' | 'space_invites' | 'notifications_enabled' | 'follow_posts' | 'friend_posts' | 'updated_at'>>;
+        Relationships: [];
+      };
+      follows: {
+        Row: { follower_id: string; followed_id: string; created_at: string };
+        Insert: { follower_id: string; followed_id: string };
+        Update: never;
         Relationships: [];
       };
       stories: {
