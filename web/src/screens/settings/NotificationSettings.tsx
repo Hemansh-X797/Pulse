@@ -10,6 +10,8 @@ const TOGGLES = [
   { key: 'comments', label: 'Comments', hint: 'When someone comments on your posts.' },
   { key: 'friend_requests', label: 'Friend requests', hint: 'Incoming requests and accepted requests.' },
   { key: 'space_invites', label: 'Space invites', hint: 'When you\u2019re invited to a space.' },
+  { key: 'follow_posts', label: 'Posts from people you follow', hint: 'New feed posts from accounts you follow.' },
+  { key: 'friend_posts', label: 'Posts from friends', hint: 'New feed posts from your friends.' },
 ] as const;
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
