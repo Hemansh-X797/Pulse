@@ -48,6 +48,8 @@ export default function PrivacyPage() {
             <li>Google / Discord / GitHub — only if you choose to sign in or link an account with them.</li>
             <li>Giphy / Tenor — only when you search for a GIF; your search query is sent to whichever provider you&apos;re using.</li>
             <li>When you post a link, PalSpace&apos;s own server fetches that page&apos;s preview info (title/image) — the linked site sees a request from PalSpace&apos;s server, not from you directly.</li>
+            <li>Google Analytics — aggregate usage analytics (pages visited, general device/location info). Doesn&apos;t receive your PalSpace account data, messages, or posts.</li>
+            <li>Vercel Analytics &amp; Speed Insights — anonymous traffic and page-performance metrics from the hosting provider, not tied to your account.</li>
           </ul>
           PalSpace does not sell your data to advertisers or data brokers.
         </Section>
