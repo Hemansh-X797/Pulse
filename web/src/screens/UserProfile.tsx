@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MoreHorizontal, UserPlus, Check, ShieldOff, Shield, X } from 'lucide-react';
+import { MoreHorizontal, UserPlus, Check, ShieldOff, Shield, X, Users } from 'lucide-react';
 import { getProfileByUsername } from '../lib/api/profile';
 import { createOrGetDM } from '../lib/api/channels';
 import { listFriends, listOutgoingRequests, sendFriendRequest } from '../lib/api/friends';
 import { listBlockedUsers, blockUser, unblockUser } from '../lib/api/blocking';
+import { followUser, unfollowUser, isFollowing, getFollowCounts } from '../lib/api/follows';
 import { useAppStore } from '../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../components/NameStyle';
 import { isValidNameplateId, nameplateSrc } from '../lib/nameplates';
@@ -29,6 +30,16 @@ export function UserProfile() {
   const { data: friends = [] } = useQuery({ queryKey: ['friends'], queryFn: listFriends });
   const { data: outgoing = [] } = useQuery({ queryKey: ['friend-requests', 'outgoing'], queryFn: listOutgoingRequests });
   const { data: blocked = [] } = useQuery({ queryKey: ['blocked-users'], queryFn: listBlockedUsers });
+  const { data: following = false } = useQuery({
+    queryKey: ['is-following', profile?.id],
+    queryFn: () => isFollowing(profile!.id),
+    enabled: !!profile && !isLoading,
+  });
+  const { data: followCounts } = useQuery({
+    queryKey: ['follow-counts', profile?.id],
+    queryFn: () => getFollowCounts(profile!.id),
+    enabled: !!profile,
+  });
 
   const isFriend = profile && friends.some((f) => f.id === profile.id);
   const isRequested = profile && outgoing.some((o) => o.recipient.id === profile.id);
@@ -38,6 +49,13 @@ export function UserProfile() {
   const sendMutation = useMutation({
     mutationFn: () => sendFriendRequest(profile!.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['friend-requests'] }),
+  });
+  const followMutation = useMutation({
+    mutationFn: () => (following ? unfollowUser(profile!.id) : followUser(profile!.id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['is-following', profile?.id] });
+      queryClient.invalidateQueries({ queryKey: ['follow-counts', profile?.id] });
+    },
   });
   const blockMutation = useMutation({
     mutationFn: () => blockUser(profile!.id),
@@ -59,6 +77,7 @@ export function UserProfile() {
     setMessageError(null);
     try {
       const channelId = await createOrGetDM(username);
+      queryClient.invalidateQueries({ queryKey: ['my-dms'] });
       router.push(`/channels/me/${channelId}`);
     } catch (e) {
       setMessageError(e instanceof Error ? e.message : 'Could not start conversation.');
@@ -111,6 +130,17 @@ export function UserProfile() {
 
           {!isSelf && (
             <div className="relative mb-4 flex items-center gap-2">
+              <button
+                onClick={() => followMutation.mutate()}
+                disabled={followMutation.isPending}
+                className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium ${
+                  following
+                    ? 'border border-[var(--color-hairline-strong)] text-[var(--color-ink-muted)] hover:border-red-400 hover:text-red-400'
+                    : 'bg-[var(--color-surface-raised)] text-[var(--color-ink)] hover:bg-[var(--color-hairline-strong)]'
+                }`}
+              >
+                {following ? 'Following' : 'Follow'}
+              </button>
               {isFriend ? (
                 <span className="flex items-center gap-1.5 rounded-full border border-[var(--color-hairline-strong)] px-3.5 py-2 text-[13px] font-medium text-[var(--color-ink-muted)]">
                   <Check size={14} /> Friends
@@ -169,6 +199,14 @@ export function UserProfile() {
         <p className="mb-1 text-sm text-[var(--color-ink-muted)]">
           @{profile.username} {profile.pronouns && `· ${profile.pronouns}`}
         </p>
+        {followCounts && (
+          <p className="mb-1 flex items-center gap-1 text-[12.5px] text-[var(--color-ink-muted)]">
+            <Users size={12} />
+            <span className="font-semibold text-[var(--color-ink)]">{followCounts.followers}</span> followers
+            <span className="mx-0.5">·</span>
+            <span className="font-semibold text-[var(--color-ink)]">{followCounts.following}</span> following
+          </p>
+        )}
         </div>
         {profile.bio && <p className="mt-3 max-w-lg text-[14px] text-[var(--color-ink)]/80">{profile.bio}</p>}
 
