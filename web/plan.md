@@ -650,3 +650,82 @@ code above does anything, same as before.
 3. Rest of the Bespoke reskin (per-screen layout vs. your demos)
 
 Once this last item lands, Part A is fully done and Part B starts.
+
+## Part A — item 3, partial. Being honest about scope here.
+
+Did, build-tested:
+- Post cards now get the crosshair corner accent (`.bespoke-corner`,
+  matching your demo's signature top-right accent) in Bespoke.
+- A new `.bespoke-timestamp` CSS class (mono, tracked-wide, uppercase)
+  applied to feed post timestamps, matching the demo's "12m AGO" style
+  micro-labels — CSS-scoped to the theme attribute so Classic is
+  unaffected, no component restructuring needed.
+
+**What I did NOT do, and want to be upfront about rather than
+overclaim**: your demos show real structural differences from the
+current layout — the post header (avatar/name/timestamp/menu) sitting
+*outside and above* the card rather than inside it, the composer's
+exact icon row and "Publish" button treatment, the message hover
+toolbar's precise positioning from `BespokeMessages.html`. Those are
+real DOM/layout rewrites, not CSS-only tweaks, and each one touches a
+component that's currently working and tested. I chose targeted,
+low-risk fidelity improvements over a full teardown-and-rebuild of
+working screens, given how much of this session has already gone into
+keeping things build-tested and not breaking what works.
+
+Marking Part A as "close enough to move on, with this one item
+genuinely partial" rather than fully done — flagging clearly so you
+can decide: live with the current level of fidelity, or tell me to
+come back and do the full structural rebuild (header-outside-card,
+exact composer/toolbar layout) as its own dedicated pass before B1
+onward, since that's real, separate work from everything else in
+Part A.
+
+---
+**Part A summary**: 6 of 7 items fully done and build-tested (chat
+name-style plumbing, nameplates, notification chime + master toggle,
+follow system, tab/taskbar badge, the real-time performance fix).
+Item 3 (Bespoke reskin) is partial, as described above. Part B has not
+started.
+
+## Part A item 3 — the real structural rebuild, in progress
+
+Analytics also added this pass (Vercel Analytics, Speed Insights,
+Google Analytics via `NEXT_PUBLIC_GA_MEASUREMENT_ID` env var — **set
+that in `.env.local`/Vercel for GA to actually activate**, nothing is
+hardcoded). Per explicit instruction, this piece specifically wasn't
+build-tested; everything below it was.
+
+Real structural rebuilds done, build-tested, matching the demos'
+actual DOM shape now, not just color/corner CSS:
+
+- **Feed post header** now sits *outside and above* the card, exactly
+  like `BespokeFeed.html` — was nested inside the card before. The
+  "more" menu on your own posts is now hover-revealed
+  (`opacity-0 group-hover:opacity-100`) matching the demo, not always
+  visible.
+- **Feed composer** got the demo's `// Broadcast` / `Public Stream`
+  mono micro-label header row, and the Publish button now matches the
+  demo's icon+uppercase-tracked-mono treatment exactly (kept the
+  rounder shape you specifically asked for on this one element
+  earlier — that request and "match the demo" aren't in conflict since
+  the demo's own container is the one round-cornered element you
+  called out).
+- **Message hover toolbar** — full rebuild, not a tweak. Was
+  individual circular buttons floating above the bubble; now it's the
+  demo's single unified bar (Copy Text, React, Reply, Forward, divider,
+  More) positioned to the *side* of the bubble
+  (`left-full`/`right-full`), opacity-revealed on hover, matching
+  `BespokeMessages.html` exactly. Copy Text and Forward are now direct
+  one-click buttons instead of buried in the "More" menu, per the demo.
+- Confirmed `MessageContextMenu.tsx` needs no changes — it already
+  inherits the Bespoke look for free through the color/corner
+  infrastructure from the first reskin pass, since it only uses
+  generic tokens.
+
+**Still not done, being upfront**: the exact composer icon row from
+`BespokeMessages.html` (paperclip/smile/gif icons — chat's compose bar
+currently has its own working icon set, not yet restyled to match that
+specific layout), the full `BespokeProfileEdit.html` settings-page
+treatment, and the create-channel modal "cooler" visual pass. This is
+real, still-open work — continuing it, not stopping here permanently.
