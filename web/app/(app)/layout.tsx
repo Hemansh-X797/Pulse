@@ -4,6 +4,9 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthSync } from '../../src/hooks/useAuthSync';
 import { useUnreadCounts } from '../../src/hooks/useUnreadCounts';
+import { useUnreadBadge } from '../../src/hooks/useUnreadBadge';
+import { useMembershipSync } from '../../src/hooks/useMembershipSync';
+import { useNotificationSync } from '../../src/hooks/useNotificationSync';
 import { useAppStore } from '../../src/store/useAppStore';
 import { AppShell } from '../../src/components/shell/AppShell';
 
@@ -24,7 +27,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const session = useAppStore((s) => s.session);
+  const totalUnread = useAppStore((s) => s.totalUnreadChannels());
   useUnreadCounts(session);
+  useUnreadBadge(totalUnread);
+  useMembershipSync(session);
+  useNotificationSync(session);
 
   useEffect(() => {
     // useAuthSync sets session in the store; read it directly via
