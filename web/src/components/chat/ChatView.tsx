@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft, MoreHorizontal } from 'lucide-react';
+import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft, MoreHorizontal, Copy, Forward as ForwardIcon } from 'lucide-react';
 import {
   listMessages,
   sendMessage,
@@ -748,7 +748,7 @@ function MessageRow({
       animate={{ opacity: message.pending ? 0.5 : 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className={`group flex gap-2.5 rounded-lg ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}
+      className={`group relative flex gap-2.5 rounded-lg ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}
     >
       {!compact && (
         <button
@@ -839,58 +839,72 @@ function MessageRow({
         )}
       </div>
 
-      <div className={`relative flex items-center gap-1 self-center opacity-0 transition-opacity group-hover:opacity-100 ${isMine ? 'order-first' : ''}`}>
-        <button
-          onClick={() => setQuickReactOpen((v) => !v)}
-          className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-          aria-label="Add reaction"
-        >
-          <Smile size={12} />
+      <div
+        className={`hover-toolbar absolute -top-3 z-20 flex items-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] px-1.5 py-1 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 ${
+          isMine ? 'right-full mr-2' : 'left-full ml-2'
+        }`}
+      >
+        <button onClick={onCopyText} title="Copy Text" className="p-1 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]">
+          <Copy size={13} />
         </button>
-        {quickReactOpen && (
-          <div className="absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] p-1 shadow-xl">
-            {QUICK_REACT_EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => {
-                  onReact(emoji);
-                  setQuickReactOpen(false);
-                }}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-[var(--color-surface-raised)]"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        )}
-        <button onClick={onReply} className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Reply">
-          <Reply size={12} />
+        <div className="relative">
+          <button
+            onClick={() => setQuickReactOpen((v) => !v)}
+            title="React with Emoji"
+            className="p-1 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
+          >
+            <Smile size={13} />
+          </button>
+          {quickReactOpen && (
+            <div className="absolute bottom-full z-20 mb-1 flex gap-0.5 rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] p-1 shadow-xl">
+              {QUICK_REACT_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => {
+                    onReact(emoji);
+                    setQuickReactOpen(false);
+                  }}
+                  className="flex h-7 w-7 items-center justify-center rounded-full text-[15px] hover:bg-[var(--color-surface-raised)]"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button onClick={onReply} title="Reply" className="p-1 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]">
+          <Reply size={13} />
         </button>
-        <button
-          onClick={() => setMenuOpen((v) => !v)}
-          className="flex h-6 w-6 items-center justify-center rounded-full border border-[var(--color-hairline-strong)] bg-[var(--color-surface)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-          aria-label="More"
-        >
-          <MoreHorizontal size={12} />
+        <button onClick={onForward} title="Forward" className="p-1 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]">
+          <ForwardIcon size={13} />
         </button>
-        {menuOpen && (
-          <div className={`absolute top-full z-20 mt-1 ${isMine ? 'right-0' : 'left-0'}`}>
-            <MessageContextMenu
-              onClose={() => setMenuOpen(false)}
-              onCopyText={onCopyText}
-              onCopyLink={onCopyLink}
-              onMarkUnread={onMarkUnread}
-              onForward={onForward}
-              onPin={onTogglePin}
-              isPinned={isPinned}
-              onReact={() => setQuickReactOpen(true)}
-              onReply={onReply}
-              onEdit={isMine ? onEdit : undefined}
-              onDelete={isMine ? onDelete : undefined}
-              isMine={isMine}
-            />
-          </div>
-        )}
+        <div className="relative border-l border-[var(--color-hairline)] pl-1">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            title="More Actions"
+            className="p-1 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
+          >
+            <MoreHorizontal size={13} />
+          </button>
+          {menuOpen && (
+            <div className={`absolute top-full z-20 mt-1 ${isMine ? 'right-0' : 'left-0'}`}>
+              <MessageContextMenu
+                onClose={() => setMenuOpen(false)}
+                onCopyText={onCopyText}
+                onCopyLink={onCopyLink}
+                onMarkUnread={onMarkUnread}
+                onForward={onForward}
+                onPin={onTogglePin}
+                isPinned={isPinned}
+                onReact={() => setQuickReactOpen(true)}
+                onReply={onReply}
+                onEdit={isMine ? onEdit : undefined}
+                onDelete={isMine ? onDelete : undefined}
+                isMine={isMine}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </motion.div>
   );
