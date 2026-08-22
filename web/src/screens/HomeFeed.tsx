@@ -84,6 +84,10 @@ export function HomeFeed() {
 
       <div className="flex flex-1 flex-col items-center gap-3 overflow-y-auto px-4 py-5 md:px-7 md:py-7">
         <div className="composer-round w-full max-w-[560px] rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-4.5">
+          <div className="mb-2.5 flex items-center justify-between font-mono text-[9px] uppercase tracking-[0.25em] text-[var(--color-ink-faint)]">
+            <span>// Broadcast</span>
+            <span>Public Stream</span>
+          </div>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -136,9 +140,10 @@ export function HomeFeed() {
             <button
               onClick={() => postMutation.mutate()}
               disabled={!body.trim() || postMutation.isPending}
-              className="rounded-full bg-white px-5 py-2 text-[13px] font-semibold text-black disabled:opacity-40"
+              className="flex items-center gap-2 rounded-full bg-white px-5 py-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-black disabled:opacity-40"
             >
-              {postMutation.isPending ? 'Posting…' : 'Post'}
+              <Send size={13} />
+              {postMutation.isPending ? 'Posting' : 'Publish'}
             </button>
           </div>
         </div>
@@ -248,8 +253,8 @@ function PostCard({ post }: { post: FeedItem }) {
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   return (
-    <div className="w-full max-w-[560px] rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5 transition-colors hover:border-[var(--color-hairline-strong)]">
-      <div ref={popoverAnchorRef} className="relative mb-3 flex items-center gap-2.5">
+    <div className="group w-full max-w-[560px] space-y-3">
+      <div ref={popoverAnchorRef} className="relative flex items-center gap-2.5 px-1">
         <button onClick={() => setPopoverOpen((v) => !v)} className="shrink-0">
           <Avatar
             url={post.author_avatar_url}
@@ -262,7 +267,7 @@ function PostCard({ post }: { post: FeedItem }) {
         <button onClick={() => setPopoverOpen((v) => !v)} className="min-w-0 flex-1 text-left hover:opacity-80">
           <div className="text-[13.5px] font-semibold"><NameStyle name={post.author_display_name} style={post.author_name_style as NameStyleData} /></div>
           <div className="text-[11.5px] text-[var(--color-ink-muted)]">
-            @{post.author_username} · {timeAgo(post.created_at)}
+            @{post.author_username} · <span className="bespoke-timestamp">{timeAgo(post.created_at)}</span>
             {post.edited_at && ' · edited'}
           </div>
         </button>
@@ -271,7 +276,7 @@ function PostCard({ post }: { post: FeedItem }) {
         )}
 
         {isMine && (
-          <div className="relative">
+          <div className="relative opacity-0 transition-opacity group-hover:opacity-100">
             <button
               onClick={() => setMenuOpen((v) => !v)}
               className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
@@ -306,6 +311,7 @@ function PostCard({ post }: { post: FeedItem }) {
         )}
       </div>
 
+      <div className="bespoke-corner rounded-2xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5 transition-colors hover:border-[var(--color-hairline-strong)]">
       {editing ? (
         <div className="mb-3.5">
           <textarea
@@ -389,6 +395,7 @@ function PostCard({ post }: { post: FeedItem }) {
         </button>
 
         {shareStatus && <span className="text-[11px] text-[var(--color-ink-faint)]">{shareStatus}</span>}
+      </div>
       </div>
 
       {detailOpen && (
