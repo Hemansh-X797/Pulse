@@ -76,6 +76,9 @@ export function Friends() {
     setMessageError(null);
     try {
       const channelId = await createOrGetDM(username);
+      // Same reasoning as GlobalNav's space create/join: don't make the
+      // DM sidebar wait on the realtime round-trip for your own action.
+      queryClient.invalidateQueries({ queryKey: ['my-dms'] });
       router.push(`/channels/me/${channelId}`);
     } catch (e) {
       setMessageError(e instanceof Error ? e.message : 'Could not start conversation.');
