@@ -119,3 +119,34 @@ export function subscribeToAllMessages(onInsert: (message: Message) => void): Re
     )
     .subscribe();
 }
+
+/**
+ * Fires the instant I'm added to a channel (a new DM, or someone adding
+ * me to a group) or a space — see 018_realtime_membership_tables.sql's
+ * comment for why this didn't work at all before that migration (the
+ * tables simply weren't in the realtime publication, not a client-code
+ * bug). Filtered server-side to rows where I'm the member, same RLS
+ * scoping as everything else — this isn't broadcasting every
+ * membership change to every client.
+ */
+export function subscribeToMyChannelMemberships(userId: string, onInsert: () => void): RealtimeChannel {
+  return supabase
+    .channel(`my-channel-memberships:${userId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'channel_members', filter: `user_id=eq.${userId}` },
+      () => onInsert()
+    )
+    .subscribe();
+}
+
+export function subscribeToMySpaceMemberships(userId: string, onInsert: () => void): RealtimeChannel {
+  return supabase
+    .channel(`my-space-memberships:${userId}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'space_members', filter: `user_id=eq.${userId}` },
+      () => onInsert()
+    )
+    .subscribe();
+}
