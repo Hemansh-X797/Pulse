@@ -12,6 +12,8 @@ const TYPE_LABEL: Record<string, string> = {
   space_invite: 'invited you to a space',
   friend_request: 'sent you a friend request',
   friend_accept: 'accepted your friend request',
+  new_post: 'posted something new',
+  follow: 'started following you',
 };
 
 function timeAgo(iso: string) {
