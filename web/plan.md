@@ -560,3 +560,93 @@ letting it hide.
    DM/space-creation slowness described in Part B's B1 — likely related
    but confirming by tracing it properly, not assuming, when that item
    comes up)
+
+## Part A — items 5 & 6 done, build-tested
+
+### 6. Tab/taskbar unread badge — done
+`useUnreadBadge.ts`: redraws the favicon onto a canvas with a red
+dot/count overlay (the standard technique — a `<link rel="icon">`
+can't be templated with live data any other way), updates
+`document.title` to `(N) PalSpace`, and calls the Badging API
+(`navigator.setAppBadge`) where the browser supports it (Chrome/Edge
+desktop — no Safari/Firefox support, so this is a bonus layer on top
+of the favicon/title, not the only mechanism, same caveat noted when
+this was originally scoped). Driven by the same `totalUnreadChannels()`
+the DM badge already uses, so no new counting logic.
+
+### 5. Follow system — done
+Migration `017_follow_system.sql`: a genuinely separate `follows`
+table from `friend_requests` — one-directional, no accept step,
+follow lists public (same as most social apps), only the follower can
+create/delete their own row. New `notify_new_post` trigger fans out to
+both followers and friends on a new post, each gated by their own
+independent preference (`follow_posts` / `friend_posts` — a person who
+is both only gets one notification, not two, via a `union` not two
+inserts), plus a new-follower notification. `src/lib/api/follows.ts`
+is a clean new file, doesn't touch `friends.ts` at all. Follow
+button + follower/following counts wired into `UserProfile.tsx`,
+new toggles in Settings → Notifications.
+
+**Deliberately not done as part of this**: mutual friends count. Your
+friend list is private per-user by RLS design (`friends_view`'s
+underlying policy only lets you read requests where you're
+sender/recipient) — computing "mutual friends with someone else"
+needs a `SECURITY DEFINER` RPC that reveals just the intersection
+without exposing either person's full friend list, which is real,
+separate work. Staying as its own Part B item (B2), not rushed in here
+just because I was already in this file.
+
+**Run migration 017** for the follow system to work.
+
+## Still not done in Part A
+3. Rest of the Bespoke reskin (per-screen layout vs. your demos)
+7. Performance/lag audit
+
+## Part A — item 7 done (the real fix, not a vague speedup)
+
+### Root cause found and fixed: DM/space lists were never wired to realtime at all
+Traced "a DM takes ~2 minutes to appear" and "space creation is slow"
+to their actual cause: `channel_members`, `channels`, `space_members`,
+and `spaces` were **never added to the Supabase realtime publication**
+in any prior migration — only `messages`, `notifications`, and
+`stories` were (`001_initial_schema.sql`,
+`005_blocking_notification_prefs_stories.sql`). Postgres's logical
+replication literally never broadcast changes on those tables, so no
+client-side subscription code could have worked regardless of how it
+was written. The sidebar's DM/space lists only ever updated when
+something incidentally triggered a React Query refetch (window focus,
+navigation, remount) — which is exactly the "eventually shows up"
+delay being reported.
+
+Fixed in `018_realtime_membership_tables.sql` (enables realtime on
+those four tables — RLS still applies the same as normal selects, so
+this doesn't expose anything not already readable) plus:
+- `subscribeToMyChannelMemberships` / `subscribeToMySpaceMemberships`
+  in `realtime.ts`.
+- New `useMembershipSync` hook, mounted once at the app-shell level,
+  invalidates `['my-dms']` / `['spaces']` the instant you're added to
+  either.
+- Fast-path invalidation added directly to your *own* create/join
+  actions (`GlobalNav.tsx`, `Friends.tsx`, `UserProfile.tsx`) so your
+  own actions don't wait on a realtime round-trip at all — the
+  subscription above is specifically for *other people* adding you to
+  something.
+
+### Also fixed while auditing: notifications had the same gap
+`subscribeToNotifications()` existed in `realtime.ts` for a while but
+was never called anywhere — the bell icon's red dot only updated
+because `NotificationsPanel.tsx` fetched the count in its own
+`useEffect`, and that component only mounts once you've already
+clicked the bell open. The dot that's supposed to tell you *before*
+opening whether there's something new never actually worked that way.
+New `useNotificationSync` hook fetches the count on session-ready and
+keeps it live via the subscription that already existed but nothing
+used.
+
+**Run migration 018** — without it, none of the client-side realtime
+code above does anything, same as before.
+
+## Still not done in Part A
+3. Rest of the Bespoke reskin (per-screen layout vs. your demos)
+
+Once this last item lands, Part A is fully done and Part B starts.
