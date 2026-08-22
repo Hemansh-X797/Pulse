@@ -1,7 +1,16 @@
 import type { Metadata } from 'next';
 import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
+import Script from 'next/script';
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 import { Providers } from './providers';
+
+// Set in .env.local / Vercel project env vars — NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXX.
+// Not hardcoded here on purpose: an env var means this stays out of
+// source control and can differ between preview/production deploys
+// without a code change.
+const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 // Previously loaded via a <link> tag in the old Vite index.html — that
 // file has no Next.js equivalent, so these fonts were silently never
@@ -133,10 +142,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" data-theme="bespoke" className={`${fraunces.variable} ${inter.variable} ${plexMono.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {GA_MEASUREMENT_ID && (
+          <>
+            <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`} strategy="afterInteractive" />
+            <Script id="ga-init" strategy="afterInteractive">
+              {`
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${GA_MEASUREMENT_ID}');
+              `}
+            </Script>
+          </>
+        )}
       </head>
       <body>
         <AppGraph />
         <Providers>{children}</Providers>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
