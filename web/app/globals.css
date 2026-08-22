@@ -175,7 +175,18 @@ html[data-theme='bespoke'] .bespoke-corner::after {
   height: 12px;
 }
 
-/* ---------- Custom display-name styling (Settings → Profile) ---------- */
+/* Bespoke's editorial touch: timestamps read as mono/tracked-wide
+   micro-labels app-wide (feed timestamps, message timestamps, "edited"
+   tags) — a CSS-only rule targeting a shared marker class rather than
+   restructuring every screen's JSX, so this scales to every timestamp
+   without a component-by-component rewrite. Classic theme is
+   unaffected since the rule is scoped under the theme attribute. */
+html[data-theme='bespoke'] .bespoke-timestamp {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.92em;
+}
 /* Fonts */
 .name-font-serif { font-family: var(--font-serif); }
 .name-font-gothic { font-family: 'UnifrakturMaguntia', var(--font-serif); letter-spacing: 0.5px; }
