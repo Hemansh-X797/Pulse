@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal, UserPlus, Check, ShieldOff, Shield, X, Users } from 'lucide-react';
 import { getProfileByUsername } from '../lib/api/profile';
 import { createOrGetDM } from '../lib/api/channels';
-import { listFriends, listOutgoingRequests, sendFriendRequest } from '../lib/api/friends';
+import { listFriends, listOutgoingRequests, sendFriendRequest, getMutualFriends } from '../lib/api/friends';
 import { listBlockedUsers, blockUser, unblockUser } from '../lib/api/blocking';
 import { followUser, unfollowUser, isFollowing, getFollowCounts } from '../lib/api/follows';
 import { useAppStore } from '../store/useAppStore';
@@ -21,6 +21,7 @@ export function UserProfile() {
   const myProfile = useAppStore((s) => s.profile);
   const [menuOpen, setMenuOpen] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
+  const [alreadyFriendsNotice, setAlreadyFriendsNotice] = useState(false);
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ['profile', username],
@@ -40,6 +41,11 @@ export function UserProfile() {
     queryFn: () => getFollowCounts(profile!.id),
     enabled: !!profile,
   });
+  const { data: mutualFriends = [] } = useQuery({
+    queryKey: ['mutual-friends', profile?.id],
+    queryFn: () => getMutualFriends(profile!.id),
+    enabled: !!profile && myProfile?.id !== profile?.id,
+  });
 
   const isFriend = profile && friends.some((f) => f.id === profile.id);
   const isRequested = profile && outgoing.some((o) => o.recipient.id === profile.id);
@@ -48,7 +54,19 @@ export function UserProfile() {
 
   const sendMutation = useMutation({
     mutationFn: () => sendFriendRequest(profile!.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['friend-requests'] }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['friend-requests'] });
+      if (result === 'already_friends') {
+        // The other person had already requested you — the RPC
+        // resolved it to an accepted friendship instead of leaving two
+        // confusing pending requests. Friends list needs invalidating
+        // too here specifically (not just requests), since this path
+        // skips the normal accept flow that would otherwise do that.
+        queryClient.invalidateQueries({ queryKey: ['friends'] });
+        setAlreadyFriendsNotice(true);
+        setTimeout(() => setAlreadyFriendsNotice(false), 5000);
+      }
+    },
   });
   const followMutation = useMutation({
     mutationFn: () => (following ? unfollowUser(profile!.id) : followUser(profile!.id)),
@@ -104,6 +122,14 @@ export function UserProfile() {
           <div className="mt-4 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
             {messageError}
             <button onClick={() => setMessageError(null)} className="ml-3 text-red-400 hover:text-[var(--color-ink)]" aria-label="Dismiss">
+              <X size={13} />
+            </button>
+          </div>
+        )}
+        {alreadyFriendsNotice && (
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-[var(--presence-default-a)]/30 bg-[var(--presence-default-a)]/10 px-3 py-2 text-[12.5px] text-[var(--presence-default-a)]">
+            {profile.display_name} already requested to add you — since you added them too, you&apos;re both friends now.
+            <button onClick={() => setAlreadyFriendsNotice(false)} className="ml-3 hover:opacity-70" aria-label="Dismiss">
               <X size={13} />
             </button>
           </div>
@@ -206,6 +232,29 @@ export function UserProfile() {
             <span className="mx-0.5">·</span>
             <span className="font-semibold text-[var(--color-ink)]">{followCounts.following}</span> following
           </p>
+        )}
+        {mutualFriends.length > 0 && (
+          <div className="mb-1 flex items-center gap-1.5">
+            <div className="flex -space-x-1.5">
+              {mutualFriends.slice(0, 4).map((f) => (
+                <div
+                  key={f.id}
+                  className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-[var(--color-void)] text-[8px] font-bold text-black presence-fill"
+                  style={{ ['--p-a' as string]: f.accent_color_top, ['--p-b' as string]: f.accent_color_bottom }}
+                  title={f.display_name}
+                >
+                  {f.avatar_url ? (
+                    <img src={f.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
+                  ) : (
+                    f.display_name.slice(0, 1).toUpperCase()
+                  )}
+                </div>
+              ))}
+            </div>
+            <span className="text-[12px] text-[var(--color-ink-muted)]">
+              {mutualFriends.length} mutual friend{mutualFriends.length !== 1 && 's'}
+            </span>
+          </div>
         )}
         </div>
         {profile.bio && <p className="mt-3 max-w-lg text-[14px] text-[var(--color-ink)]/80">{profile.bio}</p>}
