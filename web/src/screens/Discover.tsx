@@ -81,7 +81,7 @@ export function Discover() {
               <button
                 key={space.id}
                 onClick={() => router.push(`/spaces/${space.id}`)}
-                className="flex flex-col items-start gap-2 rounded-2xl border border-[var(--color-hairline)] p-4 text-left hover:border-[var(--color-hairline-strong)]"
+                className="bespoke-corner flex flex-col items-start gap-2 rounded-2xl border border-[var(--color-hairline)] p-4 text-left hover:border-[var(--color-hairline-strong)]"
               >
                 <div
                   className="flex h-11 w-11 items-center justify-center rounded-xl text-[14px] font-bold text-black presence-fill"
@@ -130,7 +130,7 @@ export function Discover() {
           {visible.map((space) => (
             <div
               key={space.id}
-              className={`rounded-2xl border p-4 transition-colors ${
+              className={`bespoke-corner rounded-2xl border p-4 transition-colors ${
                 highlightId === space.id ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)]'
               }`}
             >
