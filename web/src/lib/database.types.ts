@@ -280,6 +280,14 @@ export interface Database {
         Args: { other_user_id: string };
         Returns: string;
       };
+      get_mutual_friends: {
+        Args: { other_user_id: string };
+        Returns: { friend_id: string; username: string; display_name: string; avatar_url: string; accent_color_top: string; accent_color_bottom: string }[];
+      };
+      send_friend_request: {
+        Args: { p_recipient_id: string };
+        Returns: string;
+      };
     };
   };
 }
