@@ -567,66 +567,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       )}
 
       <div className="px-4 pb-4 pt-3 md:px-7 md:pb-6">
-        <div className="flex items-center gap-2 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] py-1.5 pl-4 pr-1.5">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingImage}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] disabled:opacity-40"
-            aria-label="Attach image"
-          >
-            {uploadingImage ? (
-              <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-ink-faint)] border-t-[var(--color-ink)]" />
-            ) : (
-              <ImagePlus size={17} />
-            )}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleAttachImage(file);
-              e.target.value = '';
-            }}
-          />
-
-          <div className="relative">
-            <button
-              onClick={() => setEphemeralMenuOpen((v) => !v)}
-              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${ephemeralSeconds ? 'text-[var(--presence-default-a)]' : 'text-[var(--color-ink-muted)]'} hover:text-[var(--color-ink)]`}
-              aria-label="Ephemeral message timer"
-              aria-haspopup="true"
-            >
-              <Timer size={17} />
-            </button>
-            {ephemeralMenuOpen && (
-              <div className="absolute bottom-full left-0 mb-2 flex flex-col overflow-hidden rounded-lg border border-[var(--color-hairline-strong)] bg-[var(--color-surface-raised)] text-[12.5px]">
-                {EPHEMERAL_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.seconds}
-                    onClick={() => {
-                      setEphemeralSeconds(opt.seconds);
-                      setEphemeralMenuOpen(false);
-                    }}
-                    className={`px-4 py-2 text-left hover:bg-[var(--color-surface-overlay)] ${ephemeralSeconds === opt.seconds ? 'text-[var(--presence-default-a)]' : 'text-[var(--color-ink)]/80'}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={toggleVoiceRecording}
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${recording ? 'text-red-400' : 'text-[var(--color-ink-muted)]'} hover:text-[var(--color-ink)]`}
-            aria-label={recording ? 'Stop recording' : 'Record a voice note'}
-          >
-            {recording ? <Square size={15} /> : <Mic size={17} />}
-          </button>
-
+        <div className="rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface)] p-3">
           <input
             value={input}
             onChange={(e) => {
@@ -634,47 +575,112 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
               if (e.target.value.trim()) handleTyping();
             }}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder={ephemeralSeconds ? `Disappearing in ${ephemeralSeconds}s… try :fire:` : 'Message... try :fire: :heart: :rocket:'}
-            className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none"
+            placeholder={ephemeralSeconds ? `Disappearing in ${ephemeralSeconds}s… try :fire:` : 'Type a message... try :fire: :heart: :rocket:'}
+            className="w-full bg-transparent text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none"
           />
 
-          <div className="relative">
-            <button
-              onClick={() => {
-                setEmojiPickerOpen((v) => !v);
-                setGifPickerOpen(false);
-              }}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-              aria-label="Emoji"
-              aria-haspopup="true"
-            >
-              <Smile size={17} />
-            </button>
-            {emojiPickerOpen && <EmojiPicker onSelect={(emoji) => setInput((v) => v + emoji)} onClose={() => setEmojiPickerOpen(false)} />}
-          </div>
+          <div className="mt-2 flex items-center justify-between border-t border-[var(--color-hairline)]/60 pt-2">
+            <div className="flex items-center gap-4 text-[var(--color-ink-muted)]">
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingImage}
+                className="transition-colors hover:text-[var(--color-ink)] disabled:opacity-40"
+                title="Attachment"
+                aria-label="Attach image"
+              >
+                {uploadingImage ? (
+                  <span className="block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--color-ink-faint)] border-t-[var(--color-ink)]" />
+                ) : (
+                  <ImagePlus size={16} />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                hidden
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleAttachImage(file);
+                  e.target.value = '';
+                }}
+              />
 
-          <div className="relative">
-            <button
-              onClick={() => {
-                setGifPickerOpen((v) => !v);
-                setEmojiPickerOpen(false);
-              }}
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]"
-              aria-label="GIF"
-              aria-haspopup="true"
-            >
-              <Sticker size={17} />
-            </button>
-            {gifPickerOpen && <GifPicker onSelect={handleSendGif} onClose={() => setGifPickerOpen(false)} />}
-          </div>
+              <div className="relative">
+                <button
+                  onClick={() => setEphemeralMenuOpen((v) => !v)}
+                  className={`transition-colors hover:text-[var(--color-ink)] ${ephemeralSeconds ? 'text-[var(--presence-default-a)]' : ''}`}
+                  title="Disappearing messages"
+                  aria-haspopup="true"
+                >
+                  <Timer size={16} />
+                </button>
+                {ephemeralMenuOpen && (
+                  <div className="absolute bottom-full left-0 mb-2 flex flex-col overflow-hidden rounded-lg border border-[var(--color-hairline-strong)] bg-[var(--color-surface-raised)] text-[12.5px]">
+                    {EPHEMERAL_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.seconds}
+                        onClick={() => {
+                          setEphemeralSeconds(opt.seconds);
+                          setEphemeralMenuOpen(false);
+                        }}
+                        className={`px-4 py-2 text-left hover:bg-[var(--color-surface-overlay)] ${ephemeralSeconds === opt.seconds ? 'text-[var(--presence-default-a)]' : 'text-[var(--color-ink)]/80'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-          <button
-            onClick={handleSend}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-black transition-transform active:scale-90"
-            aria-label="Send"
-          >
-            <Send size={15} />
-          </button>
+              <button
+                onClick={toggleVoiceRecording}
+                className={`transition-colors hover:text-[var(--color-ink)] ${recording ? 'text-red-400' : ''}`}
+                title={recording ? 'Stop recording' : 'Record a voice note'}
+                aria-label={recording ? 'Stop recording' : 'Record a voice note'}
+              >
+                {recording ? <Square size={15} /> : <Mic size={16} />}
+              </button>
+
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setEmojiPickerOpen((v) => !v);
+                    setGifPickerOpen(false);
+                  }}
+                  className="transition-colors hover:text-[var(--color-ink)]"
+                  title="Add Emoji"
+                  aria-haspopup="true"
+                >
+                  <Smile size={16} />
+                </button>
+                {emojiPickerOpen && <EmojiPicker onSelect={(emoji) => setInput((v) => v + emoji)} onClose={() => setEmojiPickerOpen(false)} />}
+              </div>
+
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setGifPickerOpen((v) => !v);
+                    setEmojiPickerOpen(false);
+                  }}
+                  className="transition-colors hover:text-[var(--color-ink)]"
+                  title="Add GIF"
+                  aria-haspopup="true"
+                >
+                  <Sticker size={16} />
+                </button>
+                {gifPickerOpen && <GifPicker onSelect={handleSendGif} onClose={() => setGifPickerOpen(false)} />}
+              </div>
+            </div>
+
+            <button
+              onClick={handleSend}
+              className="flex items-center gap-2 rounded-sm bg-white px-5 py-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-black transition-colors hover:bg-[var(--color-ink-muted)] active:scale-95"
+            >
+              <Send size={12} />
+              Send
+            </button>
+          </div>
         </div>
       </div>
 
