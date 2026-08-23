@@ -11,6 +11,7 @@ import { CropModal } from '../../components/settings/CropModal';
 import { NameStyle, type NameStyleData } from '../../components/NameStyle';
 import { NameStyleModal } from '../../components/NameStyleModal';
 import { NAMEPLATES, nameplateSrc } from '../../lib/nameplates';
+import { ProfilePreviewCard } from '../../components/ProfilePreviewCard';
 
 const ACCENT_PRESETS: [string, string][] = [
   ['#2dd4bf', '#a78bfa'], // PalSpace default — teal → violet
@@ -99,7 +100,8 @@ export function ProfileSettings() {
       bannerUrl !== profile.banner_url);
 
   return (
-    <div>
+    <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+    <div className="min-w-0 flex-1">
       <h1 className="mb-6 font-serif text-2xl font-semibold">Profile</h1>
 
       <section className="overflow-hidden rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)]">
@@ -317,6 +319,24 @@ export function ProfileSettings() {
           }}
         />
       )}
+    </div>
+
+    <div className="hidden xl:block">
+      <ProfilePreviewCard
+        displayName={displayName}
+        username={`@${profile?.username ?? ''}`}
+        bio={bio}
+        pronouns={pronouns}
+        statusText={statusText}
+        accentTop={accentTop}
+        accentBottom={accentBottom}
+        avatarUrl={avatarUrl}
+        bannerUrl={bannerUrl}
+        nameStyle={(profile?.name_style as NameStyleData) ?? null}
+        equippedNameplate={profile?.equipped_nameplate ?? null}
+        memberSince={profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+      />
+    </div>
     </div>
   );
 }
