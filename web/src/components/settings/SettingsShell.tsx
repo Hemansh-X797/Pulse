@@ -102,7 +102,7 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
         >
           ← Settings
         </button>
-        <div className="mx-auto max-w-xl px-5 py-4 md:px-8 md:py-9">{children}</div>
+        <div className={`mx-auto px-5 py-4 md:px-8 md:py-9 ${pathname === '/settings/profile' ? 'max-w-4xl' : 'max-w-xl'}`}>{children}</div>
       </div>
     </div>
   );
