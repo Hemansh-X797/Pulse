@@ -19,11 +19,19 @@ export async function searchUsers(query: string): Promise<FriendProfile[]> {
   return data ?? [];
 }
 
-export async function sendFriendRequest(recipientId: string) {
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) throw new Error('not authenticated');
-  const { error } = await supabase.from('friend_requests').insert({ sender_id: userData.user.id, recipient_id: recipientId });
+/**
+ * Uses the send_friend_request RPC (019_mutual_friends_and_request_fix.sql)
+ * rather than a plain insert — this is what fixes the simultaneous-
+ * request bug: if the other person already sent *you* a pending
+ * request, this accepts that one instead of creating a confusing
+ * second pending row in the opposite direction. The return value tells
+ * the UI which of those happened, so it can show "you're already
+ * friends now" instead of a generic "request sent".
+ */
+export async function sendFriendRequest(recipientId: string): Promise<'sent' | 'already_friends'> {
+  const { data, error } = await supabase.rpc('send_friend_request', { p_recipient_id: recipientId });
   if (error) throw error;
+  return data as 'sent' | 'already_friends';
 }
 
 export async function cancelFriendRequest(requestId: number) {
@@ -53,6 +61,27 @@ export async function listFriends(): Promise<FriendProfile[]> {
   const { data, error: profilesError } = await supabase.from('profiles').select(FRIEND_PROFILE_FIELDS).in('id', ids);
   if (profilesError) throw profilesError;
   return data ?? [];
+}
+
+/**
+ * Mutual friends between me and another user, via the
+ * get_mutual_friends RPC (019_mutual_friends_and_request_fix.sql) —
+ * needed as a SECURITY DEFINER function since friend lists are
+ * private-by-RLS; this only ever reveals the intersection, not either
+ * person's full list.
+ */
+export async function getMutualFriends(otherUserId: string): Promise<FriendProfile[]> {
+  const { data, error } = await supabase.rpc('get_mutual_friends', { other_user_id: otherUserId });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.friend_id,
+    username: row.username,
+    display_name: row.display_name,
+    avatar_url: row.avatar_url,
+    accent_color_top: row.accent_color_top,
+    accent_color_bottom: row.accent_color_bottom,
+    status_text: '',
+  }));
 }
 
 export interface IncomingRequest {
