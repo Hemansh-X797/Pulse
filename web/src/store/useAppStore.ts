@@ -29,6 +29,13 @@ interface AppState {
   connectionStatus: ConnectionStatus;
   setConnectionStatus: (status: ConnectionStatus) => void;
 
+  // ---- presence: who else is online right now, and how (online/dnd).
+  // Absence from this map means offline OR invisible — see
+  // subscribeToGlobalPresence's doc comment for why those two cases are
+  // deliberately indistinguishable to other clients. ----
+  presenceByUserId: Record<string, 'online' | 'dnd'>;
+  setPresenceByUserId: (map: Record<string, 'online' | 'dnd'>) => void;
+
   reset: () => void;
 }
 
@@ -52,6 +59,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   connectionStatus: 'connecting',
   setConnectionStatus: (status) => set({ connectionStatus: status }),
 
+  presenceByUserId: {},
+  setPresenceByUserId: (map) => set({ presenceByUserId: map }),
+
   reset: () =>
     set({
       session: null,
@@ -61,5 +71,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       unreadByChannel: {},
       unreadNotifications: 0,
       connectionStatus: 'disconnected',
+      presenceByUserId: {},
     }),
 }));
