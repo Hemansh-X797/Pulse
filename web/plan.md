@@ -839,3 +839,102 @@ creates the DM channel eligibility; no separate work needed here.
 Next up: B3 (status page + auth-persistence check), B5 (404 page), B6
 (presence), B7 (Explore overhaul), B8 (homepage redesign), then the
 larger B10 (voice) and B11 (Spaces upgrade).
+
+## Part B — B3, B4, B5 done, build-tested
+
+### B4: Auth persistence — verified, no change needed
+Checked rather than assumed: `useAuthSync.ts` correctly calls
+`getSession()` on mount (reads the persisted session) and subscribes
+to `onAuthStateChange`; the Supabase client itself defaults to
+`persistSession: true` / `autoRefreshToken: true` in browser contexts,
+stored in localStorage. Only one client instance exists app-wide (no
+"multiple GoTrueClient instances" risk from duplicate `createClient`
+calls). This was already correctly implemented — confirmed, not
+assumed, and no fix was needed.
+
+### B3: Status page — real live checks, not hardcoded green boxes
+New `/status` page. Genuinely checks four things live, from your own
+browser, every 30 seconds: a real lightweight DB query (latency-timed),
+GoTrue's actual public health endpoint, the Storage API's reachability,
+and a real Realtime channel subscribe round-trip. Each renders as a
+green/yellow/red dot with a latency sparkline. The page is explicit in
+its own copy that this reflects live client-side checks, not a
+persisted server-side uptime history — didn't want to imply monitoring
+infrastructure that doesn't exist. Linked from Settings → Account
+alongside Terms/Privacy, added to the sitemap.
+
+### B5: Real 404 page
+`app/not-found.tsx` — uses the logo (same graceful-degrade pattern
+`GlobalNav.tsx` already uses for the same asset, since `public/logo.svg`
+is populated at build time from a sibling folder not present in every
+environment), Bespoke-styled. Caught a real bug in the build test doing
+this: Next.js's `not-found.tsx` is a server component by default and
+can't take an inline event handler — had to make it a client component,
+which also meant dropping the `metadata` export (client components
+can't export that). Both fixed before calling it done.
+
+**Run migration 019** (already noted above) — nothing new to migrate
+for B3/B4/B5.
+
+Next: B6 (presence), B7 (Explore overhaul), B8 (homepage redesign),
+then B10 (voice) and B11 (Spaces upgrade).
+
+## Part B — B6 done, build-tested
+
+### Presence — Online / Do Not Disturb / Invisible
+Migration `020_presence_status.sql`: a persisted `status` choice on
+profiles (survives reloads/reconnects — this is the person's
+*preference*, separate from whether they're actually connected right
+now). Found the same "built but never wired" pattern as
+`subscribeToNotifications` earlier: `subscribeToPresence()` existed in
+`realtime.ts` but was never called anywhere, and it was scoped
+per-open-chat rather than app-wide anyway, so it couldn't have shown
+presence in a DM list even if it had been wired.
+
+Built a real global presence channel (`subscribeToGlobalPresence`) that
+every logged-in client joins once — new `usePresenceSync` hook mounted
+at the app-shell level, updates a `presenceByUserId` store slice live.
+Invisible mode works the way Discord's does: still tracked/connected
+for everything else that depends on presence, just filtered out of
+what other clients count as "online," so you genuinely appear offline
+without actually disconnecting. Status picker lives in Settings →
+Account; `StatusDot` renders in the DM list, the profile popover, and
+is reusable anywhere else a userId is available.
+
+**Run migration 020** for this to work.
+
+Next: B7 (Explore overhaul), B8 (homepage redesign), then B10 (voice)
+and B11 (Spaces upgrade).
+
+## Part B — B7 done, build-tested
+
+### Explore overhaul — Spaces/Feed split, search, top choices, hashtags
+Hashtags didn't exist anywhere in this app before this pass. Added as
+a Postgres *generated column* on `posts` (`021_post_hashtags_and_explore.sql`)
+— extracted from `body_rendered` automatically on every insert/update,
+GIN-indexed for fast search, not parsed client-side on every render.
+Made hashtags clickable in `markdown.tsx` the same way `@mentions`
+already were, linking to `/discover?tag=X`.
+
+`Discover.tsx` rebuilt around your exact spec — Explore, then Spaces
+vs Feed as the primary split, then a search bar, then top choices
+underneath:
+- **Spaces** category: unchanged functionality (tag filter, join),
+  plus a real name search added (didn't have one before).
+- **Feed** category: "top choices" by default (`listTopPosts` — recency
+  pool ranked by a simple reaction+comment weighting, honestly noted in
+  the code as not tuned against real usage data, since there isn't any
+  yet), or hashtag search results when you type. Arriving via a
+  hashtag click (`?tag=`) auto-switches to Feed and runs that search.
+
+**One real limitation, not hidden**: clicking a post in Explore's Feed
+results takes you to `/home` (the main feed) rather than scrolling
+directly to that post — there's no single-post permalink route in this
+app yet, and building one is more scope than this item covered. Noting
+it rather than pretending the click does something more precise than
+it does.
+
+**Run migration 021** for hashtags to start working.
+
+Next: B8 (homepage redesign), then B10 (voice) and B11 (Spaces
+upgrade).
