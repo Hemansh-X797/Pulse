@@ -9,6 +9,7 @@ import { listSpaceTopics, createSpaceTopic } from '../../lib/api/spaces';
 import { listMyDMs } from '../../lib/api/channels';
 import { useAppStore } from '../../store/useAppStore';
 import { NotificationsPanel } from './NotificationsPanel';
+import { StatusDot } from '../StatusDot';
 
 export function SecondarySidebar() {
   const pathname = usePathname() ?? '';
@@ -165,16 +166,21 @@ function DmList() {
                 active ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)]/60 hover:text-[var(--color-ink)]'
               }`}
             >
-              {dm.other_user.avatar_url ? (
-                <img src={dm.other_user.avatar_url} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
-              ) : (
-                <div
-                  style={{ ['--p-a' as string]: dm.other_user.accent_color_top, ['--p-b' as string]: dm.other_user.accent_color_bottom }}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black"
-                >
-                  {dm.other_user.display_name.slice(0, 2).toUpperCase()}
-                </div>
-              )}
+              <div className="relative shrink-0">
+                {dm.other_user.avatar_url ? (
+                  <img src={dm.other_user.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                ) : (
+                  <div
+                    style={{ ['--p-a' as string]: dm.other_user.accent_color_top, ['--p-b' as string]: dm.other_user.accent_color_bottom }}
+                    className="flex h-8 w-8 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black"
+                  >
+                    {dm.other_user.display_name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <span className="absolute -bottom-0.5 -right-0.5">
+                  <StatusDot userId={dm.other_user.id} size={10} />
+                </span>
+              </div>
               <div className="min-w-0 flex-1">
                 <div className={`truncate text-[13px] ${unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : 'font-medium'}`}>
                   {dm.other_user.display_name}
