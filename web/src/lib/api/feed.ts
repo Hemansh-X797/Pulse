@@ -19,6 +19,46 @@ export async function listFeed(limit = 30): Promise<FeedItem[]> {
   return data;
 }
 
+/**
+ * Explore's "top choices" — same view, ordered by a simple engagement
+ * score (reactions weighted slightly above comments, since a comment
+ * on your own post from yourself replying doesn't happen but a
+ * self-reaction can't either — both counts already exclude nothing
+ * special, this is just a reasonable default weighting, not tuned
+ * against real usage data yet). Client-side computed sort since
+ * ordering by a computed expression on a view needs either a second
+ * generated column or client-side sort of a capped result set — the
+ * latter is simpler and fine at this data volume.
+ */
+export async function listTopPosts(limit = 20): Promise<FeedItem[]> {
+  const { data, error } = await supabase
+    .from('feed_view')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(200); // recent pool to rank within, not the whole table
+  if (error) throw error;
+  return (data ?? [])
+    .map((post) => ({ post, score: post.reaction_count * 1.5 + post.comment_count }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((x) => x.post);
+}
+
+/** Hashtag search for Explore — matches the generated `hashtags` array
+ * column (021_post_hashtags_and_explore.sql), case-insensitive since
+ * that column is already lowercased at generation time. */
+export async function searchPostsByHashtag(tag: string, limit = 30): Promise<FeedItem[]> {
+  const normalized = tag.replace(/^#/, '').toLowerCase();
+  const { data, error } = await supabase
+    .from('feed_view')
+    .select('*')
+    .contains('hashtags', [normalized])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function createPost(body: string, mediaUrl?: string) {
   const trimmed = body.trim();
   if (!trimmed && !mediaUrl) throw new Error('post needs text or an image');
