@@ -60,6 +60,42 @@ export function AccountSettings() {
       <h1 className="mb-6 font-serif text-2xl font-semibold">Account</h1>
 
       <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
+        <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Status</h2>
+        <p className="mb-3 text-[11.5px] text-[var(--color-ink-faint)]">
+          What other people see next to your name while you&apos;re connected.
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {(
+            [
+              { value: 'online' as const, label: 'Online', color: '#22c55e' },
+              { value: 'dnd' as const, label: 'Do Not Disturb', color: '#ef4444' },
+              { value: 'invisible' as const, label: 'Invisible', color: '#52525b' },
+            ]
+          ).map((opt) => (
+            <button
+              key={opt.value}
+              onClick={async () => {
+                const updated = await updateProfile({ status: opt.value });
+                setStoreProfile(updated);
+                queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+              }}
+              className={`flex flex-col items-center gap-1.5 rounded-lg border p-2.5 ${
+                profile?.status === opt.value ? 'border-[var(--presence-default-a)] bg-[var(--presence-default-a)]/10' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
+              }`}
+            >
+              <span className="h-3 w-3 rounded-full" style={{ background: opt.color }} />
+              <span className="text-[11.5px] font-medium">{opt.label}</span>
+            </button>
+          ))}
+        </div>
+        {profile?.status === 'invisible' && (
+          <p className="mt-2.5 text-[11px] text-[var(--color-ink-faint)]">
+            You&apos;ll appear offline to everyone, but everything else still works normally.
+          </p>
+        )}
+      </section>
+
+      <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
         <h2 className="mb-4 text-sm font-semibold text-[var(--color-ink)]">Account info</h2>
 
         <Field label="Email" hint="Managed through your connected sign-in method below.">
@@ -134,12 +170,15 @@ export function AccountSettings() {
 
       <section>
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Legal</h2>
-        <div className="flex gap-4 text-[13px]">
+        <div className="flex flex-wrap gap-4 text-[13px]">
           <Link href="/terms" target="_blank" className="text-[var(--color-ink-muted)] underline hover:text-[var(--color-ink)]">
             Terms of Service
           </Link>
           <Link href="/privacy" target="_blank" className="text-[var(--color-ink-muted)] underline hover:text-[var(--color-ink)]">
             Privacy Policy
+          </Link>
+          <Link href="/status" target="_blank" className="text-[var(--color-ink-muted)] underline hover:text-[var(--color-ink)]">
+            System Status
           </Link>
         </div>
       </section>
