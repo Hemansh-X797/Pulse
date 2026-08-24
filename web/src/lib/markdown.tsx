@@ -25,12 +25,18 @@ function nextKey(): string {
 
 // ---- inline parsing ----
 
-const INLINE_TOKEN = /(\*\*|__|~~|\|\||--(?!\s)|\*|\[|@)/;
+const INLINE_TOKEN = /(\*\*|__|~~|\|\||--(?!\s)|\*|\[|@|#)/;
 
 function findMentionMatch(text: string): { handle: string; length: number } | null {
   const m = /^@([a-zA-Z0-9_]{2,32})/.exec(text);
   if (!m) return null;
   return { handle: m[1], length: m[0].length };
+}
+
+function findHashtagMatch(text: string): { tag: string; length: number } | null {
+  const m = /^#([a-zA-Z][a-zA-Z0-9_]{1,30})/.exec(text);
+  if (!m) return null;
+  return { tag: m[1], length: m[0].length };
 }
 
 function findLinkMatch(text: string): { label: string; href: string; length: number } | null {
@@ -141,6 +147,27 @@ function parseInline(text: string, depth = 0): ReactNode[] {
           </a>
         );
         i += mention.length;
+        plainStart = i;
+        continue;
+      }
+      i += 1;
+      continue;
+    }
+
+    if (token === '#') {
+      const hashtag = findHashtagMatch(rest);
+      if (hashtag) {
+        flushPlain(i);
+        out.push(
+          <a
+            key={nextKey()}
+            href={`/discover?tag=${encodeURIComponent(hashtag.tag.toLowerCase())}`}
+            className="font-medium text-[var(--presence-default-a)] hover:underline"
+          >
+            #{hashtag.tag}
+          </a>
+        );
+        i += hashtag.length;
         plainStart = i;
         continue;
       }
