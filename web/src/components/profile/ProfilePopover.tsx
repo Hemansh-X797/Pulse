@@ -10,6 +10,7 @@ import { listFriends, listOutgoingRequests, sendFriendRequest } from '../../lib/
 import { useAppStore } from '../../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../NameStyle';
 import { isValidNameplateId, nameplateSrc } from '../../lib/nameplates';
+import { StatusDot } from '../StatusDot';
 
 export function ProfilePopover({ username, anchorRef, onClose }: { username: string; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void }) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -101,7 +102,7 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
                 reach the full page. */}
             <button
               onClick={() => profile.avatar_url && setAvatarLightboxOpen(true)}
-              className="-mt-7 mb-2 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[var(--color-surface-overlay)] text-base font-bold text-black"
+              className="relative -mt-7 mb-2 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[var(--color-surface-overlay)] text-base font-bold text-black"
               style={{
                 background: profile.avatar_url
                   ? `url(${profile.avatar_url}) center/cover`
@@ -111,6 +112,9 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
               title={profile.avatar_url ? 'Enlarge profile photo' : undefined}
             >
               {!profile.avatar_url && profile.display_name.slice(0, 2).toUpperCase()}
+              <span className="absolute bottom-0 right-0">
+                <StatusDot userId={profile.id} size={12} />
+              </span>
             </button>
 
             <div className="text-[14.5px] font-semibold text-[var(--color-ink)]">
