@@ -97,6 +97,58 @@ export function subscribeToPresence(
   return channel;
 }
 
+/**
+ * App-wide presence, unlike subscribeToPresence above (which is scoped
+ * to one open chat and was never actually wired into any UI — found
+ * while building this). Every logged-in client joins one shared
+ * channel and tracks its own chosen status; other clients see a map of
+ * userId → 'online' | 'dnd'. A person set to 'invisible' still tracks
+ * (so they're still a real, connected participant for anything else
+ * that depends on presence) but is filtered out of what other clients
+ * treat as "online" here — the same distinction Discord draws between
+ * being connected and choosing to appear offline.
+ */
+const GLOBAL_PRESENCE_CHANNEL = 'presence:global';
+
+export function subscribeToGlobalPresence(
+  userId: string,
+  status: 'online' | 'dnd' | 'invisible',
+  onSync: (statuses: Record<string, 'online' | 'dnd'>) => void
+): RealtimeChannel {
+  const channel = supabase.channel(GLOBAL_PRESENCE_CHANNEL, {
+    config: { presence: { key: userId } },
+  });
+
+  channel
+    .on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState<{ status: 'online' | 'dnd' | 'invisible' }>();
+      const visible: Record<string, 'online' | 'dnd'> = {};
+      for (const [uid, entries] of Object.entries(state)) {
+        const entryStatus = entries[0]?.status;
+        if (entryStatus === 'online' || entryStatus === 'dnd') {
+          visible[uid] = entryStatus;
+        }
+        // 'invisible' entries are intentionally omitted — that's what
+        // makes invisible mode actually appear offline to others.
+      }
+      onSync(visible);
+    })
+    .subscribe(async (subStatus) => {
+      if (subStatus === 'SUBSCRIBED') {
+        await channel.track({ status });
+      }
+    });
+
+  return channel;
+}
+
+/** Call after changing status locally (e.g. in Settings) so the
+ * already-open global presence channel updates its tracked payload
+ * immediately, instead of waiting for a reconnect. */
+export function updateGlobalPresenceStatus(channel: RealtimeChannel, status: 'online' | 'dnd' | 'invisible') {
+  channel.track({ status });
+}
+
 export function unsubscribe(channel: RealtimeChannel) {
   supabase.removeChannel(channel);
 }
