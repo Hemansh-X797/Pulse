@@ -23,6 +23,7 @@ export interface Database {
           created_at: string;
           interests: string[];
           onboarding_completed: boolean;
+          status: 'online' | 'dnd' | 'invisible';
           name_style: { font?: string; effect?: string; colors?: string[] } | null;
           equipped_nameplate: string | null;
         };
@@ -246,6 +247,7 @@ export interface Database {
           author_name_style: { font?: string; effect?: string; colors?: string[] } | null;
           body_rendered: string;
           media_url: string;
+          hashtags: string[];
           created_at: string;
           edited_at: string | null;
           reaction_count: number;
