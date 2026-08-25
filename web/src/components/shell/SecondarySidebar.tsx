@@ -2,14 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname, useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { Hash, Plus, Bell, Users } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Hash, Volume2, Plus, Bell, Users, ChevronUp, ChevronDown, Settings2 } from 'lucide-react';
 import { useState } from 'react';
-import { listSpaceTopics, createSpaceTopic } from '../../lib/api/spaces';
+import {
+  listSpaceTopics,
+  createSpaceTopic,
+  reorderSpaceTopic,
+  listSpaceCategories,
+  hasSpacePermission,
+} from '../../lib/api/spaces';
 import { listMyDMs } from '../../lib/api/channels';
 import { useAppStore } from '../../store/useAppStore';
 import { NotificationsPanel } from './NotificationsPanel';
 import { StatusDot } from '../StatusDot';
+import { CreateChannelModal } from './CreateChannelModal';
+import { SpaceSettingsModal } from './SpaceSettingsModal';
 
 export function SecondarySidebar() {
   const pathname = usePathname() ?? '';
@@ -62,56 +70,148 @@ function SpaceTopicList() {
   const spaceId = params.spaceId;
   const pathname = usePathname() ?? '';
   const unreadByChannel = useAppStore((s) => s.unreadByChannel);
+  const queryClient = useQueryClient();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const { data: topics = [] } = useQuery({
     queryKey: ['space-topics', spaceId],
     queryFn: () => listSpaceTopics(spaceId!),
     enabled: !!spaceId,
   });
+  const { data: categories = [] } = useQuery({
+    queryKey: ['space-categories', spaceId],
+    queryFn: () => listSpaceCategories(spaceId!),
+    enabled: !!spaceId,
+  });
+  const { data: canManageChannels = false } = useQuery({
+    queryKey: ['space-permission', spaceId, 'manage_channels'],
+    queryFn: () => hasSpacePermission(spaceId!, 'manage_channels'),
+    enabled: !!spaceId,
+  });
 
-  async function handleAddTopic() {
-    const name = window.prompt('Topic name:');
-    if (!name || !spaceId) return;
-    await createSpaceTopic(spaceId, name);
+  async function handleCreateTopic(opts: { name: string; kind: 'text' | 'voice'; categoryId: string | null }) {
+    if (!spaceId) return;
+    await createSpaceTopic(spaceId, opts.name, opts.categoryId);
+    queryClient.invalidateQueries({ queryKey: ['space-topics', spaceId] });
+    setCreateOpen(false);
+  }
+
+  async function handleMove(topicId: string, direction: -1 | 1, siblings: typeof topics) {
+    const idx = siblings.findIndex((t) => t.id === topicId);
+    const swapWith = siblings[idx + direction];
+    if (!swapWith) return;
+    await Promise.all([
+      reorderSpaceTopic(topicId, swapWith.position),
+      reorderSpaceTopic(swapWith.id, siblings[idx].position),
+    ]);
+    queryClient.invalidateQueries({ queryKey: ['space-topics', spaceId] });
+  }
+
+  // Group topics by category — uncategorized ones render first,
+  // matching how Discord itself orders the "no category" bucket.
+  const uncategorized = topics.filter((t) => !t.category_id);
+  const grouped = categories.map((cat) => ({ category: cat, items: topics.filter((t) => t.category_id === cat.id) }));
+
+  function TopicRow({ topic, siblings }: { topic: (typeof topics)[number]; siblings: typeof topics }) {
+    const href = `/spaces/${spaceId}/${topic.id}`;
+    const active = pathname === href;
+    const unread = unreadByChannel[topic.id] ?? 0;
+    return (
+      <div key={topic.id} className="group/topic relative flex items-center">
+        <Link
+          href={href}
+          className={`flex flex-1 items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
+            active
+              ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]'
+              : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)]/60 hover:text-[var(--color-ink)]'
+          }`}
+        >
+          {topic.kind === 'voice' ? (
+            <Volume2 size={14} className="text-[var(--color-ink-faint)]" />
+          ) : (
+            <Hash size={14} className="text-[var(--color-ink-faint)]" />
+          )}
+          {/* No literal "#" character before the name on purpose — an
+              intentional visual departure from Discord's look, not an
+              oversight (the small icon above still conveys "text
+              channel" without the character itself). */}
+          <span className={unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : ''}>{topic.name}</span>
+          {unread > 0 && (
+            <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full presence-fill px-1 font-mono text-[10px] font-bold text-black">
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
+        </Link>
+        {canManageChannels && (
+          <div className="absolute right-1 flex flex-col opacity-0 transition-opacity group-hover/topic:opacity-100">
+            <button
+              onClick={() => handleMove(topic.id, -1, siblings)}
+              className="flex h-4 w-5 items-center justify-center text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+              aria-label="Move up"
+            >
+              <ChevronUp size={12} />
+            </button>
+            <button
+              onClick={() => handleMove(topic.id, 1, siblings)}
+              className="flex h-4 w-5 items-center justify-center text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+              aria-label="Move down"
+            >
+              <ChevronDown size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
     <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
-      <SidebarHeader title="Space" />
-      <div className="px-3.5">
-        <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
-          Topics
-        </div>
-        {topics.map((t) => {
-          const href = `/spaces/${spaceId}/${t.id}`;
-          const active = pathname === href;
-          const unread = unreadByChannel[t.id] ?? 0;
-          return (
-            <Link
-              key={t.id}
-              href={href}
-              className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
-                active
-                  ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]'
-                  : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)]/60 hover:text-[var(--color-ink)]'
-              }`}
-            >
-              <Hash size={14} className="text-[var(--color-ink-faint)]" />
-              <span className={unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : ''}>{t.name}</span>
-              {unread > 0 && (
-                <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full presence-fill px-1 font-mono text-[10px] font-bold text-black">
-                  {unread > 9 ? '9+' : unread}
-                </span>
-              )}
-            </Link>
-          );
-        })}
+      <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-[var(--color-hairline)] px-4">
+        <span className="font-serif text-[15px] font-semibold">Space</span>
         <button
-          onClick={handleAddTopic}
-          className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+          onClick={() => setSettingsOpen(true)}
+          className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
+          aria-label="Space settings"
+          title="Space settings"
         >
-          <Plus size={14} /> Add topic
+          <Settings2 size={15} />
         </button>
       </div>
+      <div className="flex-1 overflow-y-auto px-3.5 py-2">
+        {uncategorized.length > 0 && (
+          <div className="mb-2">
+            {uncategorized.map((t) => (
+              <TopicRow key={t.id} topic={t} siblings={uncategorized} />
+            ))}
+          </div>
+        )}
+
+        {grouped.map(({ category, items }) => (
+          <div key={category.id} className="mb-2">
+            <div className="px-2.5 pb-1 pt-2 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
+              {category.name}
+            </div>
+            {items.map((t) => (
+              <TopicRow key={t.id} topic={t} siblings={items} />
+            ))}
+          </div>
+        ))}
+
+        {canManageChannels && (
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]"
+          >
+            <Plus size={14} /> Add channel
+          </button>
+        )}
+      </div>
+
+      {createOpen && spaceId && (
+        <CreateChannelModal categories={categories} onClose={() => setCreateOpen(false)} onCreate={handleCreateTopic} />
+      )}
+      {settingsOpen && spaceId && <SpaceSettingsModal spaceId={spaceId} onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
