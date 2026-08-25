@@ -231,6 +231,42 @@ export async function markUnreadFrom(channelId: string, messageId: number) {
   if (error) throw error;
 }
 
+/**
+ * "Mark as Read" for a whole space (right-click menu on a space icon) —
+ * finds each of the space's channels' latest message and upserts a
+ * read_receipts row for it, the same real, persisted mechanism
+ * markRead() uses for a single channel. Not a client-only flag that
+ * resets on reload — this is what channel_unread_counts() actually
+ * reads.
+ */
+export async function markSpaceAsRead(spaceId: string): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) throw new Error('not authenticated');
+
+  const { data: channels, error: channelsError } = await supabase.from('channels').select('id').eq('space_id', spaceId);
+  if (channelsError) throw channelsError;
+  if (!channels || channels.length === 0) return;
+
+  const results = await Promise.all(
+    channels.map(async (c) => {
+      const { data: latest } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('channel_id', c.id)
+        .order('id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return latest ? { channel_id: c.id, user_id: userData.user!.id, last_read_message_id: latest.id } : null;
+    })
+  );
+
+  const rows = results.filter((r): r is { channel_id: string; user_id: string; last_read_message_id: number } => r !== null);
+  if (rows.length === 0) return;
+
+  const { error } = await supabase.from('read_receipts').upsert(rows, { onConflict: 'channel_id,user_id' });
+  if (error) throw error;
+}
+
 export interface MessageReactionSummary {
   emoji: string;
   count: number;
