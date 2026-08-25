@@ -84,6 +84,24 @@ export async function listMySpaces(): Promise<Space[]> {
   return data ?? [];
 }
 
+export async function getSpace(spaceId: string): Promise<Space> {
+  const { data, error } = await supabase.from('spaces').select('*').eq('id', spaceId).single();
+  if (error) throw error;
+  return data;
+}
+
+/** Direct update, gated by a real RLS UPDATE policy added alongside
+ * this (023_space_description.sql — there was no UPDATE policy on
+ * spaces at all before that, checked directly rather than assumed;
+ * without it this would have silently done nothing). Owner-only for
+ * now; a manage_space permission on a custom role isn't wired to this
+ * specific action yet. */
+export async function updateSpace(spaceId: string, patch: { name?: string; description?: string; accent_color_top?: string; accent_color_bottom?: string }): Promise<Space> {
+  const { data, error } = await supabase.from('spaces').update(patch).eq('id', spaceId).select().single();
+  if (error) throw error;
+  return data;
+}
+
 export async function listSpaceTopics(spaceId: string): Promise<Topic[]> {
   const { data, error } = await supabase
     .from('channels')
@@ -94,19 +112,122 @@ export async function listSpaceTopics(spaceId: string): Promise<Topic[]> {
   return data ?? [];
 }
 
-export async function createSpaceTopic(spaceId: string, name: string): Promise<Topic> {
-  const { count } = await supabase
-    .from('channels')
-    .select('*', { count: 'exact', head: true })
-    .eq('space_id', spaceId);
-
-  const { data, error } = await supabase
-    .from('channels')
-    .insert({ space_id: spaceId, name, is_group: true, position: count ?? 0 })
-    .select()
-    .single();
+export async function createSpaceTopic(spaceId: string, name: string, categoryId?: string | null): Promise<Topic> {
+  // Now goes through create_space_channel (022_space_roles_permissions_categories.sql),
+  // which checks manage_channels — the old version was a plain client
+  // insert with no permission check at all, meaning any space member
+  // could create topics regardless of role. Only the auto-created
+  // Admin role (the owner, by default) has manage_channels until the
+  // owner grants it to a custom role, per your exact spec.
+  const { data: channelId, error } = await supabase.rpc('create_space_channel', {
+    p_space_id: spaceId,
+    p_name: name,
+    p_kind: 'text',
+    p_category_id: categoryId ?? null,
+  });
   if (error) throw error;
+  const { data, error: fetchError } = await supabase.from('channels').select('*').eq('id', channelId).single();
+  if (fetchError) throw fetchError;
   return data;
+}
+
+export async function reorderSpaceTopic(channelId: string, newPosition: number): Promise<void> {
+  const { error } = await supabase.rpc('reorder_space_channel', { p_channel_id: channelId, p_new_position: newPosition });
+  if (error) throw error;
+}
+
+// ---------- categories ----------
+export interface SpaceCategory {
+  id: string;
+  space_id: string;
+  name: string;
+  position: number;
+  created_at: string;
+}
+
+export async function listSpaceCategories(spaceId: string): Promise<SpaceCategory[]> {
+  const { data, error } = await supabase.from('space_categories').select('*').eq('space_id', spaceId).order('position', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createSpaceCategory(spaceId: string, name: string): Promise<string> {
+  const { data, error } = await supabase.rpc('create_space_category', { p_space_id: spaceId, p_name: name });
+  if (error) throw error;
+  return data as string;
+}
+
+// ---------- roles & permissions ----------
+export interface SpaceRolePermissions {
+  [key: string]: boolean | undefined;
+  manage_space?: boolean;
+  manage_roles?: boolean;
+  manage_channels?: boolean;
+  manage_messages?: boolean;
+  kick_members?: boolean;
+  ban_members?: boolean;
+  create_invites?: boolean;
+}
+
+export interface SpaceRole {
+  id: string;
+  space_id: string;
+  name: string;
+  color: string;
+  permissions: SpaceRolePermissions;
+  position: number;
+  is_default: boolean;
+  created_at: string;
+}
+
+export async function listSpaceRoles(spaceId: string): Promise<SpaceRole[]> {
+  const { data, error } = await supabase.from('space_roles').select('*').eq('space_id', spaceId).order('position', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as SpaceRole[];
+}
+
+export async function createSpaceRole(spaceId: string, name: string, color?: string): Promise<string> {
+  const { data, error } = await supabase.rpc('create_space_role', { p_space_id: spaceId, p_name: name, p_color: color ?? '#99aab5' });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function updateSpaceRolePermissions(roleId: string, permissions: SpaceRolePermissions): Promise<void> {
+  const { error } = await supabase.rpc('update_space_role_permissions', { p_role_id: roleId, p_permissions: permissions as Record<string, boolean> });
+  if (error) throw error;
+}
+
+export async function deleteSpaceRole(roleId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_space_role', { p_role_id: roleId });
+  if (error) throw error;
+}
+
+export async function assignSpaceRole(spaceId: string, targetUserId: string, roleId: string): Promise<void> {
+  const { error } = await supabase.rpc('assign_space_role', { p_space_id: spaceId, p_target_user_id: targetUserId, p_role_id: roleId });
+  if (error) throw error;
+}
+
+export async function unassignSpaceRole(spaceId: string, targetUserId: string, roleId: string): Promise<void> {
+  const { error } = await supabase.rpc('unassign_space_role', { p_space_id: spaceId, p_target_user_id: targetUserId, p_role_id: roleId });
+  if (error) throw error;
+}
+
+export async function listMemberRoleAssignments(spaceId: string): Promise<{ user_id: string; role_id: string }[]> {
+  const { data, error } = await supabase.from('space_member_roles').select('user_id, role_id').eq('space_id', spaceId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function hasSpacePermission(spaceId: string, permission: string): Promise<boolean> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return false;
+  const { data, error } = await supabase.rpc('space_member_has_permission', {
+    p_space_id: spaceId,
+    p_user_id: userData.user.id,
+    p_permission: permission,
+  });
+  if (error) throw error;
+  return !!data;
 }
 
 export async function joinSpaceByInvite(inviteCode: string): Promise<Space> {
