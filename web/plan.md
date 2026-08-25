@@ -938,3 +938,79 @@ it does.
 
 Next: B8 (homepage redesign), then B10 (voice) and B11 (Spaces
 upgrade).
+
+## Part B — B8 done, and a large B11 foundation pass, all build-tested
+
+### B8: Homepage redesign
+`app/page.tsx` (the logged-out landing page — confirmed distinct from
+`app/(app)/page.tsx`, checked not assumed) was a genuine 12-line
+placeholder. Real page now: nav with logo + login/get-started, a hero
+section, a 4-card feature grid (Chat/Feed/Spaces/Stories) using the
+`.bespoke-corner` treatment already established, footer with
+Terms/Privacy/Status links.
+
+### B11 foundation — real roles/permissions, categories, reordering
+This is the start of the "HUGE" Spaces upgrade, not the whole thing.
+Built the schema and API layer first, since every UI piece depends on
+it, then a meaningful slice of UI on top:
+
+- **Real custom roles**, not just the old fixed owner/admin/member
+  enum (which still exists underneath, untouched). New `space_roles` +
+  `space_member_roles` tables. Every space gets exactly one
+  auto-created "Admin" role at creation, assigned to the owner —
+  per your exact spec, "there should just be an admin role made by
+  default, rest user makes and handles permissions." The owner can
+  create further roles with a real 6-permission set (manage channels,
+  manage roles, manage messages, kick, ban, create invites), each
+  checked server-side via a `SECURITY DEFINER` helper
+  (`space_member_has_permission`) — every mutating action (create
+  role, edit permissions, assign/unassign, create channel, create
+  category, reorder) goes through a permission-checked RPC, not a bare
+  table insert. Caught and fixed a real gap while building this: the
+  *old* `createSpaceTopic` was a plain client insert with **no
+  permission check at all** — any space member could already create
+  topics regardless of role, before this pass.
+- **Categories** — new `space_categories` table, channels gain an
+  optional `category_id`. Sidebar groups topics under their category
+  header, uncategorized ones first.
+- **Topic reordering** — the `position` column already existed on
+  `channels` (unused for this); wired real move-up/move-down controls,
+  permission-gated, hover-revealed.
+- **No more `#` prefix** — removed the literal character before topic
+  names (kept the small Hash/Volume2 icon, which still conveys
+  text-vs-voice without the character itself) — explicit, intentional
+  departure from Discord's look, not an oversight.
+- **Real Space Settings modal** — Server Profile (name + a
+  `description` field that **didn't exist on spaces at all before this
+  pass**, confirmed by checking), Roles (full permission editor),
+  Members (with role assignment/removal), and Invites (now shows the
+  space's ID directly alongside the link, per your spec).
+- **Space right-click context menu** — built with only real,
+  functional items: Mark as Read (a genuine new
+  `markSpaceAsRead` that persists via `read_receipts`, the same real
+  mechanism as marking one channel read — not a client-only flag),
+  Invite, Create Channel, Create Category, Server Settings, Copy
+  Server ID. **Deliberately left out** Mute Server, per-server
+  Notification Settings, Hide Muted Channels, Privacy Settings, Edit
+  Per-server Profile, and Create Event from your reference
+  screenshot — none of those have any backing functionality in this
+  app, and shipping them as menu items that do nothing would be
+  exactly the kind of fake, unenforced UI this whole project has
+  avoided everywhere else.
+- **Real create-channel modal** — replaced the `window.prompt` that
+  was there before (this is also what "make channel creation a bit
+  cooler" turns into now that it has somewhere real to live): type
+  picker (Text/Voice — voice channels are schema-ready, calling itself
+  is still B10), name, category picker.
+- Caught a second real gap while building the settings modal: **there
+  was no UPDATE policy on `spaces` at all** before this pass — an
+  `updateSpace()` call would have silently done nothing via RLS's
+  default deny. Added the policy; caught this by checking directly,
+  not by assuming an update would work.
+
+**Not done yet, still real, still ahead**: the members-list kick/ban
+buttons that the new permissions actually support aren't wired to UI
+yet (the permission check exists, the button doesn't); voice channels
+are schema-only until B10 builds actual calling.
+
+**Run migrations 022 and 023** for all of this to work.
