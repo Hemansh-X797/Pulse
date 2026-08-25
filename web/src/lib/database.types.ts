@@ -43,6 +43,7 @@ export interface Database {
           created_at: string;
           is_private: boolean;
           tags: string[];
+          description: string;
         };
         Insert: Partial<Database['public']['Tables']['spaces']['Row']> & { name: string; owner_id: string };
         Update: Partial<Database['public']['Tables']['spaces']['Row']>;
@@ -67,9 +68,38 @@ export interface Database {
           topic: string;
           position: number;
           created_at: string;
+          category_id: string | null;
+          kind: 'text' | 'voice';
         };
         Insert: Partial<Database['public']['Tables']['channels']['Row']> & { name?: string };
         Update: Partial<Database['public']['Tables']['channels']['Row']>;
+        Relationships: [];
+      };
+      space_roles: {
+        Row: {
+          id: string;
+          space_id: string;
+          name: string;
+          color: string;
+          permissions: Record<string, boolean>;
+          position: number;
+          is_default: boolean;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      space_member_roles: {
+        Row: { space_id: string; user_id: string; role_id: string; granted_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      space_categories: {
+        Row: { id: string; space_id: string; name: string; position: number; created_at: string };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       channel_members: {
@@ -288,6 +318,42 @@ export interface Database {
       };
       send_friend_request: {
         Args: { p_recipient_id: string };
+        Returns: string;
+      };
+      create_space_role: {
+        Args: { p_space_id: string; p_name: string; p_color?: string };
+        Returns: string;
+      };
+      update_space_role_permissions: {
+        Args: { p_role_id: string; p_permissions: Record<string, boolean> };
+        Returns: void;
+      };
+      delete_space_role: {
+        Args: { p_role_id: string };
+        Returns: void;
+      };
+      assign_space_role: {
+        Args: { p_space_id: string; p_target_user_id: string; p_role_id: string };
+        Returns: void;
+      };
+      unassign_space_role: {
+        Args: { p_space_id: string; p_target_user_id: string; p_role_id: string };
+        Returns: void;
+      };
+      space_member_has_permission: {
+        Args: { p_space_id: string; p_user_id: string; p_permission: string };
+        Returns: boolean;
+      };
+      create_space_category: {
+        Args: { p_space_id: string; p_name: string };
+        Returns: string;
+      };
+      reorder_space_channel: {
+        Args: { p_channel_id: string; p_new_position: number };
+        Returns: void;
+      };
+      create_space_channel: {
+        Args: { p_space_id: string; p_name: string; p_kind?: string; p_category_id?: string | null };
         Returns: string;
       };
     };
