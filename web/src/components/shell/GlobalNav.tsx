@@ -9,6 +9,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { listMySpaces, createSpace, joinSpaceByInvite } from '../../lib/api/spaces';
 import { CreateSpaceModal } from './CreateSpaceModal';
 import { SearchModal } from './SearchModal';
+import { SpaceContextMenu } from './SpaceContextMenu';
 
 function initials(name: string) {
   return name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
@@ -30,15 +31,17 @@ function RailItem({
   label,
   children,
   badge,
+  onContextMenu,
 }: {
   href: string;
   active: boolean;
   label: string;
   children: React.ReactNode;
   badge?: React.ReactNode;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   return (
-    <Link href={href} aria-label={label} className="group relative flex flex-1 items-center justify-center py-1 md:w-full md:flex-none">
+    <Link href={href} aria-label={label} onContextMenu={onContextMenu} className="group relative flex flex-1 items-center justify-center py-1 md:w-full md:flex-none">
       <span
         className={`absolute left-1/2 top-0 -translate-x-1/2 rounded-b-full bg-[image:var(--rail-indicator)] transition-all duration-200 md:left-0 md:top-1/2 md:-translate-x-0 md:-translate-y-1/2 md:rounded-r-full md:rounded-b-none ${
           active ? 'h-[3px] w-6 opacity-100 md:h-6 md:w-[3px]' : 'h-[3px] w-4 opacity-0 group-hover:opacity-70 md:h-2 md:w-[3px] md:group-hover:h-4'
@@ -65,6 +68,7 @@ export function GlobalNav() {
   const profile = useAppStore((s) => s.profile);
   const unreadChannels = useAppStore((s) => s.totalUnreadChannels());
   const [createOpen, setCreateOpen] = useState(false);
+  const [contextMenuSpaceId, setContextMenuSpaceId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -153,15 +157,38 @@ export function GlobalNav() {
         {spaces.map((space) => {
           const active = pathname.startsWith(`/spaces/${space.id}`);
           return (
-            <RailItem key={space.id} href={`/spaces/${space.id}`} active={active} label={space.name}>
-              <span
-                className="flex h-full w-full items-center justify-center rounded-2xl text-[13px] font-bold text-black presence-fill"
-                style={{ ['--p-a' as string]: space.accent_color_top, ['--p-b' as string]: space.accent_color_bottom }}
-                title={space.name}
+            <div key={space.id} className="relative w-full">
+              <RailItem
+                href={`/spaces/${space.id}`}
+                active={active}
+                label={space.name}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenuSpaceId(space.id);
+                }}
               >
-                {initials(space.name)}
-              </span>
-            </RailItem>
+                <span
+                  className="flex h-full w-full items-center justify-center rounded-2xl text-[13px] font-bold text-black presence-fill"
+                  style={{ ['--p-a' as string]: space.accent_color_top, ['--p-b' as string]: space.accent_color_bottom }}
+                  title={space.name}
+                >
+                  {initials(space.name)}
+                </span>
+              </RailItem>
+              {contextMenuSpaceId === space.id && (
+                <div className="absolute left-full top-0 z-30 ml-2" onMouseLeave={() => setContextMenuSpaceId(null)}>
+                  <SpaceContextMenu
+                    spaceId={space.id}
+                    inviteCode={space.invite_code}
+                    onClose={() => setContextMenuSpaceId(null)}
+                    onCreateChannel={() => {
+                      setContextMenuSpaceId(null);
+                      router.push(`/spaces/${space.id}`);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
