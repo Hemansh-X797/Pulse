@@ -230,6 +230,43 @@ export async function hasSpacePermission(spaceId: string, permission: string): P
   return !!data;
 }
 
+// ---------- kick / ban ----------
+export interface SpaceBan {
+  space_id: string;
+  user_id: string;
+  banned_by: string;
+  reason: string;
+  created_at: string;
+}
+
+export async function kickSpaceMember(spaceId: string, targetUserId: string): Promise<void> {
+  const { error } = await supabase.rpc('kick_space_member', { p_space_id: spaceId, p_target_user_id: targetUserId });
+  if (error) throw error;
+}
+
+export async function banSpaceMember(spaceId: string, targetUserId: string, reason?: string): Promise<void> {
+  const { error } = await supabase.rpc('ban_space_member', { p_space_id: spaceId, p_target_user_id: targetUserId, p_reason: reason ?? '' });
+  if (error) throw error;
+}
+
+export async function unbanSpaceMember(spaceId: string, targetUserId: string): Promise<void> {
+  const { error } = await supabase.rpc('unban_space_member', { p_space_id: spaceId, p_target_user_id: targetUserId });
+  if (error) throw error;
+}
+
+export async function listSpaceBans(spaceId: string): Promise<(SpaceBan & { username: string; display_name: string })[]> {
+  const { data, error } = await supabase
+    .from('space_bans')
+    .select('*, profiles:user_id(username, display_name)')
+    .eq('space_id', spaceId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => {
+    const p = row.profiles as unknown as { username: string; display_name: string } | null;
+    return { ...row, username: p?.username ?? '?', display_name: p?.display_name ?? '?' };
+  });
+}
+
 export async function joinSpaceByInvite(inviteCode: string): Promise<Space> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error('not authenticated');
