@@ -1,3 +1,4 @@
 private/
 .vscode/
 node_modules
+_tests_/

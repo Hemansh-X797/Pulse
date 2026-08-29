@@ -7,6 +7,7 @@ import { useUnreadCounts } from '../../src/hooks/useUnreadCounts';
 import { useUnreadBadge } from '../../src/hooks/useUnreadBadge';
 import { useMembershipSync } from '../../src/hooks/useMembershipSync';
 import { useNotificationSync } from '../../src/hooks/useNotificationSync';
+import { usePresenceSync } from '../../src/hooks/usePresenceSync';
 import { useAppStore } from '../../src/store/useAppStore';
 import { AppShell } from '../../src/components/shell/AppShell';
 
@@ -32,6 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useUnreadBadge(totalUnread);
   useMembershipSync(session);
   useNotificationSync(session);
+  usePresenceSync(session, useAppStore((s) => s.profile?.status));
 
   useEffect(() => {
     // useAuthSync sets session in the store; read it directly via
