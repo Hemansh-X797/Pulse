@@ -44,6 +44,44 @@ export async function listTopPosts(limit = 20): Promise<FeedItem[]> {
     .map((x) => x.post);
 }
 
+/** Simple, honest account suggestions for the feed sidebar's "For You"
+ * pill — accounts whose recent posts share a hashtag with your
+ * interests, excluding anyone you already follow or are friends with.
+ * Not a real recommendation model (that's meaningfully more work than
+ * this pass covers), just a starting point for discovery. */
+export async function getSuggestedAccounts(
+  interests: string[],
+  limit = 5
+): Promise<{ id: string; username: string; display_name: string; avatar_url: string; accent_color_top: string; accent_color_bottom: string }[]> {
+  if (interests.length === 0) return [];
+
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  const [postsRes, followingRes, friendsRes] = await Promise.all([
+    supabase.from('feed_view').select('author_id').overlaps('hashtags', interests).order('created_at', { ascending: false }).limit(100),
+    supabase.from('follows').select('followed_id').eq('follower_id', userData.user.id),
+    supabase.from('friends_view').select('friend_id').eq('user_id', userData.user.id),
+  ]);
+  if (postsRes.error) throw postsRes.error;
+
+  const excluded = new Set<string>([
+    userData.user.id,
+    ...(followingRes.data ?? []).map((r) => r.followed_id),
+    ...(friendsRes.data ?? []).map((r) => r.friend_id),
+  ]);
+
+  const candidateIds = Array.from(new Set((postsRes.data ?? []).map((p) => p.author_id))).filter((id) => !excluded.has(id));
+  if (candidateIds.length === 0) return [];
+
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, username, display_name, avatar_url, accent_color_top, accent_color_bottom')
+    .in('id', candidateIds.slice(0, limit * 3));
+  if (profilesError) throw profilesError;
+  return (profiles ?? []).slice(0, limit);
+}
+
 /** Hashtag search for Explore — matches the generated `hashtags` array
  * column (021_post_hashtags_and_explore.sql), case-insensitive since
  * that column is already lowercased at generation time. */
