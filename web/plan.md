@@ -1014,3 +1014,140 @@ yet (the permission check exists, the button doesn't); voice channels
 are schema-only until B10 builds actual calling.
 
 **Run migrations 022 and 023** for all of this to work.
+
+## Part B — kick/ban wired, build-tested
+
+Closed the exact gap named above. Migration `024_space_kick_ban.sql`:
+real `space_bans` table, `kick_space_member`/`ban_space_member`/
+`unban_space_member` RPCs — each checks the `kick_members`/
+`ban_members` permission server-side, the space owner can never be
+kicked or banned (checked in the function itself, not just hidden in
+the UI). Ban actually prevents rejoining: found that the existing
+"join via invite" INSERT policy on `space_members` only ever checked
+`user_id = auth.uid()`, no ban check at all — fixed that policy
+directly so a ban holds regardless of which join path someone uses
+(invite link, public-space join), not just the ones that happened to
+remember to check `space_bans` client-side.
+
+Members tab now has real Kick/Ban buttons (permission-gated, hidden
+entirely if you don't have the permission — not shown-then-disabled),
+plus a togglable banned-users list with Unban. All wired to the RPCs
+above, nothing client-only.
+
+**Run migration 024** for this to work.
+
+B11 is now substantially complete — roles, permissions, categories,
+reordering, real settings panel, kick/ban, no more `#` prefix. What's
+left there is voice channels' actual calling mechanics, which is B10's
+job specifically.
+
+Next: B10 (voice — the biggest remaining item, WebRTC signaling via
+Supabase Realtime + free-tier TURN, per the earlier agreed plan).
+
+## Part B — B10 done (build-tested; WebRTC itself needs your own live-network test)
+
+Real voice calls, not a stub. Migration `025_voice_calls.sql`: `calls`
++ `call_participants` tables, RLS scoped to channel members (reusing
+`is_channel_member`, no new recursion risk), and RPCs
+(`start_or_join_call`/`leave_call`/`set_call_muted`) — a call reuses
+whatever's already active in a channel rather than creating a second
+concurrent one if two people click "start" close together, and is
+capped at 6 participants server-side, enforced in the function itself.
+
+**Signaling**: `src/lib/webrtc.ts`'s `CallSession` class uses a
+Supabase Realtime *broadcast* channel (not `postgres_changes` — this
+traffic is high-frequency and never needs to be a DB row, same
+reasoning typing indicators already used) to exchange SDP offers/
+answers and ICE candidates. This is what makes it free — no separate
+signaling server, just the Realtime connection every client already
+has open, exactly the plan you approved.
+
+**STUN**: free public Google servers, no config. **TURN**: I can't
+fabricate real credentials for you — three new env vars
+(`NEXT_PUBLIC_TURN_URL`/`_USERNAME`/`_CREDENTIAL`) documented in
+`.env.local.example` with a link to a free-tier provider. Calls work
+without it for most direct-P2P-capable connections; the ~10-20% that
+need a relay won't connect until you add one.
+
+**Topology**: full mesh (every participant connects directly to every
+other), which is what makes this free — no SFU/media server. This is
+exactly the tradeoff we agreed on: fine for a small group, genuinely
+degrades past that, hence the 6-participant cap rather than pretending
+it scales further.
+
+**UI**: a phone icon in the chat header starts/joins a call on *any*
+channel — DMs and space voice channels both route through the same
+`ChatView` component already, so no separate "voice channel page" was
+needed. `CallBar` shows connection status, live participant avatars,
+mute toggle, leave button, and holds the actual `<audio>` elements for
+remote streams. Leaving a channel automatically ends your call
+participation.
+
+**Being completely honest about testing here**: everything above
+passed a real `next build` and clean `tsc --noEmit`, same discipline
+as every other pass — but this sandbox has no microphone, no real
+network, and no second browser to actually place a call between two
+peers. I cannot verify the actual WebRTC handshake connects and
+carries audio end-to-end the way I've verified everything else in this
+project. The code is structurally sound and follows the standard
+offer/answer/ICE pattern correctly, but **you need to be the one to
+test an actual live call** before trusting this is fully working —
+this is a different category of "tested" than everything else in this
+plan, and I don't want to blur that line.
+
+**Run migration 025**, then genuinely test a call between two real
+accounts before considering this done.
+
+## Video/screen-share, scoped out of this pass
+Not built. Voice-only was the explicit scope from when this was
+planned; adding video/screen-share is a real, separate follow-up if
+you want it, not a quiet gap.
+
+## Part B — B12, B15, B16 done, build-tested. Only B14 left.
+
+### B12: Chat bubble toggle
+New `useChatBubbles` hook, same localStorage pattern as compact mode.
+Off removes the bubble background/border/rounding entirely — direct
+text, matching your reference screenshot — and drops the 70%-width cap
+so text isn't artificially constrained to bubble width anymore.
+Deliberately left the avatar-side/alignment logic untouched (left
+`isMine` still controls layout side) since the hover toolbar's
+positioning depends on it and restructuring that risked breaking
+something working for a purely cosmetic toggle. Every feature —
+reactions, reply, edit, markdown, link previews — works identically
+either way; only the container styling changes. Toggle lives in
+Settings → Appearance.
+
+### B15: Date of birth + theme picker in onboarding
+Migration `026_date_of_birth.sql` — checked the profiles UPDATE policy
+actually exists before assuming it (it does, unlike the `spaces` gap
+found earlier). New onboarding step asks for DOB with real validation
+against a computed age, enforcing the same 13+ minimum already stated
+in `/terms` — kept the two consistent rather than picking a different
+number in each place. A theme step was added too, using the two
+themes that actually exist (Bespoke/Classic) — the two *additional*
+new looks from earlier in this conversation still need your visual
+direction before I can build real tokens for them, so onboarding picks
+from what's real today, not from placeholders for themes that don't
+exist yet.
+
+### B16: Feed suggestions
+Found the "For You" pill in the feed sidebar had existed as pure
+decoration — it rendered but did nothing. Built a real, honestly-scoped
+version: a new "Suggested for you" list of accounts whose recent posts
+share a hashtag with your interests, excluding anyone you already
+follow or are friends with. This is explicitly not a real
+recommendation model — said so directly in the code — just a genuine
+starting point for discovery built from data that already exists
+(interests, hashtags, follows, friends), not a fabricated "AI-powered"
+claim for something this simple.
+
+**Run migration 026** for the DOB field to work.
+
+---
+**Only B14 (two more UI themes) remains from the entire Part B list**,
+and it's blocked on you, not on more building — I need your visual
+direction for what those two looks actually are before I can design
+real tokens for them, the same way Bespoke needed your HTML demos.
+Every other item across both Part A and Part B is done and
+build-tested.
