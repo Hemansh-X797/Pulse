@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Camera } from 'lucide-react';
+import { Check, Camera, Sparkles } from 'lucide-react';
 import { updateProfile, getMyProfile } from '../lib/api/profile';
 import { uploadMedia, MediaUploadError } from '../lib/api/media';
 import { listPublicSpaces, joinPublicSpace } from '../lib/api/spaces';
 import { useAppStore } from '../store/useAppStore';
+import { setTheme, type ThemeName } from '../hooks/useTheme';
 import type { Profile, Space } from '../lib/database.types';
 
 const INTEREST_OPTIONS = [
@@ -18,8 +19,11 @@ export function Onboarding() {
   const setStoreProfile = useAppStore((s) => s.setProfile);
   const session = useAppStore((s) => s.session);
 
-  const [step, setStep] = useState<'interests' | 'avatar' | 'spaces' | 'loading'>('loading');
+  const [step, setStep] = useState<'dob' | 'interests' | 'avatar' | 'theme' | 'spaces' | 'loading'>('loading');
   const [profile, setProfileState] = useState<Profile | null>(null);
+  const [dob, setDob] = useState('');
+  const [dobError, setDobError] = useState<string | null>(null);
+  const [selectedTheme, setSelectedTheme] = useState<ThemeName>('bespoke');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -40,7 +44,7 @@ export function Onboarding() {
         }
         setProfileState(p);
         setAvatarUrl(p.avatar_url);
-        setStep('interests');
+        setStep('dob');
       })
       .catch(() => router.replace('/login'));
     return () => {
@@ -50,6 +54,34 @@ export function Onboarding() {
 
   function toggleInterest(tag: string) {
     setSelectedInterests((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
+
+  async function handleDobSubmit() {
+    setDobError(null);
+    if (!dob) {
+      setDobError('Enter your date of birth.');
+      return;
+    }
+    const birthDate = new Date(dob);
+    if (Number.isNaN(birthDate.getTime()) || birthDate > new Date()) {
+      setDobError('That date doesn\u2019t look right.');
+      return;
+    }
+    const ageMs = Date.now() - birthDate.getTime();
+    const age = ageMs / (365.25 * 24 * 60 * 60 * 1000);
+    // Matches the minimum age already stated in /terms — keeping the
+    // two consistent rather than enforcing one number in the legal
+    // page and a different one here.
+    if (age < 13) {
+      setDobError('You must be at least 13 years old to use PalSpace.');
+      return;
+    }
+    try {
+      await updateProfile({ date_of_birth: dob });
+      setStep('interests');
+    } catch (e) {
+      setDobError(e instanceof Error ? e.message : 'Could not save — try again.');
+    }
   }
 
   async function handleAvatarUpload(file: File) {
@@ -65,13 +97,23 @@ export function Onboarding() {
     }
   }
 
-  async function goToSpacesStep() {
+  async function goToThemeStep() {
     setError(null);
     try {
       if (avatarUrl && avatarUrl !== profile?.avatar_url) {
         await updateProfile({ avatar_url: avatarUrl });
       }
       await updateProfile({ interests: selectedInterests });
+      setStep('theme');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong.');
+    }
+  }
+
+  async function goToSpacesStep() {
+    setError(null);
+    try {
+      setTheme(selectedTheme);
       const spaces = await listPublicSpaces(selectedInterests);
       setSuggestedSpaces(spaces.slice(0, 9));
       setStep('spaces');
@@ -110,11 +152,11 @@ export function Onboarding() {
     <div className="flex h-screen w-full items-center justify-center bg-[var(--color-void)] p-4">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center gap-1.5">
-          {(['interests', 'avatar', 'spaces'] as const).map((s) => (
+          {(['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).map((s) => (
             <div
               key={s}
               className={`h-1 flex-1 rounded-full transition-colors ${
-                (['interests', 'avatar', 'spaces'] as const).indexOf(step) >= (['interests', 'avatar', 'spaces'] as const).indexOf(s)
+                (['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).indexOf(step as never) >= (['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).indexOf(s)
                   ? 'presence-fill'
                   : 'bg-[var(--color-hairline)]'
               }`}
@@ -124,6 +166,26 @@ export function Onboarding() {
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">{error}</div>
+        )}
+
+        {step === 'dob' && (
+          <>
+            <h1 className="mb-1 font-serif text-2xl font-semibold">When&apos;s your birthday?</h1>
+            <p className="mb-5 text-[13px] text-[var(--color-ink-muted)]">Never shown to other users — just used to confirm you meet the minimum age.</p>
+            {dobError && (
+              <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">{dobError}</div>
+            )}
+            <input
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+              className="mb-6 w-full rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-3 py-2.5 text-[14px] outline-none focus:border-[var(--presence-default-a)]"
+            />
+            <button onClick={handleDobSubmit} className="w-full rounded-lg presence-fill py-2.5 text-[13.5px] font-semibold text-black">
+              Continue
+            </button>
+          </>
         )}
 
         {step === 'interests' && (
@@ -190,7 +252,40 @@ export function Onboarding() {
               </label>
             </div>
 
-            <button onClick={goToSpacesStep} className="w-full rounded-lg presence-fill py-2.5 text-[13.5px] font-semibold text-black">
+            <button onClick={goToThemeStep} className="w-full rounded-lg presence-fill py-2.5 text-[13.5px] font-semibold text-black">
+              Continue
+            </button>
+          </>
+        )}
+
+        {step === 'theme' && (
+          <>
+            <h1 className="mb-1 font-serif text-2xl font-semibold">Pick a look</h1>
+            <p className="mb-5 text-[13px] text-[var(--color-ink-muted)]">You can change this anytime in Settings → Appearance.</p>
+            <div className="mb-6 grid grid-cols-2 gap-2.5">
+              {(['bespoke', 'classic'] as ThemeName[]).map((name) => (
+                <button
+                  key={name}
+                  onClick={() => setSelectedTheme(name)}
+                  className={`rounded-lg border p-3 text-left transition-colors ${
+                    selectedTheme === name ? 'border-[var(--presence-default-a)] bg-[var(--presence-default-a)]/10' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
+                  }`}
+                >
+                  <div className="mb-1.5 flex gap-1">
+                    <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${name === 'bespoke' ? '' : 'rounded-full'}`} style={{ background: name === 'bespoke' ? '#0a0a0a' : '#1a1a22' }} />
+                    <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${name === 'bespoke' ? '' : 'rounded-full'}`} style={{ background: name === 'bespoke' ? '#161616' : '#212129' }} />
+                  </div>
+                  <div className="flex items-center gap-1 text-[13px] font-medium capitalize">
+                    {name}
+                    {name === 'bespoke' && <Sparkles size={11} className="text-[var(--presence-default-a)]" />}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={goToSpacesStep}
+              className="w-full rounded-lg presence-fill py-2.5 text-[13.5px] font-semibold text-black"
+            >
               Continue
             </button>
           </>
