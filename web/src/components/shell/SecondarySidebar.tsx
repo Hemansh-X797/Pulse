@@ -13,6 +13,7 @@ import {
   hasSpacePermission,
 } from '../../lib/api/spaces';
 import { listMyDMs } from '../../lib/api/channels';
+import { getSuggestedAccounts } from '../../lib/api/feed';
 import { useAppStore } from '../../store/useAppStore';
 import { NotificationsPanel } from './NotificationsPanel';
 import { StatusDot } from '../StatusDot';
@@ -300,13 +301,56 @@ function DmList() {
   );
 }
 
+/**
+ * "For You" filter is real now — the pill has always existed but did
+ * nothing before this. Since a real personalized ranking model is a
+ * much bigger project than this pass, this is an honest, simple
+ * version: accounts whose recent posts share a hashtag with your
+ * interests, that you don't already follow or friend — a starting
+ * point for discovery, not a full recommendation engine.
+ */
 function FeedFilters() {
+  const profile = useAppStore((s) => s.profile);
+  const { data: suggestions = [] } = useQuery({
+    queryKey: ['feed-suggestions', profile?.id],
+    queryFn: () => (profile ? getSuggestedAccounts(profile.interests) : Promise.resolve([])),
+    enabled: !!profile,
+  });
+
   return (
     <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
       <SidebarHeader title="PalSpace" />
-      <div className="px-3.5">
+      <div className="flex-1 overflow-y-auto px-3.5">
         <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">Feed</div>
         <div className="rounded-xl bg-[var(--color-surface-raised)] px-3 py-2.5 text-[13.5px] font-medium text-[var(--color-ink)]">For You</div>
+
+        {suggestions.length > 0 && (
+          <>
+            <div className="px-2.5 pb-2 pt-5 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
+              Suggested for you
+            </div>
+            <div className="space-y-0.5 pb-4">
+              {suggestions.map((s) => (
+                <Link
+                  key={s.id}
+                  href={`/${s.username}`}
+                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-[var(--color-surface-raised)]/60"
+                >
+                  <div
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-black presence-fill"
+                    style={{ ['--p-a' as string]: s.accent_color_top, ['--p-b' as string]: s.accent_color_bottom }}
+                  >
+                    {s.avatar_url ? <img src={s.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : s.display_name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[12.5px] font-medium">{s.display_name}</div>
+                    <div className="truncate text-[10.5px] text-[var(--color-ink-faint)]">@{s.username}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
