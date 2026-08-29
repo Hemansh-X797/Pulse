@@ -202,3 +202,19 @@ export function subscribeToMySpaceMemberships(userId: string, onInsert: () => vo
     )
     .subscribe();
 }
+
+/**
+ * Generic ANY-event subscription to one table, optionally filtered —
+ * used where a caller just needs "something changed, go refetch"
+ * rather than a specific typed payload (e.g. useCall.ts's live
+ * participant list). Named distinctly from the more specific
+ * subscribeTo* functions above so it's clear this is the general-
+ * purpose escape hatch, not the preferred pattern for new code that
+ * knows its exact shape.
+ */
+export function subscribeToTable(table: string, filter: string, onChange: () => void): RealtimeChannel {
+  return supabase
+    .channel(`table:${table}:${filter}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table, filter }, () => onChange())
+    .subscribe();
+}
