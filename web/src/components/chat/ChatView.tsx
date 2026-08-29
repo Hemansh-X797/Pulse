@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft, MoreHorizontal, Copy, Forward as ForwardIcon } from 'lucide-react';
+import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft, MoreHorizontal, Copy, Forward as ForwardIcon, Phone } from 'lucide-react';
 import {
   listMessages,
   sendMessage,
@@ -26,9 +26,12 @@ import { uploadMedia } from '../../lib/api/media';
 import { renderMarkdown } from '../../lib/markdown';
 import { extractFirstUrl, LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { useCompactMode } from '../../hooks/useCompactMode';
+import { useChatBubbles } from '../../hooks/useChatBubbles';
 import { EmojiPicker } from './EmojiPicker';
 import { GifPicker } from './GifPicker';
 import { ProfilePopover } from '../profile/ProfilePopover';
+import { useCall } from '../../hooks/useCall';
+import { CallBar } from '../CallBar';
 import { NameStyle, type NameStyleData } from '../NameStyle';
 import {
   subscribeToChannelMessages,
@@ -63,6 +66,18 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const setUnreadByChannel = useAppStore((s) => s.setUnreadByChannel);
   const unreadByChannel = useAppStore((s) => s.unreadByChannel);
   const compactMode = useCompactMode();
+  const chatBubbles = useChatBubbles();
+  const call = useCall(channelId);
+
+  // Leave any active call when navigating away from this channel
+  // entirely (not on every re-render — channelId only, matching
+  // markRead's own channelId-scoped effect elsewhere in this file).
+  useEffect(() => {
+    return () => {
+      if (call.status !== 'idle') call.leave();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelId]);
 
   // Tell useUnreadCounts "I'm looking at this channel right now" so its
   // global subscription stops incrementing this one, and clear whatever
@@ -484,11 +499,23 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
             📌 {pinnedList.length}
           </button>
         )}
+        {call.status === 'idle' && (
+          <button
+            onClick={call.join}
+            className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
+            aria-label="Start voice call"
+            title="Start voice call"
+          >
+            <Phone size={16} />
+          </button>
+        )}
         <span
-          className={`ml-auto h-1.5 w-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400' : 'bg-[var(--color-ink-faint)]'}`}
+          className={`${call.status === 'idle' ? '' : 'ml-auto'} h-1.5 w-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400' : 'bg-[var(--color-ink-faint)]'}`}
           title={connectionStatus}
         />
       </div>
+
+      <CallBar call={call} label={`Voice — ${channelLabel}`} />
 
       {pinsBarOpen && pinnedList.length > 0 && (
         <div className="max-h-32 overflow-y-auto border-b border-[var(--color-hairline)] bg-[var(--color-surface)] px-4 py-2 md:px-7">
@@ -523,6 +550,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
               isEditing={editingId === m.id}
               replySnippet={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : undefined}
               compact={compactMode}
+              bubbles={chatBubbles}
               onReply={() => setReplyTarget(m)}
               onEdit={() => startEdit(m)}
               onSaveEdit={(body) => saveEdit(m.id, body)}
@@ -695,6 +723,7 @@ function MessageRow({
   isEditing,
   replySnippet,
   compact,
+  bubbles,
   onReply,
   onEdit,
   onSaveEdit,
@@ -713,6 +742,7 @@ function MessageRow({
   isEditing: boolean;
   replySnippet?: DisplayMessage;
   compact: boolean;
+  bubbles: boolean;
   onReply: () => void;
   onEdit: () => void;
   onSaveEdit: (body: string) => void;
@@ -765,7 +795,7 @@ function MessageRow({
         </button>
       )}
       {compact && <div className="w-[30px] shrink-0" />}
-      <div className={`relative flex max-w-[70%] flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+      <div className={`relative flex flex-col ${bubbles ? 'max-w-[70%]' : 'max-w-full flex-1'} ${isMine ? 'items-end' : 'items-start'}`}>
         <div ref={popoverAnchorRef} className={`mb-0.5 flex items-baseline gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
           <button onClick={() => setPopoverOpen((v) => !v)} className="text-[12.5px] font-semibold hover:opacity-80">
             <NameStyle name={message.sender_display_name} style={message.sender_name_style as NameStyleData} />
@@ -811,11 +841,15 @@ function MessageRow({
             )}
             {message.body_rendered && (
               <div
-                className={`bubble-shape rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                  isMine
-                    ? 'rounded-br-md presence-fill font-medium text-black'
-                    : 'rounded-bl-md border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink)]'
-                }`}
+                className={
+                  bubbles
+                    ? `bubble-shape rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                        isMine
+                          ? 'rounded-br-md presence-fill font-medium text-black'
+                          : 'rounded-bl-md border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink)]'
+                      }`
+                    : 'text-sm leading-relaxed text-[var(--color-ink)]'
+                }
               >
                 {renderMarkdown(message.body_rendered)}
               </div>
