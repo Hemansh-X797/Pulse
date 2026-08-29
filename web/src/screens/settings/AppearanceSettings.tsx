@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { getCompactModeSync, setCompactMode } from '../../hooks/useCompactMode';
+import { getChatBubblesSync, setChatBubbles } from '../../hooks/useChatBubbles';
 import { getThemeSync, setTheme, type ThemeName } from '../../hooks/useTheme';
 
 const STORAGE_KEY = 'palspace-reduced-motion';
@@ -22,6 +23,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 export function AppearanceSettings() {
   const [reducedMotion, setReducedMotion] = useState(false);
   const [compact, setCompact] = useState(false);
+  const [bubbles, setBubbles] = useState(true);
   const [themeName, setThemeName] = useState<ThemeName>('bespoke');
 
   // Reads/writes a plain in-memory + localStorage flag, not a data-*
@@ -34,6 +36,7 @@ export function AppearanceSettings() {
   useEffect(() => {
     setReducedMotion(localStorage.getItem(STORAGE_KEY) === 'true');
     setCompact(getCompactModeSync());
+    setBubbles(getChatBubblesSync());
     setThemeName(getThemeSync());
   }, []);
 
@@ -89,6 +92,20 @@ export function AppearanceSettings() {
             <div className="text-[11.5px] text-[var(--color-ink-faint)]">Tighter message spacing, no avatars per line.</div>
           </div>
           <Toggle on={compact} onClick={toggleCompact} />
+        </div>
+        <div className="mt-3 flex items-center justify-between border-t border-[var(--color-hairline)] pt-3">
+          <div>
+            <div className="text-[13.5px] font-medium">Chat bubbles</div>
+            <div className="text-[11.5px] text-[var(--color-ink-faint)]">Off shows direct text with no bubble background — everything still works the same either way.</div>
+          </div>
+          <Toggle
+            on={bubbles}
+            onClick={() => {
+              const next = !bubbles;
+              setBubbles(next);
+              setChatBubbles(next);
+            }}
+          />
         </div>
       </section>
 
