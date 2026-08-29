@@ -26,6 +26,7 @@ export interface Database {
           status: 'online' | 'dnd' | 'invisible';
           name_style: { font?: string; effect?: string; colors?: string[] } | null;
           equipped_nameplate: string | null;
+          date_of_birth: string | null;
         };
         Insert: Partial<Database['public']['Tables']['profiles']['Row']> & { id: string; username: string; display_name: string };
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
@@ -98,6 +99,24 @@ export interface Database {
       };
       space_categories: {
         Row: { id: string; space_id: string; name: string; position: number; created_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      space_bans: {
+        Row: { space_id: string; user_id: string; banned_by: string; reason: string; created_at: string };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      calls: {
+        Row: { id: string; channel_id: string; started_by: string; started_at: string; ended_at: string | null };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      call_participants: {
+        Row: { call_id: string; user_id: string; joined_at: string; left_at: string | null; muted: boolean };
         Insert: never;
         Update: never;
         Relationships: [];
@@ -355,6 +374,30 @@ export interface Database {
       create_space_channel: {
         Args: { p_space_id: string; p_name: string; p_kind?: string; p_category_id?: string | null };
         Returns: string;
+      };
+      kick_space_member: {
+        Args: { p_space_id: string; p_target_user_id: string };
+        Returns: void;
+      };
+      ban_space_member: {
+        Args: { p_space_id: string; p_target_user_id: string; p_reason?: string };
+        Returns: void;
+      };
+      unban_space_member: {
+        Args: { p_space_id: string; p_target_user_id: string };
+        Returns: void;
+      };
+      start_or_join_call: {
+        Args: { p_channel_id: string };
+        Returns: string;
+      };
+      leave_call: {
+        Args: { p_call_id: string };
+        Returns: void;
+      };
+      set_call_muted: {
+        Args: { p_call_id: string; p_muted: boolean };
+        Returns: void;
       };
     };
   };
