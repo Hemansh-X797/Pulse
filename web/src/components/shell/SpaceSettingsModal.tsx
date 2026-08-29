@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Copy, Check, Trash2, Plus } from 'lucide-react';
+import { X, Copy, Check, Trash2, Plus, UserX, Ban } from 'lucide-react';
 import {
   getSpace,
   updateSpace,
@@ -15,6 +15,10 @@ import {
   unassignSpaceRole,
   listSpaceMembers,
   hasSpacePermission,
+  kickSpaceMember,
+  banSpaceMember,
+  unbanSpaceMember,
+  listSpaceBans,
   type SpaceRolePermissions,
 } from '../../lib/api/spaces';
 import { useAppStore } from '../../store/useAppStore';
@@ -82,7 +86,7 @@ export function SpaceSettingsModal({ spaceId, onClose }: { spaceId: string; onCl
 
           {tab === 'overview' && space && <OverviewTab spaceId={spaceId} space={space} canEdit={isOwner} />}
           {tab === 'roles' && <RolesTab spaceId={spaceId} canManage={canManageRoles} />}
-          {tab === 'members' && <MembersTab spaceId={spaceId} canManageRoles={canManageRoles} />}
+          {tab === 'members' && space && <MembersTab spaceId={spaceId} canManageRoles={canManageRoles} spaceOwnerId={space.owner_id} />}
           {tab === 'invites' && space && <InvitesTab space={space} />}
         </div>
       </div>
@@ -272,11 +276,16 @@ function RolesTab({ spaceId, canManage }: { spaceId: string; canManage: boolean 
   );
 }
 
-function MembersTab({ spaceId, canManageRoles }: { spaceId: string; canManageRoles: boolean }) {
+function MembersTab({ spaceId, canManageRoles, spaceOwnerId }: { spaceId: string; canManageRoles: boolean; spaceOwnerId: string }) {
   const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const [showBans, setShowBans] = useState(false);
   const { data: members = [] } = useQuery({ queryKey: ['space-members', spaceId], queryFn: () => listSpaceMembers(spaceId) });
   const { data: roles = [] } = useQuery({ queryKey: ['space-roles', spaceId], queryFn: () => listSpaceRoles(spaceId) });
   const { data: assignments = [] } = useQuery({ queryKey: ['space-role-assignments', spaceId], queryFn: () => listMemberRoleAssignments(spaceId) });
+  const { data: canKick = false } = useQuery({ queryKey: ['space-permission', spaceId, 'kick_members'], queryFn: () => hasSpacePermission(spaceId, 'kick_members') });
+  const { data: canBan = false } = useQuery({ queryKey: ['space-permission', spaceId, 'ban_members'], queryFn: () => hasSpacePermission(spaceId, 'ban_members') });
+  const { data: bans = [] } = useQuery({ queryKey: ['space-bans', spaceId], queryFn: () => listSpaceBans(spaceId), enabled: showBans && canBan });
 
   const assignMutation = useMutation({
     mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) => assignSpaceRole(spaceId, userId, roleId),
@@ -286,14 +295,59 @@ function MembersTab({ spaceId, canManageRoles }: { spaceId: string; canManageRol
     mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) => unassignSpaceRole(spaceId, userId, roleId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['space-role-assignments', spaceId] }),
   });
+  const kickMutation = useMutation({
+    mutationFn: (userId: string) => kickSpaceMember(spaceId, userId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['space-members', spaceId] }),
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not kick member.'),
+  });
+  const banMutation = useMutation({
+    mutationFn: (userId: string) => banSpaceMember(spaceId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['space-members', spaceId] });
+      queryClient.invalidateQueries({ queryKey: ['space-bans', spaceId] });
+    },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not ban member.'),
+  });
+  const unbanMutation = useMutation({
+    mutationFn: (userId: string) => unbanSpaceMember(spaceId, userId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['space-bans', spaceId] }),
+  });
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold">Members — {members.length}</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Members — {members.length}</h2>
+        {canBan && (
+          <button onClick={() => setShowBans((v) => !v)} className="flex items-center gap-1.5 text-[11.5px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+            <Ban size={12} /> {showBans ? 'Hide' : 'Show'} banned users
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">{error}</div>
+      )}
+
+      {showBans && canBan && (
+        <div className="mb-4 rounded-lg border border-[var(--color-hairline)] p-3">
+          <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">Banned</div>
+          {bans.length === 0 && <p className="text-[12px] text-[var(--color-ink-faint)]">No one is banned.</p>}
+          {bans.map((b) => (
+            <div key={b.user_id} className="flex items-center justify-between py-1.5">
+              <span className="text-[12.5px]">{b.display_name}</span>
+              <button onClick={() => unbanMutation.mutate(b.user_id)} className="text-[11px] font-medium text-[var(--presence-default-a)]">
+                Unban
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-1">
         {members.map((m) => {
           const memberProfile = m.profiles as unknown as { username: string; display_name: string; avatar_url: string } | null;
           const memberRoleIds = assignments.filter((a) => a.user_id === m.user_id).map((a) => a.role_id);
+          const isOwnerRow = m.user_id === spaceOwnerId;
           return (
             <div key={m.user_id} className="flex items-center gap-3 border-b border-[var(--color-hairline)] py-2.5 last:border-0">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-surface-raised)] text-[11px] font-bold">
@@ -304,7 +358,10 @@ function MembersTab({ spaceId, canManageRoles }: { spaceId: string; canManageRol
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-medium">{memberProfile?.display_name ?? m.user_id}</div>
+                <div className="flex items-center gap-1.5 truncate text-[13px] font-medium">
+                  {memberProfile?.display_name ?? m.user_id}
+                  {isOwnerRow && <span className="text-[9px] uppercase text-[var(--color-ink-faint)]">Owner</span>}
+                </div>
                 <div className="flex flex-wrap gap-1">
                   {roles
                     .filter((r) => memberRoleIds.includes(r.id))
@@ -344,6 +401,30 @@ function MembersTab({ spaceId, canManageRoles }: { spaceId: string; canManageRol
                       </option>
                     ))}
                 </select>
+              )}
+              {!isOwnerRow && (canKick || canBan) && (
+                <div className="flex gap-1">
+                  {canKick && (
+                    <button
+                      onClick={() => window.confirm(`Kick ${memberProfile?.display_name}?`) && kickMutation.mutate(m.user_id)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
+                      title="Kick"
+                      aria-label={`Kick ${memberProfile?.display_name}`}
+                    >
+                      <UserX size={13} />
+                    </button>
+                  )}
+                  {canBan && (
+                    <button
+                      onClick={() => window.confirm(`Ban ${memberProfile?.display_name}? They won't be able to rejoin.`) && banMutation.mutate(m.user_id)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-red-500/10 hover:text-red-400"
+                      title="Ban"
+                      aria-label={`Ban ${memberProfile?.display_name}`}
+                    >
+                      <Ban size={13} />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           );
