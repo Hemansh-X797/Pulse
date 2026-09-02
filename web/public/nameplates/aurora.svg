@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120" width="340" height="120">
+  <defs>
+    <linearGradient id="auroraA" x1="0%" y1="100%" x2="40%" y2="0%">
+      <stop offset="0%" stop-color="#39ffb0" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#39ffb0" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="auroraB" x1="20%" y1="100%" x2="70%" y2="0%">
+      <stop offset="0%" stop-color="#8a5bff" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#8a5bff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="auroraC" x1="50%" y1="100%" x2="100%" y2="10%">
+      <stop offset="0%" stop-color="#39c6ff" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#39c6ff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M0,120 L0,60 C60,20 100,80 160,45 C210,18 260,70 340,30 L340,120 Z" fill="url(#auroraA)"/>
+  <path d="M0,120 L0,80 C70,50 130,100 190,65 C240,38 290,85 340,55 L340,120 Z" fill="url(#auroraB)"/>
+  <path d="M0,120 L0,100 C90,80 150,115 220,90 C270,72 300,105 340,85 L340,120 Z" fill="url(#auroraC)"/>
+</svg>
