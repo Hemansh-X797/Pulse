@@ -175,6 +175,73 @@ html[data-theme='bespoke'] .bespoke-corner::after {
   height: 12px;
 }
 
+/*
+  SUNROOM — warm/light theme. The soft opposite of Bespoke: cream paper
+  surfaces, terracotta accent, no corner-flattening (keeps the app's
+  normal rounded shapes, same as Classic) — this theme's identity is
+  entirely about warmth and light, not shape.
+*/
+html[data-theme='sunroom'] {
+  --color-void: #f7f1e6;
+  --color-surface: #fdfaf3;
+  --color-surface-raised: #f0e6d2;
+  --color-surface-overlay: #e8dcc4;
+  --color-hairline: rgba(58, 47, 31, 0.12);
+  --color-hairline-strong: rgba(58, 47, 31, 0.22);
+  --color-ink: #3a2f1f;
+  --color-ink-muted: #6b5c42;
+  --color-ink-faint: #a1926f;
+  --presence-default-a: #c96f4a;
+  --presence-default-b: #e0a458;
+}
+/* Buttons/pills that assume a black-on-white "presence-fill" surface
+   (e.g. the Publish/Send buttons, which hardcode text-black expecting a
+   light fill) need dark text swapped to work against Sunroom's already-
+   light, warm-toned fill instead of fighting it — scoped narrowly to
+   avoid touching every presence-fill usage's meaning elsewhere. */
+html[data-theme='sunroom'] .presence-fill {
+  color: #fdfaf3;
+}
+
+/*
+  SIGNAL — dark terminal theme. All-monospace type, green-on-black,
+  sharp corners everywhere (same flattening mechanism as Bespoke, reused
+  rather than duplicated, since the ask was literally "sharp corners
+  everywhere" — Bespoke's own exemption list for round avatars/composer/
+  bubbles still applies, since a terminal aesthetic doesn't need square
+  avatars to read as itself).
+*/
+html[data-theme='signal'] {
+  --color-void: #050806;
+  --color-surface: #0a0f0b;
+  --color-surface-raised: #0d1a10;
+  --color-surface-overlay: #122415;
+  --color-hairline: #1f3d26;
+  --color-hairline-strong: #2c5536;
+  --color-ink: #c9ffd6;
+  --color-ink-muted: #4fae64;
+  --color-ink-faint: #2c6b3a;
+  --presence-default-a: #3ddc63;
+  --presence-default-b: #8ff0a4;
+  --font-sans: var(--font-mono);
+  --font-serif: var(--font-mono);
+}
+html[data-theme='signal'] :focus-visible {
+  border-radius: 2px;
+}
+html[data-theme='signal']
+  :is(.rounded-sm, .rounded, .rounded-md, .rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl):not(
+    .rounded-full,
+    .pill-shape,
+    .composer-round,
+    .bubble-shape
+  ) {
+  border-radius: 2px;
+}
+html[data-theme='signal'] .presence-fill {
+  color: #050806;
+}
+
 /* Bespoke's editorial touch: timestamps read as mono/tracked-wide
    micro-labels app-wide (feed timestamps, message timestamps, "edited"
    tags) — a CSS-only rule targeting a shared marker class rather than
@@ -189,8 +256,11 @@ html[data-theme='bespoke'] .bespoke-timestamp {
 }
 /* Fonts */
 .name-font-serif { font-family: var(--font-serif); }
-.name-font-gothic { font-family: 'UnifrakturMaguntia', var(--font-serif); letter-spacing: 0.5px; }
-.name-font-pixel { font-family: '"Press Start 2P"', var(--font-mono); letter-spacing: -0.5px; }
+.name-font-gothic { font-family: var(--font-gothic), var(--font-serif); letter-spacing: 0.5px; }
+.name-font-pixel { font-family: var(--font-pixel), var(--font-mono); letter-spacing: -0.5px; }
+.name-font-orbitron { font-family: var(--font-orbitron), var(--font-sans); letter-spacing: 0.5px; }
+.name-font-bungee { font-family: var(--font-bungee), var(--font-sans); }
+.name-font-marker { font-family: var(--font-marker), var(--font-serif); letter-spacing: 0.5px; }
 
 /* Effects — each reads its colors from --name-c1 / --name-c2 (and
    --name-c3..7 for Prism), set inline per-profile from the person's
@@ -247,3 +317,115 @@ html[data-theme='bespoke'] .bespoke-timestamp {
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5), 0 2px 2px rgba(0, 0, 0, 0.35);
   -webkit-text-stroke: 0.4px rgba(255, 255, 255, 0.25);
 }
+
+/* Chrome: brushed-metal look — a light-to-dark-to-light gradient sweep
+   across the text using the two saved colors as the metal's tint. */
+.name-effect-chrome {
+  background: linear-gradient(
+    180deg,
+    #fff 0%,
+    var(--name-c1, #b8b8b8) 35%,
+    var(--name-c2, #6b6b6b) 55%,
+    #fff 75%,
+    var(--name-c1, #b8b8b8) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
+}
+
+/* Fire: warm gradient base plus a flickering glow, distinct from Neon
+   (which is a static two-tone glow) by actually animating intensity. */
+.name-effect-fire {
+  background: linear-gradient(180deg, var(--name-c1, #ffd23f) 0%, var(--name-c2, #ff2a2a) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 6px var(--name-c2, #ff2a2a));
+  animation: name-fire-flicker 1.6s ease-in-out infinite;
+}
+@keyframes name-fire-flicker {
+  0%, 100% { filter: drop-shadow(0 0 5px var(--name-c2, #ff2a2a)) drop-shadow(0 0 1px var(--name-c1, #ffd23f)); }
+  50% { filter: drop-shadow(0 0 10px var(--name-c2, #ff2a2a)) drop-shadow(0 0 3px var(--name-c1, #ffd23f)); }
+}
+
+/* Ice: cool gradient with a crisp, un-animated frosty glow — the calm
+   counterpart to Fire, same 2-color mechanic. */
+.name-effect-ice {
+  background: linear-gradient(180deg, var(--name-c1, #d6faff) 0%, var(--name-c2, #2ab7ff) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 5px var(--name-c2, #2ab7ff));
+}
+
+/* Glitch: base color plus two mis-registered RGB-split copies that
+   snap to new offsets on a stepped timer — the "corrupted signal"
+   look, using the two saved colors as the two split channels. */
+.name-effect-glitch {
+  position: relative;
+  display: inline-block;
+  color: var(--name-c1, #fff);
+}
+.name-effect-glitch::before,
+.name-effect-glitch::after {
+  content: attr(data-glitch-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  overflow: hidden;
+}
+.name-effect-glitch::before {
+  color: var(--name-c1, #ff2a6d);
+  clip-path: inset(0 0 55% 0);
+  animation: name-glitch-a 2.4s infinite steps(1, end);
+}
+.name-effect-glitch::after {
+  color: var(--name-c2, #05d9e8);
+  clip-path: inset(55% 0 0 0);
+  animation: name-glitch-b 2.4s infinite steps(1, end);
+}
+@keyframes name-glitch-a {
+  0%, 92%, 100% { transform: translate(0, 0); }
+  93% { transform: translate(-2px, -1px); }
+  95% { transform: translate(2px, 1px); }
+  97% { transform: translate(-1px, 1px); }
+}
+@keyframes name-glitch-b {
+  0%, 92%, 100% { transform: translate(0, 0); }
+  94% { transform: translate(2px, -1px); }
+  96% { transform: translate(-2px, 1px); }
+  98% { transform: translate(1px, -1px); }
+}
+
+/* Nameplates — a subtle, slow shimmer sweep across the equipped
+   nameplate art. Discord's own nameplates are animated (their newer
+   "collectibles" nameplates especially), and the SVGs here were
+   completely static before, which made them read as a plain banner
+   image rather than a nameplate as its own kind of cosmetic. This
+   shimmer is applied to the wrapper via a CSS mask sweep rather than
+   editing every individual SVG, so any nameplate — including future
+   ones — gets it automatically. Respects reduced-motion. */
+.nameplate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.nameplate-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.16) 50%, transparent 60%);
+  background-size: 250% 100%;
+  animation: nameplate-shimmer-sweep 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes nameplate-shimmer-sweep {
+  0% { background-position: 200% 0; }
+  55%, 100% { background-position: -50% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nameplate-shimmer::after { animation: none; }
+}
+
