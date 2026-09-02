@@ -26,7 +26,9 @@ export interface Database {
           status: 'online' | 'dnd' | 'invisible';
           name_style: { font?: string; effect?: string; colors?: string[] } | null;
           equipped_nameplate: string | null;
+          equipped_avatar_decoration: string | null;
           date_of_birth: string | null;
+          last_seen_at: string | null;
         };
         Insert: Partial<Database['public']['Tables']['profiles']['Row']> & { id: string; username: string; display_name: string };
         Update: Partial<Database['public']['Tables']['profiles']['Row']>;
@@ -345,6 +347,10 @@ export interface Database {
       };
       update_space_role_permissions: {
         Args: { p_role_id: string; p_permissions: Record<string, boolean> };
+        Returns: void;
+      };
+      update_space_role: {
+        Args: { p_role_id: string; p_name: string; p_color: string };
         Returns: void;
       };
       delete_space_role: {
