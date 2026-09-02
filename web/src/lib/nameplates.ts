@@ -13,6 +13,8 @@ export const NAMEPLATES: NameplateDef[] = [
   { id: 'void', label: 'Void' },
   { id: 'bloom', label: 'Bloom' },
   { id: 'static', label: 'Static' },
+  { id: 'aurora', label: 'Aurora' },
+  { id: 'galaxy', label: 'Galaxy' },
 ];
 
 export function isValidNameplateId(id: string | null | undefined): id is string {
