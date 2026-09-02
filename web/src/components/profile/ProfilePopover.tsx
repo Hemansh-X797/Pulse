@@ -10,7 +10,17 @@ import { listFriends, listOutgoingRequests, sendFriendRequest } from '../../lib/
 import { useAppStore } from '../../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../NameStyle';
 import { isValidNameplateId, nameplateSrc } from '../../lib/nameplates';
+import { DecoratedAvatar } from '../DecoratedAvatar';
 import { StatusDot } from '../StatusDot';
+
+function lastSeenLabel(iso: string) {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
 export function ProfilePopover({ username, anchorRef, onClose }: { username: string; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void }) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -20,6 +30,8 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
   const [avatarLightboxOpen, setAvatarLightboxOpen] = useState(false);
 
   const { data: profile, isLoading } = useQuery({ queryKey: ['profile', username], queryFn: () => getProfileByUsername(username) });
+  const presenceStatus = useAppStore((s) => (profile ? s.presenceByUserId[profile.id] : undefined));
+  const isOnline = !!presenceStatus;
   const { data: friends = [] } = useQuery({ queryKey: ['friends'], queryFn: listFriends });
   const { data: outgoing = [] } = useQuery({ queryKey: ['friend-requests', 'outgoing'], queryFn: listOutgoingRequests });
 
@@ -89,33 +101,33 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
           />
           <div className="relative px-4 pb-4">
             {isValidNameplateId(profile.equipped_nameplate) && (
-              <img
-                src={nameplateSrc(profile.equipped_nameplate)}
-                alt=""
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-24 w-full object-cover object-bottom"
-              />
+              <div className="nameplate-shimmer pointer-events-none absolute inset-x-0 bottom-0 h-24 w-full">
+                <img src={nameplateSrc(profile.equipped_nameplate)} alt="" className="h-full w-full object-cover object-bottom" />
+              </div>
             )}
             <div className="relative">
             {/* Click enlarges the avatar in place (lightbox), per your
                 screenshot — it no longer navigates away on click.
                 "View Full Profile" below is the new, explicit way to
                 reach the full page. */}
-            <button
-              onClick={() => profile.avatar_url && setAvatarLightboxOpen(true)}
-              className="relative -mt-7 mb-2 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[var(--color-surface-overlay)] text-base font-bold text-black"
-              style={{
-                background: profile.avatar_url
-                  ? `url(${profile.avatar_url}) center/cover`
-                  : `linear-gradient(150deg, ${profile.accent_color_top}, ${profile.accent_color_bottom})`,
-              }}
-              aria-label={profile.avatar_url ? 'Enlarge profile photo' : undefined}
-              title={profile.avatar_url ? 'Enlarge profile photo' : undefined}
-            >
-              {!profile.avatar_url && profile.display_name.slice(0, 2).toUpperCase()}
-              <span className="absolute bottom-0 right-0">
-                <StatusDot userId={profile.id} size={12} />
-              </span>
-            </button>
+            <DecoratedAvatar decorationId={profile.equipped_avatar_decoration} size={56}>
+              <button
+                onClick={() => profile.avatar_url && setAvatarLightboxOpen(true)}
+                className="relative -mt-7 mb-2 flex h-14 w-14 items-center justify-center rounded-full border-[3px] border-[var(--color-surface-overlay)] text-base font-bold text-black"
+                style={{
+                  background: profile.avatar_url
+                    ? `url(${profile.avatar_url}) center/cover`
+                    : `linear-gradient(150deg, ${profile.accent_color_top}, ${profile.accent_color_bottom})`,
+                }}
+                aria-label={profile.avatar_url ? 'Enlarge profile photo' : undefined}
+                title={profile.avatar_url ? 'Enlarge profile photo' : undefined}
+              >
+                {!profile.avatar_url && profile.display_name.slice(0, 2).toUpperCase()}
+                <span className="absolute bottom-0 right-0">
+                  <StatusDot userId={profile.id} size={12} />
+                </span>
+              </button>
+            </DecoratedAvatar>
 
             <div className="text-[14.5px] font-semibold text-[var(--color-ink)]">
               <NameStyle name={profile.display_name} style={profile.name_style as NameStyleData} />
@@ -123,6 +135,9 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
             <div className="mb-2 text-[12px] text-[var(--color-ink-muted)]">
               @{profile.username} {profile.pronouns && `· ${profile.pronouns}`}
             </div>
+            {!isOnline && profile.last_seen_at && (
+              <div className="mb-2 text-[11.5px] text-[var(--color-ink-faint)]">Last seen {lastSeenLabel(profile.last_seen_at)}</div>
+            )}
             {profile.status_text && <div className="mb-2 text-[12.5px] text-[var(--color-ink)]/80">{profile.status_text}</div>}
 
             {!isSelf && (
