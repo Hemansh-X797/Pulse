@@ -1,0 +1,17 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" stroke="#ff6a2a" stroke-width="2.5" opacity="0.95">
+    <circle cx="50" cy="50" r="46"/>
+  </g>
+  <g fill="#ff9142">
+    <path d="M50 1 C46 8 44 13 50 18 C56 13 54 8 50 1 Z"/>
+    <path d="M99 50 C92 46 87 44 82 50 C87 56 92 54 99 50 Z"/>
+    <path d="M50 99 C54 92 56 87 50 82 C44 87 46 92 50 99 Z"/>
+    <path d="M1 50 C8 54 13 56 18 50 C13 44 8 46 1 50 Z"/>
+  </g>
+  <g fill="#ffd23f">
+    <path d="M50 3 C48 7 47 9 50 12 C53 9 52 7 50 3 Z"/>
+    <path d="M97 50 C93 48 91 47 88 50 C91 53 93 52 97 50 Z"/>
+    <path d="M50 97 C52 93 53 91 50 88 C47 91 48 93 50 97 Z"/>
+    <path d="M3 50 C7 52 9 53 12 50 C9 47 7 48 3 50 Z"/>
+  </g>
+</svg>
