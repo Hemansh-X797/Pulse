@@ -93,9 +93,9 @@ export async function getSpace(spaceId: string): Promise<Space> {
 /** Direct update, gated by a real RLS UPDATE policy added alongside
  * this (023_space_description.sql — there was no UPDATE policy on
  * spaces at all before that, checked directly rather than assumed;
- * without it this would have silently done nothing). Owner-only for
- * now; a manage_space permission on a custom role isn't wired to this
- * specific action yet. */
+ * without it this would have silently done nothing). Enforced by the
+ * `spaces` UPDATE RLS policy — owner or anyone a role grants the
+ * manage_space permission to (030_space_update_policy_manage_space.sql). */
 export async function updateSpace(spaceId: string, patch: { name?: string; description?: string; accent_color_top?: string; accent_color_bottom?: string }): Promise<Space> {
   const { data, error } = await supabase.from('spaces').update(patch).eq('id', spaceId).select().single();
   if (error) throw error;
@@ -194,6 +194,17 @@ export async function createSpaceRole(spaceId: string, name: string, color?: str
 
 export async function updateSpaceRolePermissions(roleId: string, permissions: SpaceRolePermissions): Promise<void> {
   const { error } = await supabase.rpc('update_space_role_permissions', { p_role_id: roleId, p_permissions: permissions as Record<string, boolean> });
+  if (error) throw error;
+}
+
+/**
+ * Renames/recolors an existing role — createSpaceRole only ever sets
+ * name+color once, at creation, and there was no way to change either
+ * afterward even though update_space_role_permissions already let you
+ * change everything else about a role. See 029_update_space_role.sql.
+ */
+export async function updateSpaceRole(roleId: string, name: string, color: string): Promise<void> {
+  const { error } = await supabase.rpc('update_space_role', { p_role_id: roleId, p_name: name, p_color: color });
   if (error) throw error;
 }
 
