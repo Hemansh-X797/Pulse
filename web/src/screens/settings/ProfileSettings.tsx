@@ -7,10 +7,16 @@ import { uploadMedia, MediaUploadError } from '../../lib/api/media';
 import { getMyProfile, updateProfile } from '../../lib/api/profile';
 import { useAppStore } from '../../store/useAppStore';
 import { Field, inputClass } from './shared';
-import { CropModal } from '../../components/settings/CropModal';
+import dynamic from 'next/dynamic';
 import { NameStyle, type NameStyleData } from '../../components/NameStyle';
-import { NameStyleModal } from '../../components/NameStyleModal';
+// Both are modal-only, opened on demand (crop after picking a file,
+// name-style editor from an explicit "Edit" tap) — splitting them out
+// keeps them off Settings' initial chunk. Neither needs SSR.
+const CropModal = dynamic(() => import('../../components/settings/CropModal').then((m) => m.CropModal), { ssr: false });
+const NameStyleModal = dynamic(() => import('../../components/NameStyleModal').then((m) => m.NameStyleModal), { ssr: false });
 import { NAMEPLATES, nameplateSrc } from '../../lib/nameplates';
+import { AVATAR_DECORATIONS } from '../../lib/avatarDecorations';
+import { DecoratedAvatar } from '../../components/DecoratedAvatar';
 import { ProfilePreviewCard } from '../../components/ProfilePreviewCard';
 
 const ACCENT_PRESETS: [string, string][] = [
@@ -232,6 +238,53 @@ export function ProfileSettings() {
                   }`}
                 >
                   <img src={nameplateSrc(n.id)} alt={n.label} className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
+              Avatar decoration <span className="normal-case text-[var(--color-ink-faint)]">(a ring/frame around your profile picture)</span>
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              <button
+                onClick={async () => {
+                  const updated = await updateProfile({ equipped_avatar_decoration: null });
+                  setStoreProfile(updated);
+                  queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+                }}
+                className={`flex h-14 items-center justify-center rounded-lg border text-[10.5px] text-[var(--color-ink-muted)] ${
+                  !profile?.equipped_avatar_decoration ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
+                }`}
+              >
+                None
+              </button>
+              {AVATAR_DECORATIONS.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={async () => {
+                    const updated = await updateProfile({ equipped_avatar_decoration: d.id });
+                    setStoreProfile(updated);
+                    queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+                  }}
+                  title={d.label}
+                  className={`flex h-14 items-center justify-center overflow-hidden rounded-lg border bg-[var(--color-void)] ${
+                    profile?.equipped_avatar_decoration === d.id ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
+                  }`}
+                >
+                  <DecoratedAvatar decorationId={d.id} size={30}>
+                    <div
+                      className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-[10px] font-bold text-black"
+                      style={{
+                        background: profile?.avatar_url
+                          ? `url(${profile.avatar_url}) center/cover`
+                          : `linear-gradient(150deg, ${profile?.accent_color_top ?? '#888'}, ${profile?.accent_color_bottom ?? '#444'})`,
+                      }}
+                    >
+                      {!profile?.avatar_url && (displayName || profile?.display_name || '?').slice(0, 2).toUpperCase()}
+                    </div>
+                  </DecoratedAvatar>
                 </button>
               ))}
             </div>
