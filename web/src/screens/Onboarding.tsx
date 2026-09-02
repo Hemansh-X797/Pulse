@@ -10,6 +10,13 @@ import { useAppStore } from '../store/useAppStore';
 import { setTheme, type ThemeName } from '../hooks/useTheme';
 import type { Profile, Space } from '../lib/database.types';
 
+const THEME_SWATCHES: { name: ThemeName; a: string; b: string; corners: string }[] = [
+  { name: 'bespoke', a: '#0a0a0a', b: '#161616', corners: '' },
+  { name: 'classic', a: '#1a1a22', b: '#212129', corners: 'rounded-full' },
+  { name: 'sunroom', a: '#fdfaf3', b: '#c96f4a', corners: 'rounded-full' },
+  { name: 'signal', a: '#050806', b: '#3ddc63', corners: '' },
+];
+
 const INTEREST_OPTIONS = [
   'gaming', 'art', 'music', 'coding', 'anime', 'study', 'sports', 'movies', 'books', 'food', 'photography', 'fitness',
 ];
@@ -263,7 +270,7 @@ export function Onboarding() {
             <h1 className="mb-1 font-serif text-2xl font-semibold">Pick a look</h1>
             <p className="mb-5 text-[13px] text-[var(--color-ink-muted)]">You can change this anytime in Settings → Appearance.</p>
             <div className="mb-6 grid grid-cols-2 gap-2.5">
-              {(['bespoke', 'classic'] as ThemeName[]).map((name) => (
+              {THEME_SWATCHES.map(({ name, a, b, corners }) => (
                 <button
                   key={name}
                   onClick={() => setSelectedTheme(name)}
@@ -272,8 +279,8 @@ export function Onboarding() {
                   }`}
                 >
                   <div className="mb-1.5 flex gap-1">
-                    <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${name === 'bespoke' ? '' : 'rounded-full'}`} style={{ background: name === 'bespoke' ? '#0a0a0a' : '#1a1a22' }} />
-                    <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${name === 'bespoke' ? '' : 'rounded-full'}`} style={{ background: name === 'bespoke' ? '#161616' : '#212129' }} />
+                    <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${corners}`} style={{ background: a }} />
+                    <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${corners}`} style={{ background: b }} />
                   </div>
                   <div className="flex items-center gap-1 text-[13px] font-medium capitalize">
                     {name}
