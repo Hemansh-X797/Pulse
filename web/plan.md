@@ -1151,3 +1151,44 @@ direction for what those two looks actually are before I can design
 real tokens for them, the same way Bespoke needed your HTML demos.
 Every other item across both Part A and Part B is done and
 build-tested.
+
+## Part B — B14 done. Plan is fully complete, build-tested.
+
+Proposed two directions (Sunroom: warm/light/paper, terracotta accent;
+Signal: green-on-black terminal, all-monospace, sharp corners) — you
+approved both. Built as real theme tokens, same mechanism as Bespoke:
+`html[data-theme='sunroom']`/`['signal']` blocks in `globals.css`
+redefining the same `--color-*` variables every component already
+reads, so both flip app-wide with zero component changes, exactly like
+the first two themes. Signal reuses Bespoke's corner-flattening
+mechanism (unlayered CSS, confirmed to beat Tailwind's own utility
+classes in cascade priority — same reason Bespoke's own radius
+override already worked) rather than duplicating it. Sunroom keeps
+normal rounded corners since its identity is warmth/light, not shape.
+
+Both needed a small correction to `.presence-fill`-using buttons
+(Publish/Send etc., which hardcode `text-black` assuming a light fill)
+— added scoped overrides so button text stays legible against Sunroom's
+already-light fill and Signal's bright-green fill, rather than
+`text-black` fighting the theme.
+
+`useTheme.ts` had a latent bug I fixed while adding the two new
+options: its validation logic was `stored === 'classic' ? 'classic' :
+'bespoke'` — anything that wasn't literally `'classic'` fell back to
+Bespoke, which would have silently broken `'sunroom'`/`'signal'` the
+moment they were selectable. Rewrote it as a real allowlist check
+against all four valid names.
+
+All four themes now appear identically in both Settings → Appearance
+and the onboarding theme step, driven by one shared swatch list, not
+copy-pasted twice.
+
+**Your message asking me to "be sure to add a ___" cut off** — I
+proceeded with the core build since you'd already said "go ahead," but
+I genuinely don't know what was meant to follow "add a". Let me know
+and I'll add it.
+
+---
+**The entire plan — all of Part A and all of Part B — is now done and
+build-tested.** Every item that was blocked on your input got it and
+shipped; nothing outstanding remains on the list as of this pass.
