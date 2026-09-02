@@ -45,28 +45,61 @@ if (typeof window !== 'undefined') {
  */
 export function playNotificationChime() {
   if (!getNotificationSoundEnabled()) return;
-  if (!audioCtx) return; // not unlocked yet — no gesture has happened
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume().catch(() => {});
+
+  // Fallback unlock: the pointerdown/keydown listeners above only catch
+  // a gesture that happens *after* this module has loaded and attached
+  // them. If this module gets pulled in slightly late (route-level code
+  // splitting, hook mounting after first paint, etc.) a gesture that
+  // already happened is missed and audioCtx stays null forever, even
+  // though the user has clearly already interacted with the page by the
+  // time a chime would fire (they're mid-conversation). So also try a
+  // lazy create here — this still requires we're inside a context where
+  // the browser considers the page "activated", which is true in
+  // practice for basically every real chime-triggering moment.
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    } catch {
+      return;
+    }
   }
+  if (!audioCtx) return;
 
-  const now = audioCtx.currentTime;
-  const notes = [
-    { freq: 880, start: 0, dur: 0.14 },
-    { freq: 1318.5, start: 0.12, dur: 0.35 },
-  ];
+  // The actual bug: browsers auto-suspend an AudioContext after a period
+  // of inactivity (and some start it suspended even after being
+  // constructed inside a gesture handler). `resume()` is async, but the
+  // old code scheduled the oscillators immediately after *calling* it
+  // without waiting — so the nodes were scheduled against a context that
+  // was, at that instant, still suspended, and the chime silently never
+  // played. Waiting for the resume to actually finish (and re-reading
+  // currentTime afterwards, since time doesn't advance while suspended)
+  // fixes it.
+  const ctx = audioCtx;
+  const fire = () => {
+    const now = ctx.currentTime;
+    const notes = [
+      { freq: 880, start: 0, dur: 0.14 },
+      { freq: 1318.5, start: 0.12, dur: 0.35 },
+    ];
 
-  for (const note of notes) {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = note.freq;
-    gain.gain.setValueAtTime(0, now + note.start);
-    gain.gain.linearRampToValueAtTime(0.16, now + note.start + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + note.start + note.dur);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start(now + note.start);
-    osc.stop(now + note.start + note.dur + 0.05);
+    for (const note of notes) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = note.freq;
+      gain.gain.setValueAtTime(0, now + note.start);
+      gain.gain.linearRampToValueAtTime(0.16, now + note.start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + note.start + note.dur);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + note.start);
+      osc.stop(now + note.start + note.dur + 0.05);
+    }
+  };
+
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(fire).catch(() => {});
+  } else {
+    fire();
   }
 }
