@@ -20,6 +20,41 @@ export async function listFeed(limit = 30): Promise<FeedItem[]> {
 }
 
 /**
+ * The "Following" feed tab — posts only from accounts you actually
+ * follow, chronological. The `follows` table + follow/unfollow API has
+ * existed since migration 017, and profile pages already show
+ * follower/following counts and a Follow button, but the feed itself
+ * had no way to filter down to just those people — the only feed was
+ * the global one. Two queries (who you follow, then their posts) since
+ * feed_view has no join back to `follows` to filter server-side in one
+ * shot without a dedicated view; fine at this data volume, same
+ * client-capped-then-filter approach the rest of feed.ts already uses
+ * (see listTopPosts above).
+ */
+export async function listFollowingFeed(limit = 30): Promise<FeedItem[]> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return [];
+
+  const { data: followingRows, error: followingError } = await supabase
+    .from('follows')
+    .select('followed_id')
+    .eq('follower_id', userData.user.id);
+  if (followingError) throw followingError;
+
+  const followedIds = (followingRows ?? []).map((r) => r.followed_id);
+  if (followedIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('feed_view')
+    .select('*')
+    .in('author_id', followedIds)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
  * Explore's "top choices" — same view, ordered by a simple engagement
  * score (reactions weighted slightly above comments, since a comment
  * on your own post from yourself replying doesn't happen but a
