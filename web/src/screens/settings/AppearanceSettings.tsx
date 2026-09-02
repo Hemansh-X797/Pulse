@@ -7,6 +7,13 @@ import { getThemeSync, setTheme, type ThemeName } from '../../hooks/useTheme';
 
 const STORAGE_KEY = 'palspace-reduced-motion';
 
+const THEME_SWATCHES: { name: ThemeName; a: string; b: string; corners: string }[] = [
+  { name: 'bespoke', a: '#0a0a0a', b: '#161616', corners: '' },
+  { name: 'classic', a: '#1a1a22', b: '#212129', corners: 'rounded-full' },
+  { name: 'sunroom', a: '#fdfaf3', b: '#c96f4a', corners: 'rounded-full' },
+  { name: 'signal', a: '#050806', b: '#3ddc63', corners: '' },
+];
+
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
     <button
@@ -59,9 +66,9 @@ export function AppearanceSettings() {
 
       <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Theme</h2>
-        <p className="mb-3 text-[11.5px] text-[var(--color-ink-faint)]">Bespoke is the default look. Classic is the original rounded style, kept as an option.</p>
+        <p className="mb-3 text-[11.5px] text-[var(--color-ink-faint)]">Four real, equally-supported looks — pick whichever fits.</p>
         <div className="grid grid-cols-2 gap-2.5">
-          {(['bespoke', 'classic'] as ThemeName[]).map((name) => (
+          {THEME_SWATCHES.map(({ name, a, b, corners }) => (
             <button
               key={name}
               onClick={() => {
@@ -75,8 +82,8 @@ export function AppearanceSettings() {
               }`}
             >
               <div className="mb-1.5 flex gap-1">
-                <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${name === 'bespoke' ? '' : 'rounded-full'}`} style={{ background: name === 'bespoke' ? '#0a0a0a' : '#1a1a22' }} />
-                <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${name === 'bespoke' ? '' : 'rounded-full'}`} style={{ background: name === 'bespoke' ? '#161616' : '#212129' }} />
+                <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${corners}`} style={{ background: a }} />
+                <span className={`h-4 w-4 border border-[var(--color-hairline-strong)] ${corners}`} style={{ background: b }} />
               </div>
               <div className="text-[13px] font-medium capitalize">{name}</div>
             </button>
