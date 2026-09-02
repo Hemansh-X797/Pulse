@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Heart, MessageCircle, Send, ImagePlus, MoreHorizontal, Pencil, Trash2, X, Share2 } from 'lucide-react';
 import {
   listFeed,
+  listFollowingFeed,
   createPost,
   editPost,
   deletePost,
@@ -41,7 +43,22 @@ const LIKE_EMOJI = '❤️';
 export function HomeFeed() {
   const queryClient = useQueryClient();
   const session = useAppStore((s) => s.session);
-  const { data: posts = [], isLoading } = useQuery({ queryKey: ['feed'], queryFn: () => listFeed() });
+  const [feedTab, setFeedTab] = useState<'for-you' | 'following'>('for-you');
+  const { data: posts = [], isLoading } = useQuery({
+    queryKey: ['feed', feedTab],
+    queryFn: () => (feedTab === 'following' ? listFollowingFeed() : listFeed()),
+  });
+  const searchParams = useSearchParams();
+  const highlightPostId = searchParams.get('post');
+
+  // Deep-link from a notification (reaction/comment/new_post): scroll to
+  // the post and open its detail modal, instead of just landing on the
+  // feed with the person having to go hunt for what changed.
+  useEffect(() => {
+    if (!highlightPostId || posts.length === 0) return;
+    const el = document.getElementById(`post-${highlightPostId}`);
+    if (el) el.scrollIntoView({ block: 'center' });
+  }, [highlightPostId, posts.length]);
 
   const [body, setBody] = useState('');
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -148,10 +165,31 @@ export function HomeFeed() {
           </div>
         </div>
 
-        {!isLoading && posts.length === 0 && <EmptyFeed />}
+        <div className="mb-1 flex items-center gap-1 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-1">
+          {(['for-you', 'following'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setFeedTab(tab)}
+              className={`flex-1 rounded-full py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+                feedTab === tab ? 'bg-white text-black' : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              {tab === 'for-you' ? 'For You' : 'Following'}
+            </button>
+          ))}
+        </div>
+
+        {!isLoading && posts.length === 0 && feedTab === 'following' && (
+          <div className="mt-10 flex flex-col items-center gap-3 text-center">
+            <div className="text-[13px] text-[var(--color-ink-muted)]">
+              No posts yet from people you follow — follow some accounts from Discover to see them here.
+            </div>
+          </div>
+        )}
+        {!isLoading && posts.length === 0 && feedTab === 'for-you' && <EmptyFeed />}
 
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
+          <PostCard key={post.id} post={post} autoOpen={String(post.id) === highlightPostId} />
         ))}
       </div>
     </div>
@@ -192,12 +230,12 @@ function Avatar({ url, name, size = 34, accentTop, accentBottom }: { url?: strin
   );
 }
 
-function PostCard({ post }: { post: FeedItem }) {
+function PostCard({ post, autoOpen }: { post: FeedItem; autoOpen?: boolean }) {
   const queryClient = useQueryClient();
   const profile = useAppStore((s) => s.profile);
   const isMine = profile?.id === post.author_id;
 
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(autoOpen ?? false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(post.body_rendered);
@@ -253,7 +291,7 @@ function PostCard({ post }: { post: FeedItem }) {
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   return (
-    <div className="group w-full max-w-[560px] space-y-3">
+    <div id={`post-${post.id}`} className="group w-full max-w-[560px] space-y-3">
       <div ref={popoverAnchorRef} className="relative flex items-center gap-2.5 px-1">
         <button onClick={() => setPopoverOpen((v) => !v)} className="shrink-0">
           <Avatar
