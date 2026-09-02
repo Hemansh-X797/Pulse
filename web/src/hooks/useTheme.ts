@@ -3,28 +3,33 @@
 import { useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'palspace-theme';
-export type ThemeName = 'bespoke' | 'classic';
+export type ThemeName = 'bespoke' | 'classic' | 'sunroom' | 'signal';
+const VALID_THEMES: ThemeName[] = ['bespoke', 'classic', 'sunroom', 'signal'];
 const DEFAULT_THEME: ThemeName = 'bespoke';
 
-/** Real, wired setting (Settings → Appearance) — same per-device
- * localStorage pattern as useCompactMode.ts, not a DB column, since
- * this is a display preference rather than something that needs to
- * sync across devices or be visible to anyone else. Bespoke (hard
- * edges, near-black surfaces) is the default; Classic is the original
- * rounded look, kept as the opt-out. */
+function parseTheme(value: string | null): ThemeName {
+  return VALID_THEMES.includes(value as ThemeName) ? (value as ThemeName) : DEFAULT_THEME;
+}
+
+/** Real, wired setting (Settings → Appearance, and an onboarding step)
+ * — same per-device localStorage pattern as useCompactMode.ts, not a
+ * DB column, since this is a display preference rather than something
+ * that needs to sync across devices or be visible to anyone else.
+ * Bespoke (hard edges, near-black surfaces) is the default; Classic,
+ * Sunroom (warm/light), and Signal (green-on-black terminal) are all
+ * real, equally-selectable alternatives, not lesser options. */
 export function useTheme() {
-  const [theme, setTheme] = useState<ThemeName>(DEFAULT_THEME);
+  const [theme, setThemeState] = useState<ThemeName>(DEFAULT_THEME);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const initial: ThemeName = stored === 'classic' ? 'classic' : 'bespoke';
-    setTheme(initial);
+    const initial = parseTheme(localStorage.getItem(STORAGE_KEY));
+    setThemeState(initial);
     document.documentElement.setAttribute('data-theme', initial);
 
     function onStorage(e: StorageEvent) {
       if (e.key === STORAGE_KEY) {
-        const next: ThemeName = e.newValue === 'classic' ? 'classic' : 'bespoke';
-        setTheme(next);
+        const next = parseTheme(e.newValue);
+        setThemeState(next);
         document.documentElement.setAttribute('data-theme', next);
       }
     }
@@ -45,5 +50,5 @@ export function setTheme(value: ThemeName) {
 
 export function getThemeSync(): ThemeName {
   if (typeof window === 'undefined') return DEFAULT_THEME;
-  return localStorage.getItem(STORAGE_KEY) === 'classic' ? 'classic' : 'bespoke';
+  return parseTheme(localStorage.getItem(STORAGE_KEY));
 }
