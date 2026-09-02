@@ -102,10 +102,14 @@ export async function listMyDMs(): Promise<DmSummary[]> {
     .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''));
 }
 
-export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string; sender_display_name: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
+export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string; sender_display_name: string; sender_avatar_url: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
   const { data, error } = await supabase
     .from('messages')
-    .select('*, profiles!messages_sender_id_fkey(username, display_name, name_style)')
+    // avatar_url wasn't selected here before, so the sender's profile
+    // picture never made it into a message row at all — ChatView had no
+    // choice but to always fall back to initials, even for users who do
+    // have an avatar set.
+    .select('*, profiles!messages_sender_id_fkey(username, display_name, avatar_url, name_style)')
     .eq('channel_id', channelId)
     .order('id', { ascending: false })
     .limit(limit);
@@ -113,11 +117,12 @@ export async function listMessages(channelId: string, limit = 50): Promise<(Mess
 
   return (data ?? [])
     .map((row) => {
-      const profile = row.profiles as unknown as { username: string; display_name: string; name_style: { font?: string; effect?: string; colors?: string[] } | null } | null;
+      const profile = row.profiles as unknown as { username: string; display_name: string; avatar_url: string | null; name_style: { font?: string; effect?: string; colors?: string[] } | null } | null;
       return {
         ...row,
         sender_username: profile?.username ?? '?',
         sender_display_name: profile?.display_name ?? profile?.username ?? '?',
+        sender_avatar_url: profile?.avatar_url ?? '',
         sender_name_style: profile?.name_style ?? null,
       };
     })
@@ -361,4 +366,39 @@ export async function forwardMessage(targetChannelId: string, message: Message &
     mediaUrl: message.media_url ?? undefined,
     mediaType: (message.media_type as 'image' | 'audio' | undefined) ?? undefined,
   });
+}
+
+/**
+ * Read receipts for a DM — the `read_receipts` table (001_initial_schema.sql)
+ * already tracks each member's own last-read pointer per channel, but it
+ * was only ever read back for *your own* unread-count badge, never
+ * surfaced to show the other person that you've seen their message —
+ * so PalSpace had the data for a real "Seen" indicator the whole time
+ * and nothing showed it. Only meaningful for 1:1 DMs (a space channel
+ * can have many members, so "seen by" there is a different, group-style
+ * feature — this intentionally doesn't try to be that).
+ */
+export async function getOtherDmParticipantId(channelId: string): Promise<string | null> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return null;
+  const { data, error } = await supabase
+    .from('channel_members')
+    .select('user_id')
+    .eq('channel_id', channelId)
+    .neq('user_id', userData.user.id)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.user_id ?? null;
+}
+
+export async function getReadReceipt(channelId: string, userId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('read_receipts')
+    .select('last_read_message_id')
+    .eq('channel_id', channelId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.last_read_message_id ?? null;
 }
