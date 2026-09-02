@@ -9,11 +9,13 @@ const FONTS: { id: NameFont; label: string }[] = [
   { id: 'serif', label: 'Serif' },
   { id: 'gothic', label: 'Gothic' },
   { id: 'pixel', label: 'Pixel' },
+  { id: 'orbitron', label: 'Orbitron' },
+  { id: 'bungee', label: 'Bungee' },
+  { id: 'marker', label: 'Marker' },
 ];
 
 // Colors-needed per effect, exactly as specified: Solid picks 1 from a
-// full color picker; Gradient/Neon/Gummy each need exactly 2; Toon
-// needs 1; Prism needs all 7.
+// full color picker; most others need exactly 2; Prism needs all 7.
 const EFFECTS: { id: NameEffect; label: string; colorCount: number }[] = [
   { id: 'solid', label: 'Solid', colorCount: 1 },
   { id: 'gradient', label: 'Gradient', colorCount: 2 },
@@ -21,6 +23,10 @@ const EFFECTS: { id: NameEffect; label: string; colorCount: number }[] = [
   { id: 'toon', label: 'Toon / Pop', colorCount: 1 },
   { id: 'prism', label: 'Prism', colorCount: 7 },
   { id: 'gummy', label: 'Gummy', colorCount: 2 },
+  { id: 'chrome', label: 'Chrome', colorCount: 2 },
+  { id: 'fire', label: 'Fire', colorCount: 2 },
+  { id: 'ice', label: 'Ice', colorCount: 2 },
+  { id: 'glitch', label: 'Glitch', colorCount: 2 },
 ];
 
 const DEFAULT_COLORS = ['#ff2a6d', '#05d9e8', '#f1fa8c', '#50fa7b', '#bd93f9', '#ff79c6', '#ffb86c'];
