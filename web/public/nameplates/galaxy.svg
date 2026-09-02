@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 120" width="340" height="120">
+  <defs>
+    <radialGradient id="galaxyCore" cx="70%" cy="80%" r="70%">
+      <stop offset="0%" stop-color="#c04bff" stop-opacity="0.55"/>
+      <stop offset="55%" stop-color="#4b2fbf" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#0a0620" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="340" height="120" fill="url(#galaxyCore)"/>
+  <g fill="#ffffff">
+    <circle cx="24" cy="30" r="1.1" opacity="0.9"/>
+    <circle cx="58" cy="15" r="0.8" opacity="0.6"/>
+    <circle cx="96" cy="42" r="1.3" opacity="0.85"/>
+    <circle cx="140" cy="20" r="0.9" opacity="0.7"/>
+    <circle cx="180" cy="55" r="1.1" opacity="0.9"/>
+    <circle cx="220" cy="25" r="0.8" opacity="0.55"/>
+    <circle cx="260" cy="48" r="1.2" opacity="0.8"/>
+    <circle cx="300" cy="18" r="1" opacity="0.7"/>
+    <circle cx="320" cy="60" r="0.9" opacity="0.6"/>
+    <circle cx="70" cy="70" r="0.7" opacity="0.5"/>
+    <circle cx="200" cy="80" r="0.7" opacity="0.5"/>
+  </g>
+</svg>
