@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Fraunces, Inter, IBM_Plex_Mono } from 'next/font/google';
+import { Fraunces, Inter, IBM_Plex_Mono, Orbitron, Bungee, Permanent_Marker, UnifrakturMaguntia, Press_Start_2P } from 'next/font/google';
 import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -36,6 +36,45 @@ const plexMono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['400', '500'],
   variable: '--font-plex-mono',
+  display: 'swap',
+});
+
+// Name-style fonts. `gothic` and `pixel` referenced these families by
+// name in globals.css's .name-font-* classes for a while, but nothing
+// ever actually loaded them (no next/font entry, no Google Fonts
+// <link>) — so both silently fell back to the serif/mono stack and the
+// "Gothic"/"Pixel" font picks in the name style modal did nothing
+// visually. Loading them for real here fixes that, plus adds three new
+// picks (Orbitron, Bungee, Permanent Marker) for actual variety beyond
+// the original four.
+const unifraktur = UnifrakturMaguntia({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-gothic',
+  display: 'swap',
+});
+const pressStart = Press_Start_2P({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-pixel',
+  display: 'swap',
+});
+const orbitron = Orbitron({
+  subsets: ['latin'],
+  weight: ['500', '700', '900'],
+  variable: '--font-orbitron',
+  display: 'swap',
+});
+const bungee = Bungee({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-bungee',
+  display: 'swap',
+});
+const permanentMarker = Permanent_Marker({
+  subsets: ['latin'],
+  weight: '400',
+  variable: '--font-marker',
   display: 'swap',
 });
 
@@ -131,7 +170,8 @@ function AppGraph() {
 const THEME_INIT_SCRIPT = `
 try {
   var t = localStorage.getItem('palspace-theme');
-  document.documentElement.setAttribute('data-theme', t === 'classic' ? 'classic' : 'bespoke');
+  var valid = ['bespoke', 'classic', 'sunroom', 'signal'];
+  document.documentElement.setAttribute('data-theme', valid.indexOf(t) !== -1 ? t : 'bespoke');
 } catch (e) {
   document.documentElement.setAttribute('data-theme', 'bespoke');
 }
@@ -139,7 +179,7 @@ try {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="bespoke" className={`${fraunces.variable} ${inter.variable} ${plexMono.variable}`}>
+    <html lang="en" data-theme="bespoke" className={`${fraunces.variable} ${inter.variable} ${plexMono.variable} ${unifraktur.variable} ${pressStart.variable} ${orbitron.variable} ${bungee.variable} ${permanentMarker.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         {GA_MEASUREMENT_ID && (
