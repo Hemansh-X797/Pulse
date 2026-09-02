@@ -17,6 +17,8 @@ import {
   listPinnedMessages,
   pinMessage,
   unpinMessage,
+  getOtherDmParticipantId,
+  getReadReceipt,
   type MessageReactionSummary,
   type PinnedMessage,
 } from '../../lib/api/channels';
@@ -27,8 +29,7 @@ import { renderMarkdown } from '../../lib/markdown';
 import { extractFirstUrl, LinkPreviewCard } from '../shared/LinkPreviewCard';
 import { useCompactMode } from '../../hooks/useCompactMode';
 import { useChatBubbles } from '../../hooks/useChatBubbles';
-import { EmojiPicker } from './EmojiPicker';
-import { GifPicker } from './GifPicker';
+import dynamic from 'next/dynamic';
 import { ProfilePopover } from '../profile/ProfilePopover';
 import { useCall } from '../../hooks/useCall';
 import { CallBar } from '../CallBar';
@@ -37,12 +38,23 @@ import {
   subscribeToChannelMessages,
   subscribeToTyping,
   broadcastTyping,
+  subscribeToTable,
   unsubscribe,
 } from '../../lib/realtime';
 import { useAppStore } from '../../store/useAppStore';
 import type { Message } from '../../lib/database.types';
 
-type DisplayMessage = (Message & { sender_username: string; sender_display_name: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null }) & { pending?: boolean };
+// EmojiPicker/GifPicker are only ever needed once the person actually
+// opens one of the two popover buttons in the composer — code-splitting
+// them out of ChatView's own chunk means the message view (the thing
+// that has to be fast on every single DM/channel open) doesn't pay to
+// parse/execute picker code nobody's asked for yet. Neither renders
+// anything server-side anyway (portal-style popovers anchored to a
+// button), so ssr: false is safe and skips an unnecessary SSR pass too.
+const EmojiPicker = dynamic(() => import('./EmojiPicker').then((m) => m.EmojiPicker), { ssr: false });
+const GifPicker = dynamic(() => import('./GifPicker').then((m) => m.GifPicker), { ssr: false });
+
+type DisplayMessage = (Message & { sender_username: string; sender_display_name: string; sender_avatar_url?: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null }) & { pending?: boolean };
 
 const EPHEMERAL_OPTIONS = [
   { label: 'Off', seconds: 0 },
@@ -110,6 +122,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const [pinsBarOpen, setPinsBarOpen] = useState(false);
   const [pinnedList, setPinnedList] = useState<PinnedMessage[]>([]);
   const [forwardTarget, setForwardTarget] = useState<(Message & { sender_username: string; sender_display_name: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null }) | null>(null);
+  const [otherLastRead, setOtherLastRead] = useState<number | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +157,42 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
     };
   }, [channelId]);
 
+  // "Seen" indicator — see getOtherDmParticipantId/getReadReceipt in
+  // channels.ts for why this data already existed but nothing surfaced
+  // it. Only meaningful for a 1:1 DM (returns null in a space channel,
+  // where "seen by" is a many-member concept this isn't trying to be),
+  // so this silently no-ops there.
+  useEffect(() => {
+    let cancelled = false;
+    let otherUserId: string | null = null;
+    let sub: ReturnType<typeof subscribeToTable> | null = null;
+
+    getOtherDmParticipantId(channelId)
+      .then((uid) => {
+        if (cancelled || !uid) return;
+        otherUserId = uid;
+        return getReadReceipt(channelId, uid).then((lastRead) => {
+          if (!cancelled) setOtherLastRead(lastRead);
+        });
+      })
+      .then(() => {
+        if (cancelled || !otherUserId) return;
+        sub = subscribeToTable('read_receipts', `channel_id=eq.${channelId}`, () => {
+          if (!otherUserId) return;
+          getReadReceipt(channelId, otherUserId).then((lastRead) => {
+            if (!cancelled) setOtherLastRead(lastRead);
+          });
+        });
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+      setOtherLastRead(null);
+      if (sub) unsubscribe(sub);
+    };
+  }, [channelId]);
+
   useEffect(() => {
     if (!history || history.length === 0) return;
     let cancelled = false;
@@ -172,7 +221,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
             const idx = prev.findIndex((m) => m.pending && m.client_ref === incoming.client_ref);
             if (idx !== -1) {
               const next = [...prev];
-              next[idx] = { ...incoming, sender_username: prev[idx].sender_username, sender_display_name: prev[idx].sender_display_name, sender_name_style: prev[idx].sender_name_style, pending: false };
+              next[idx] = { ...incoming, sender_username: prev[idx].sender_username, sender_display_name: prev[idx].sender_display_name, sender_avatar_url: prev[idx].sender_avatar_url, sender_name_style: prev[idx].sender_name_style, pending: false };
               return next;
             }
           }
@@ -186,8 +235,9 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
           const isMe = incoming.sender_id === profile?.id;
           const senderUsername = isMe ? profile.username : '…';
           const senderDisplayName = isMe ? profile.display_name : '…';
+          const senderAvatarUrl = isMe ? (profile.avatar_url ?? undefined) : undefined;
           const senderNameStyle = isMe ? (profile.name_style as DisplayMessage['sender_name_style']) : null;
-          return [...prev, { ...incoming, sender_username: senderUsername, sender_display_name: senderDisplayName, sender_name_style: senderNameStyle }];
+          return [...prev, { ...incoming, sender_username: senderUsername, sender_display_name: senderDisplayName, sender_avatar_url: senderAvatarUrl, sender_name_style: senderNameStyle }];
         });
       },
       (updated) => {
@@ -241,6 +291,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       sender_id: profile.id,
       sender_username: profile.username,
       sender_display_name: profile.display_name,
+      sender_avatar_url: profile.avatar_url ?? undefined,
       sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
       body_raw: body,
       body_rendered: body, // rendered for real once the emoji lib runs in sendMessage; good enough for the instant local paint
@@ -286,6 +337,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         sender_id: profile.id,
         sender_username: profile.username,
         sender_display_name: profile.display_name,
+        sender_avatar_url: profile.avatar_url ?? undefined,
         sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
         body_raw: '',
         body_rendered: '',
@@ -322,6 +374,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       sender_id: profile.id,
       sender_username: profile.username,
       sender_display_name: profile.display_name,
+      sender_avatar_url: profile.avatar_url ?? undefined,
       sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
       body_raw: '',
       body_rendered: '',
@@ -566,6 +619,16 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
             />
           ))}
         </AnimatePresence>
+
+        {(() => {
+          const lastMine = [...messages].reverse().find((m) => !m.pending);
+          if (!lastMine || lastMine.sender_id !== profile?.id) return null;
+          const seen = otherLastRead != null && otherLastRead >= lastMine.id;
+          if (!seen) return null;
+          return (
+            <div className="mt-1 flex justify-end pr-1 font-mono text-[10px] text-[var(--color-ink-muted)]">Seen</div>
+          );
+        })()}
       </div>
 
       <div className={`px-4 md:px-7 text-[11.5px] text-[var(--color-ink-muted)] transition-opacity ${typingUser ? 'opacity-100' : 'opacity-0'}`}>
@@ -758,7 +821,31 @@ function MessageRow({
 }) {
   const [editValue, setEditValue] = useState(message.body_rendered);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [longPressMenuOpen, setLongPressMenuOpen] = useState(false);
   const [quickReactOpen, setQuickReactOpen] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+
+  // Long-press-to-open-menu — this is the actual fix for "there's no
+  // way to react/reply/forward on mobile at all": every one of those
+  // actions previously lived only in `.hover-toolbar`, a
+  // `group-hover:opacity-100` element, which has nothing to key off of
+  // on a touch screen since there's no hover state. 450ms is roughly
+  // what iOS/Android's own long-press gestures use before triggering.
+  function handleTouchStart() {
+    longPressFired.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      if (navigator.vibrate) navigator.vibrate(12);
+      setLongPressMenuOpen(true);
+    }, 450);
+  }
+  function cancelLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
 
   if (message.deleted) {
     return (
@@ -785,13 +872,30 @@ function MessageRow({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       className={`group relative flex gap-2.5 rounded-lg ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={cancelLongPress}
+      onTouchMove={cancelLongPress}
+      onTouchCancel={cancelLongPress}
+      onContextMenu={(e) => {
+        // A long-press on many touch browsers also fires the native
+        // context menu (image save / text select popup) right on top
+        // of the custom one — suppress it once our own long-press menu
+        // has actually fired, but leave normal right-click alone.
+        if (longPressFired.current) e.preventDefault();
+      }}
     >
       {!compact && (
         <button
           onClick={() => setPopoverOpen((v) => !v)}
-          className="mt-0.5 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black"
+          className="mt-0.5 h-[30px] w-[30px] shrink-0 overflow-hidden rounded-full"
         >
-          {initials}
+          {message.sender_avatar_url ? (
+            <img src={message.sender_avatar_url} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center presence-fill text-[11px] font-bold text-black">
+              {initials}
+            </div>
+          )}
         </button>
       )}
       {compact && <div className="w-[30px] shrink-0" />}
@@ -946,6 +1050,56 @@ function MessageRow({
           )}
         </div>
       </div>
+
+      {longPressMenuOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center md:hidden" onClick={() => setLongPressMenuOpen(false)}>
+          <div className="absolute inset-0 bg-black/60" />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative w-full max-w-md overflow-hidden rounded-t-2xl border-t border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] pb-[env(safe-area-inset-bottom)] shadow-2xl"
+          >
+            <div className="mx-auto mt-2.5 h-1 w-9 rounded-full bg-[var(--color-hairline-strong)]" />
+            {/* Quick emoji row up top, same 8 shortcuts as the desktop
+                hover toolbar's popover — the full "Add reaction" item
+                below still opens the complete picker. */}
+            <div className="flex items-center justify-center gap-1.5 border-b border-[var(--color-hairline)] px-4 py-3">
+              {QUICK_REACT_EMOJIS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => {
+                    onReact(emoji);
+                    setLongPressMenuOpen(false);
+                  }}
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-[19px] active:bg-[var(--color-surface-raised)]"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <MessageContextMenu
+              onClose={() => setLongPressMenuOpen(false)}
+              onCopyText={onCopyText}
+              onCopyLink={onCopyLink}
+              onMarkUnread={onMarkUnread}
+              onForward={onForward}
+              onPin={onTogglePin}
+              isPinned={isPinned}
+              onReact={() => {
+                setLongPressMenuOpen(false);
+                setQuickReactOpen(true);
+              }}
+              onReply={() => {
+                onReply();
+                setLongPressMenuOpen(false);
+              }}
+              onEdit={isMine ? () => { onEdit(); setLongPressMenuOpen(false); } : undefined}
+              onDelete={isMine ? () => { onDelete(); setLongPressMenuOpen(false); } : undefined}
+              isMine={isMine}
+              variant="sheet"
+            />
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
