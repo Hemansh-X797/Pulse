@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Copy, Check, Trash2, Plus, UserX, Ban } from 'lucide-react';
 import {
@@ -8,6 +8,7 @@ import {
   updateSpace,
   listSpaceRoles,
   createSpaceRole,
+  updateSpaceRole,
   updateSpaceRolePermissions,
   deleteSpaceRole,
   listMemberRoleAssignments,
@@ -26,6 +27,7 @@ import { useAppStore } from '../../store/useAppStore';
 type Tab = 'overview' | 'roles' | 'members' | 'invites';
 
 const PERMISSION_LABELS: { key: keyof SpaceRolePermissions; label: string; hint: string }[] = [
+  { key: 'manage_space', label: 'Manage Space', hint: "Edit this space's name, description, and profile." },
   { key: 'manage_channels', label: 'Manage Channels', hint: 'Create, reorder, and delete channels and categories.' },
   { key: 'manage_roles', label: 'Manage Roles', hint: 'Create roles and assign them to members.' },
   { key: 'manage_messages', label: 'Manage Messages', hint: "Delete other people's messages in this space." },
@@ -33,6 +35,12 @@ const PERMISSION_LABELS: { key: keyof SpaceRolePermissions; label: string; hint:
   { key: 'ban_members', label: 'Ban Members', hint: 'Remove members and block them from rejoining.' },
   { key: 'create_invites', label: 'Create Invites', hint: 'Generate invite links for this space.' },
 ];
+
+// Discord-alike default role color palette — offered as swatches in the
+// role editor rather than a raw color input, matching the same
+// "curated, not overwhelming" choice the rest of this app's color
+// pickers (accent colors, name style) already make.
+const ROLE_COLORS = ['#99aab5', '#f04747', '#faa61a', '#f1c40f', '#43b581', '#3ea6ff', '#7289da', '#c04bff', '#ff6bd6'];
 
 export function SpaceSettingsModal({ spaceId, onClose }: { spaceId: string; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('overview');
@@ -42,6 +50,17 @@ export function SpaceSettingsModal({ spaceId, onClose }: { spaceId: string; onCl
   const { data: canManageRoles = false } = useQuery({
     queryKey: ['space-permission', spaceId, 'manage_roles'],
     queryFn: () => hasSpacePermission(spaceId, 'manage_roles'),
+  });
+  // The backend has tracked a `manage_space` permission since the
+  // default Admin role was introduced (022_space_roles_permissions_categories.sql
+  // grants it automatically) — a space owner could delegate "edit the
+  // space profile" to a custom role via this exact permission — but
+  // OverviewTab below ignored it entirely and only ever checked
+  // `isOwner`, so that delegation silently did nothing for this one
+  // screen even though the permission existed and could be granted.
+  const { data: canManageSpace = false } = useQuery({
+    queryKey: ['space-permission', spaceId, 'manage_space'],
+    queryFn: () => hasSpacePermission(spaceId, 'manage_space'),
   });
   const isOwner = space?.owner_id === profile?.id;
 
@@ -84,7 +103,7 @@ export function SpaceSettingsModal({ spaceId, onClose }: { spaceId: string; onCl
             <X size={15} />
           </button>
 
-          {tab === 'overview' && space && <OverviewTab spaceId={spaceId} space={space} canEdit={isOwner} />}
+          {tab === 'overview' && space && <OverviewTab spaceId={spaceId} space={space} canEdit={isOwner || canManageSpace} />}
           {tab === 'roles' && <RolesTab spaceId={spaceId} canManage={canManageRoles} />}
           {tab === 'members' && space && <MembersTab spaceId={spaceId} canManageRoles={canManageRoles} spaceOwnerId={space.owner_id} />}
           {tab === 'invites' && space && <InvitesTab space={space} />}
@@ -147,7 +166,7 @@ function OverviewTab({
           {saveMutation.isPending ? 'Saving…' : 'Save changes'}
         </button>
       ) : (
-        <p className="text-[11.5px] text-[var(--color-ink-faint)]">Only the space owner can edit these fields.</p>
+        <p className="text-[11.5px] text-[var(--color-ink-faint)]">Only the space owner, or a role with Manage Space, can edit these fields.</p>
       )}
     </div>
   );
@@ -157,15 +176,18 @@ function RolesTab({ spaceId, canManage }: { spaceId: string; canManage: boolean 
   const queryClient = useQueryClient();
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [newRoleName, setNewRoleName] = useState('');
+  const [newRoleColor, setNewRoleColor] = useState(ROLE_COLORS[0]);
+  const [editName, setEditName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const { data: roles = [] } = useQuery({ queryKey: ['space-roles', spaceId], queryFn: () => listSpaceRoles(spaceId) });
   const selectedRole = roles.find((r) => r.id === selectedRoleId) ?? roles[0];
 
   const createMutation = useMutation({
-    mutationFn: () => createSpaceRole(spaceId, newRoleName.trim() || 'new role'),
+    mutationFn: () => createSpaceRole(spaceId, newRoleName.trim() || 'new role', newRoleColor),
     onSuccess: () => {
       setNewRoleName('');
+      setNewRoleColor(ROLE_COLORS[0]);
       queryClient.invalidateQueries({ queryKey: ['space-roles', spaceId] });
     },
     onError: (e) => setError(e instanceof Error ? e.message : 'Could not create role.'),
@@ -177,6 +199,15 @@ function RolesTab({ spaceId, canManage }: { spaceId: string; canManage: boolean 
     onError: (e) => setError(e instanceof Error ? e.message : 'Could not update permissions.'),
   });
 
+  // Renaming/recoloring an existing role — createSpaceRole only ever
+  // set these once, at creation; see updateSpaceRole in spaces.ts for
+  // why there was previously no way to change either afterward.
+  const renameMutation = useMutation({
+    mutationFn: ({ name, color }: { name: string; color: string }) => updateSpaceRole(selectedRole!.id, name, color),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['space-roles', spaceId] }),
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not update role.'),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteSpaceRole(selectedRole!.id),
     onSuccess: () => {
@@ -185,6 +216,13 @@ function RolesTab({ spaceId, canManage }: { spaceId: string; canManage: boolean 
     },
     onError: (e) => setError(e instanceof Error ? e.message : 'Could not delete role.'),
   });
+
+  // Keep the rename input in sync with whichever role is selected —
+  // reset it whenever the selection changes rather than leaking the
+  // previous role's in-progress edit into the newly selected one.
+  useEffect(() => {
+    setEditName(selectedRole?.name ?? '');
+  }, [selectedRole?.id, selectedRole?.name]);
 
   return (
     <div className="flex h-full gap-6">
@@ -206,21 +244,34 @@ function RolesTab({ spaceId, canManage }: { spaceId: string; canManage: boolean 
           ))}
         </div>
         {canManage && (
-          <div className="flex gap-1.5">
-            <input
-              value={newRoleName}
-              onChange={(e) => setNewRoleName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && createMutation.mutate()}
-              placeholder="Role name"
-              className="min-w-0 flex-1 rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-2.5 py-1.5 text-[12px] outline-none"
-            />
-            <button
-              onClick={() => createMutation.mutate()}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-surface-raised)] hover:bg-[var(--color-hairline-strong)]"
-              aria-label="Create role"
-            >
-              <Plus size={14} />
-            </button>
+          <div className="space-y-1.5">
+            <div className="flex gap-1.5">
+              <input
+                value={newRoleName}
+                onChange={(e) => setNewRoleName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && createMutation.mutate()}
+                placeholder="Role name"
+                className="min-w-0 flex-1 rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-2.5 py-1.5 text-[12px] outline-none"
+              />
+              <button
+                onClick={() => createMutation.mutate()}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--color-surface-raised)] hover:bg-[var(--color-hairline-strong)]"
+                aria-label="Create role"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {ROLE_COLORS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setNewRoleColor(c)}
+                  aria-label={`Color ${c}`}
+                  className={`h-4 w-4 rounded-full ${newRoleColor === c ? 'ring-2 ring-offset-1 ring-offset-[var(--color-surface)] ring-[var(--color-ink)]' : ''}`}
+                  style={{ background: c }}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -232,7 +283,24 @@ function RolesTab({ spaceId, canManage }: { spaceId: string; canManage: boolean 
         {selectedRole ? (
           <>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-[15px] font-semibold">{selectedRole.name}</h3>
+              {canManage && !selectedRole.is_default ? (
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onBlur={() => {
+                    const trimmed = editName.trim();
+                    if (trimmed && trimmed !== selectedRole.name) {
+                      renameMutation.mutate({ name: trimmed, color: selectedRole.color });
+                    } else {
+                      setEditName(selectedRole.name);
+                    }
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                  className="rounded-lg border border-transparent bg-transparent px-1.5 py-0.5 text-[15px] font-semibold outline-none hover:border-[var(--color-hairline)] focus:border-[var(--presence-default-a)] focus:bg-[var(--color-surface-raised)]"
+                />
+              ) : (
+                <h3 className="text-[15px] font-semibold">{selectedRole.name}</h3>
+              )}
               {canManage && !selectedRole.is_default && (
                 <button
                   onClick={() => deleteMutation.mutate()}
@@ -242,6 +310,20 @@ function RolesTab({ spaceId, canManage }: { spaceId: string; canManage: boolean 
                 </button>
               )}
             </div>
+            {canManage && !selectedRole.is_default && (
+              <div className="mb-4 flex items-center gap-1.5">
+                <span className="mr-1 text-[11px] text-[var(--color-ink-faint)]">Color</span>
+                {ROLE_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => renameMutation.mutate({ name: selectedRole.name, color: c })}
+                    aria-label={`Color ${c}`}
+                    className={`h-4 w-4 rounded-full ${selectedRole.color === c ? 'ring-2 ring-offset-1 ring-offset-[var(--color-surface-overlay)] ring-[var(--color-ink)]' : ''}`}
+                    style={{ background: c }}
+                  />
+                ))}
+              </div>
+            )}
             <div className="space-y-3">
               {PERMISSION_LABELS.map(({ key, label, hint }) => {
                 const on = !!selectedRole.permissions[key];
