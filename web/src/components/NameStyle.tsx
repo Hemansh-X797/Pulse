@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
-export type NameFont = 'sans' | 'serif' | 'gothic' | 'pixel';
-export type NameEffect = 'solid' | 'gradient' | 'neon' | 'toon' | 'prism' | 'gummy';
+export type NameFont = 'sans' | 'serif' | 'gothic' | 'pixel' | 'orbitron' | 'bungee' | 'marker';
+export type NameEffect = 'solid' | 'gradient' | 'neon' | 'toon' | 'prism' | 'gummy' | 'chrome' | 'fire' | 'ice' | 'glitch';
 
 export interface NameStyleData {
   font?: NameFont;
@@ -14,6 +14,9 @@ const FONT_CLASS: Record<NameFont, string> = {
   serif: 'name-font-serif',
   gothic: 'name-font-gothic',
   pixel: 'name-font-pixel',
+  orbitron: 'name-font-orbitron',
+  bungee: 'name-font-bungee',
+  marker: 'name-font-marker',
 };
 
 // Minimum colors each effect actually needs — used to fall back to
@@ -27,6 +30,10 @@ const MIN_COLORS: Record<NameEffect, number> = {
   toon: 1,
   prism: 7,
   gummy: 2,
+  chrome: 2,
+  fire: 2,
+  ice: 2,
+  glitch: 2,
 };
 
 function isValidHex(c: string): boolean {
@@ -104,14 +111,56 @@ export function NameStyle({ name, style, className }: { name: string; style: Nam
     );
   }
 
+  if (effect === 'chrome') {
+    const vars = { ['--name-c1' as string]: colors[0], ['--name-c2' as string]: colors[1] } as CSSProperties;
+    return (
+      <span className={`name-effect-chrome ${fontClass} ${className ?? ''}`} style={vars}>
+        {name}
+      </span>
+    );
+  }
+
+  if (effect === 'fire') {
+    const vars = { ['--name-c1' as string]: colors[0], ['--name-c2' as string]: colors[1] } as CSSProperties;
+    return (
+      <span className={`name-effect-fire ${fontClass} ${className ?? ''}`} style={vars}>
+        {name}
+      </span>
+    );
+  }
+
+  if (effect === 'ice') {
+    const vars = { ['--name-c1' as string]: colors[0], ['--name-c2' as string]: colors[1] } as CSSProperties;
+    return (
+      <span className={`name-effect-ice ${fontClass} ${className ?? ''}`} style={vars}>
+        {name}
+      </span>
+    );
+  }
+
+  if (effect === 'glitch') {
+    const vars = { ['--name-c1' as string]: colors[0], ['--name-c2' as string]: colors[1] } as CSSProperties;
+    return (
+      <span className={`name-effect-glitch ${fontClass} ${className ?? ''}`} style={vars} data-glitch-text={name}>
+        {name}
+      </span>
+    );
+  }
+
   // Gummy: exactly 2 colors, alternating per letter. CSS alone can't
   // target "every other character" of an arbitrary text node, so this
   // wraps each character in its own span with the alternating color set
   // inline — the only effect that needs per-character markup rather
-  // than a single styled span.
+  // than a single styled span. Uses Array.from rather than .split('')
+  // so multi-code-unit characters (emoji, combining diacritics, most
+  // non-Latin scripts) don't get sliced apart mid-character — .split('')
+  // works on raw UTF-16 code units, so a display name with an emoji or
+  // e.g. Hindi/Devanagari text would previously render mangled/broken
+  // halves through this effect specifically.
+  const graphemes = Array.from(name);
   return (
     <span className={`${fontClass} ${className ?? ''}`}>
-      {name.split('').map((char, i) => (
+      {graphemes.map((char, i) => (
         <span
           key={i}
           className="name-effect-gummy-letter"
