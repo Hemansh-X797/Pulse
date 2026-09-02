@@ -23,6 +23,7 @@ export function MessageContextMenu({
   onEdit,
   onDelete,
   isMine,
+  variant = 'dropdown',
 }: {
   onClose: () => void;
   onCopyText: () => void;
@@ -36,10 +37,19 @@ export function MessageContextMenu({
   onEdit?: () => void;
   onDelete?: () => void;
   isMine: boolean;
+  // 'dropdown' (default): small floating box, used on desktop anchored
+  // to the "..." button, closes on outside click. 'sheet': full-width
+  // list with larger touch targets, used inside the mobile long-press
+  // bottom sheet — that sheet already has its own backdrop-click
+  // handler, so this variant skips the extra outside-click listener
+  // (which uses `mousedown`, unreliable right after a touch-driven open
+  // on some mobile browsers, and would be redundant anyway).
+  variant?: 'dropdown' | 'sheet';
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (variant === 'sheet') return;
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     }
@@ -52,7 +62,7 @@ export function MessageContextMenu({
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [onClose]);
+  }, [onClose, variant]);
 
   const items: MessageMenuAction[] = [
     { icon: <SmilePlus size={14} />, label: 'Add reaction', onClick: onReact },
@@ -67,6 +77,28 @@ export function MessageContextMenu({
     ...(isMine && onEdit ? [{ icon: <Pencil size={14} />, label: 'Edit', onClick: onEdit }] : []),
     ...(isMine && onDelete ? [{ icon: <Trash2 size={14} />, label: 'Delete', onClick: onDelete, destructive: true }] : []),
   ];
+
+  if (variant === 'sheet') {
+    return (
+      <div ref={ref} className="overflow-hidden pb-1.5">
+        {items.map((item) => (
+          <button
+            key={item.label}
+            onClick={() => {
+              item.onClick();
+              onClose();
+            }}
+            className={`flex w-full items-center gap-3.5 px-5 py-3.5 text-left text-[15px] transition-colors active:bg-[var(--color-surface-raised)] ${
+              item.destructive ? 'text-red-400' : 'text-[var(--color-ink)]'
+            }`}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div
