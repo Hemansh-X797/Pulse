@@ -12,6 +12,7 @@ import { followUser, unfollowUser, isFollowing, getFollowCounts } from '../lib/a
 import { useAppStore } from '../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../components/NameStyle';
 import { isValidNameplateId, nameplateSrc } from '../lib/nameplates';
+import { DecoratedAvatar } from '../components/DecoratedAvatar';
 
 export function UserProfile() {
   const params = useParams<{ username: string }>()!;
@@ -136,23 +137,23 @@ export function UserProfile() {
         )}
         <div className="relative">
           {isValidNameplateId(profile.equipped_nameplate) && (
-            <img
-              src={nameplateSrc(profile.equipped_nameplate)}
-              alt=""
-              className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-28 w-full object-cover object-bottom"
-            />
+            <div className="nameplate-shimmer pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-28 w-full">
+              <img src={nameplateSrc(profile.equipped_nameplate)} alt="" className="h-full w-full object-cover object-bottom" />
+            </div>
           )}
         <div className="flex items-end justify-between">
-          <div
-            className="-mt-10 mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[var(--color-void)] text-2xl font-bold text-black"
-            style={{
-              background: profile.avatar_url
-                ? `url(${profile.avatar_url}) center/cover`
-                : `linear-gradient(150deg, ${profile.accent_color_top}, ${profile.accent_color_bottom})`,
-            }}
-          >
-            {!profile.avatar_url && profile.display_name.slice(0, 2).toUpperCase()}
-          </div>
+          <DecoratedAvatar decorationId={profile.equipped_avatar_decoration} size={80}>
+            <div
+              className="-mt-10 mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[var(--color-void)] text-2xl font-bold text-black"
+              style={{
+                background: profile.avatar_url
+                  ? `url(${profile.avatar_url}) center/cover`
+                  : `linear-gradient(150deg, ${profile.accent_color_top}, ${profile.accent_color_bottom})`,
+              }}
+            >
+              {!profile.avatar_url && profile.display_name.slice(0, 2).toUpperCase()}
+            </div>
+          </DecoratedAvatar>
 
           {!isSelf && (
             <div className="relative mb-4 flex items-center gap-2">
