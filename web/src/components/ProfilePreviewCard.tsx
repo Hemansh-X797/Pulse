@@ -53,11 +53,9 @@ export function ProfilePreviewCard({
 
       <div className="relative px-4 pb-4">
         {isValidNameplateId(equippedNameplate) && (
-          <img
-            src={nameplateSrc(equippedNameplate)}
-            alt=""
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-28 w-full object-cover object-bottom"
-          />
+          <div className="nameplate-shimmer pointer-events-none absolute inset-x-0 bottom-0 h-28 w-full">
+            <img src={nameplateSrc(equippedNameplate)} alt="" className="h-full w-full object-cover object-bottom" />
+          </div>
         )}
         <div className="relative">
           <div
