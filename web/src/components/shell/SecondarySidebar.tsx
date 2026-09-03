@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useParams } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Hash, Volume2, Plus, Bell, Users, ChevronUp, ChevronDown, Settings2 } from 'lucide-react';
+import { usePathname, useParams, useRouter } from 'next/navigation';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { Hash, Volume2, Plus, Bell, Users, ChevronUp, ChevronDown, Settings2, X, Check } from 'lucide-react';
 import { useState } from 'react';
 import {
   listSpaceTopics,
@@ -12,7 +12,8 @@ import {
   listSpaceCategories,
   hasSpacePermission,
 } from '../../lib/api/spaces';
-import { listMyDMs } from '../../lib/api/channels';
+import { listMyDMs, createGroupDm, type DmSummary } from '../../lib/api/channels';
+import { listFriends } from '../../lib/api/friends';
 import { getSuggestedAccounts } from '../../lib/api/feed';
 import { useAppStore } from '../../store/useAppStore';
 import { NotificationsPanel } from './NotificationsPanel';
@@ -219,8 +220,10 @@ function SpaceTopicList() {
 
 function DmList() {
   const pathname = usePathname() ?? '';
+  const router = useRouter();
   const unreadByChannel = useAppStore((s) => s.unreadByChannel);
   const { data: dms = [], isLoading } = useQuery({ queryKey: ['my-dms'], queryFn: listMyDMs });
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
 
   return (
     <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
@@ -235,9 +238,27 @@ function DmList() {
           <Users size={16} /> Friends
         </Link>
 
-        <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
-          Direct Messages
+        <div className="flex items-center justify-between px-2.5 pb-2 pt-3">
+          <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">Direct Messages</span>
+          <button
+            onClick={() => setNewGroupOpen(true)}
+            className="flex h-5 w-5 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
+            aria-label="New group"
+            title="New group"
+          >
+            <Plus size={13} />
+          </button>
         </div>
+
+        {newGroupOpen && (
+          <NewGroupModal
+            onClose={() => setNewGroupOpen(false)}
+            onCreated={(channelId) => {
+              setNewGroupOpen(false);
+              router.push(`/channels/me/${channelId}`);
+            }}
+          />
+        )}
 
         {!isLoading && dms.length === 0 && (
           <div className="mt-4 flex flex-1 flex-col items-center gap-3 px-2 text-center">
@@ -259,6 +280,9 @@ function DmList() {
           const href = `/channels/me/${dm.channel_id}`;
           const active = pathname === href;
           const unread = unreadByChannel[dm.channel_id] ?? 0;
+          const label = dm.is_group
+            ? dm.group_name || dm.other_users.map((u) => u.display_name).join(', ') || 'Group'
+            : (dm.other_users[0]?.display_name ?? 'Unknown');
           return (
             <Link
               key={dm.channel_id}
@@ -268,24 +292,30 @@ function DmList() {
               }`}
             >
               <div className="relative shrink-0">
-                {dm.other_user.avatar_url ? (
-                  <img src={dm.other_user.avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                {dm.is_group ? (
+                  <GroupAvatar members={dm.other_users} />
                 ) : (
-                  <div
-                    style={{ ['--p-a' as string]: dm.other_user.accent_color_top, ['--p-b' as string]: dm.other_user.accent_color_bottom }}
-                    className="flex h-8 w-8 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black"
-                  >
-                    {dm.other_user.display_name.slice(0, 2).toUpperCase()}
-                  </div>
+                  <>
+                    {dm.other_users[0]?.avatar_url ? (
+                      <img src={dm.other_users[0].avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                    ) : (
+                      <div
+                        style={{ ['--p-a' as string]: dm.other_users[0]?.accent_color_top, ['--p-b' as string]: dm.other_users[0]?.accent_color_bottom }}
+                        className="flex h-8 w-8 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black"
+                      >
+                        {(dm.other_users[0]?.display_name ?? '?').slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                    {dm.other_users[0] && (
+                      <span className="absolute -bottom-0.5 -right-0.5">
+                        <StatusDot userId={dm.other_users[0].id} size={10} />
+                      </span>
+                    )}
+                  </>
                 )}
-                <span className="absolute -bottom-0.5 -right-0.5">
-                  <StatusDot userId={dm.other_user.id} size={10} />
-                </span>
               </div>
               <div className="min-w-0 flex-1">
-                <div className={`truncate text-[13px] ${unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : 'font-medium'}`}>
-                  {dm.other_user.display_name}
-                </div>
+                <div className={`truncate text-[13px] ${unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : 'font-medium'}`}>{label}</div>
                 <div className="truncate text-[11.5px] text-[var(--color-ink-faint)]">{dm.last_message_preview}</div>
               </div>
               {unread > 0 && (
@@ -351,6 +381,125 @@ function FeedFilters() {
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Overlapping 2-3 avatar cluster for a group DM row, since there's no
+ * single "other person" to show a picture for. Caps at 3 visible faces
+ * with a "+N" badge for anything beyond that — mirrors the same
+ * truncation CallBar already does for call participants.
+ */
+function GroupAvatar({ members }: { members: DmSummary['other_users'] }) {
+  const shown = members.slice(0, 3);
+  return (
+    <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
+      <div className="flex -space-x-2">
+        {shown.map((m) => (
+          <div
+            key={m.id}
+            className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--color-surface)] text-[8px] font-bold text-black presence-fill"
+            style={{ ['--p-a' as string]: m.accent_color_top, ['--p-b' as string]: m.accent_color_bottom }}
+          >
+            {m.avatar_url ? <img src={m.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : m.display_name.slice(0, 1).toUpperCase()}
+          </div>
+        ))}
+      </div>
+      {members.length > 3 && (
+        <span className="absolute -bottom-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[var(--color-surface-overlay)] px-0.5 font-mono text-[7px] font-bold text-[var(--color-ink-muted)]">
+          +{members.length - 3}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Pick 2+ friends and (optionally) name it, to create a group DM — see 032_group_dm.sql. */
+function NewGroupModal({ onClose, onCreated }: { onClose: () => void; onCreated: (channelId: string) => void }) {
+  const { data: friends = [] } = useQuery({ queryKey: ['friends'], queryFn: listFriends });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const createMutation = useMutation({
+    mutationFn: () => createGroupDm([...selected], name.trim() || undefined),
+    onSuccess: onCreated,
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not create group.'),
+  });
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[520px] w-full max-w-sm flex-col overflow-hidden rounded-2xl border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] shadow-2xl"
+      >
+        <div className="flex items-center justify-between border-b border-[var(--color-hairline)] px-4 py-3">
+          <span className="text-[14px] font-semibold">New group</span>
+          <button onClick={onClose} className="text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]" aria-label="Close">
+            <X size={17} />
+          </button>
+        </div>
+
+        <div className="border-b border-[var(--color-hairline)] px-4 py-3">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Group name (optional)"
+            className="w-full rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-2.5 py-1.5 text-[12.5px] outline-none focus:border-[var(--presence-default-a)]"
+          />
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {friends.length === 0 ? (
+            <p className="px-2.5 py-4 text-center text-[12px] text-[var(--color-ink-muted)]">Add some friends first — you'll see them here.</p>
+          ) : (
+            friends.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => toggle(f.id)}
+                className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left hover:bg-[var(--color-surface-raised)]"
+              >
+                <div
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-black presence-fill"
+                  style={{ ['--p-a' as string]: f.accent_color_top, ['--p-b' as string]: f.accent_color_bottom }}
+                >
+                  {f.avatar_url ? <img src={f.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : f.display_name.slice(0, 2).toUpperCase()}
+                </div>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium">{f.display_name}</span>
+                <div
+                  className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border ${
+                    selected.has(f.id) ? 'border-[var(--presence-default-a)] bg-[var(--presence-default-a)] text-black' : 'border-[var(--color-hairline-strong)]'
+                  }`}
+                >
+                  {selected.has(f.id) && <Check size={11} />}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+
+        {error && <p className="px-4 pb-1 text-[11.5px] text-red-400">{error}</p>}
+
+        <div className="border-t border-[var(--color-hairline)] px-4 py-3">
+          <button
+            onClick={() => createMutation.mutate()}
+            disabled={selected.size < 2 || createMutation.isPending}
+            className="w-full rounded-full bg-white py-2 text-[12.5px] font-semibold text-black disabled:opacity-40"
+          >
+            {createMutation.isPending ? 'Creating…' : selected.size < 2 ? `Pick ${2 - selected.size} more` : `Create group (${selected.size + 1})`}
+          </button>
+        </div>
       </div>
     </div>
   );
