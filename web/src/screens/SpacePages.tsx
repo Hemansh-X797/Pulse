@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { listSpaceTopics } from '../lib/api/spaces';
 import { ChatView } from '../components/chat/ChatView';
+import { VoiceChannelView } from './VoiceChannelView';
 
 export function SpaceHome() {
   const params = useParams<{ spaceId: string }>()!;
@@ -21,7 +22,11 @@ export function SpaceHome() {
       </div>
     );
   }
-  return <ChatView channelId={general.id} channelLabel={general.name} />;
+  return general.kind === 'voice' ? (
+    <VoiceChannelView channelId={general.id} channelLabel={general.name} />
+  ) : (
+    <ChatView channelId={general.id} channelLabel={general.name} />
+  );
 }
 
 export function SpaceTopic() {
@@ -32,5 +37,13 @@ export function SpaceTopic() {
     queryFn: () => listSpaceTopics(spaceId),
   });
   const topic = topics.find((t) => t.id === topicId);
-  return <ChatView channelId={topicId} channelLabel={topic?.name ?? '...'} />;
+  // Falls back to ChatView while topics are still loading (topic is
+  // undefined for a beat on first render) — kind === 'voice' can't be
+  // true yet in that state, so this never flashes the voice screen for
+  // a text channel or vice versa, just briefly shows a loading label.
+  return topic?.kind === 'voice' ? (
+    <VoiceChannelView channelId={topicId} channelLabel={topic.name} />
+  ) : (
+    <ChatView channelId={topicId} channelLabel={topic?.name ?? '...'} />
+  );
 }
