@@ -228,6 +228,18 @@ export interface Database {
         Update: { read?: boolean };
         Relationships: [];
       };
+      badges: {
+        Row: { id: string; label: string; description: string; icon: string };
+        Insert: never; // seeded by migration only — see 031_badges_founding_member.sql
+        Update: never;
+        Relationships: [];
+      };
+      profile_badges: {
+        Row: { profile_id: string; badge_id: string; granted_at: string };
+        Insert: never; // granted by migration/admin only, never client-side — see 031's RLS note
+        Update: never;
+        Relationships: [];
+      };
       friend_requests: {
         Row: {
           id: number;
@@ -332,6 +344,18 @@ export interface Database {
       create_dm_channel: {
         Args: { other_user_id: string };
         Returns: string;
+      };
+      create_group_dm: {
+        Args: { p_member_ids: string[]; p_name: string | null };
+        Returns: string;
+      };
+      add_group_dm_member: {
+        Args: { p_channel_id: string; p_user_id: string };
+        Returns: void;
+      };
+      leave_group_dm: {
+        Args: { p_channel_id: string };
+        Returns: void;
       };
       get_mutual_friends: {
         Args: { other_user_id: string };
