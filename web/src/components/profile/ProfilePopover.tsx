@@ -11,6 +11,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../NameStyle';
 import { isValidNameplateId, nameplateSrc } from '../../lib/nameplates';
 import { DecoratedAvatar } from '../DecoratedAvatar';
+import { ProfileBadges } from '../ProfileBadges';
 import { StatusDot } from '../StatusDot';
 
 function lastSeenLabel(iso: string) {
@@ -129,8 +130,9 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
               </button>
             </DecoratedAvatar>
 
-            <div className="text-[14.5px] font-semibold text-[var(--color-ink)]">
+            <div className="flex items-center gap-1.5 text-[14.5px] font-semibold text-[var(--color-ink)]">
               <NameStyle name={profile.display_name} style={profile.name_style as NameStyleData} />
+              <ProfileBadges userId={profile.id} size={15} />
             </div>
             <div className="mb-2 text-[12px] text-[var(--color-ink-muted)]">
               @{profile.username} {profile.pronouns && `· ${profile.pronouns}`}
