@@ -13,6 +13,7 @@ import { useAppStore } from '../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../components/NameStyle';
 import { isValidNameplateId, nameplateSrc } from '../lib/nameplates';
 import { DecoratedAvatar } from '../components/DecoratedAvatar';
+import { ProfileBadges } from '../components/ProfileBadges';
 
 export function UserProfile() {
   const params = useParams<{ username: string }>()!;
@@ -222,7 +223,10 @@ export function UserProfile() {
           )}
         </div>
 
-        <h1 className="font-serif text-2xl font-semibold"><NameStyle name={profile.display_name} style={profile.name_style as NameStyleData} /></h1>
+        <div className="flex items-center gap-2">
+          <h1 className="font-serif text-2xl font-semibold"><NameStyle name={profile.display_name} style={profile.name_style as NameStyleData} /></h1>
+          <ProfileBadges userId={profile.id} size={18} />
+        </div>
         <p className="mb-1 text-sm text-[var(--color-ink-muted)]">
           @{profile.username} {profile.pronouns && `· ${profile.pronouns}`}
         </p>
