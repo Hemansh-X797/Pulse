@@ -43,7 +43,9 @@ export function Landing() {
           <span className="font-serif text-lg font-semibold">PalSpace</span>
         </div>
         <nav className="flex items-center gap-4">
-          <DownloadButton size="md" />
+          <Link href="/download" className="text-[13px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
+            Download
+          </Link>
           <Link href="/login" className="text-[13px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
             Log in
           </Link>
@@ -68,9 +70,12 @@ export function Landing() {
           PalSpace puts chat, a real feed, communities you actually own, and stories in one place —
           without asking you to choose which app your friends live in.
         </p>
-        <div className="mb-5 flex flex-wrap items-center justify-center gap-3.5">
+        <div className="mb-2 flex flex-wrap items-center justify-center gap-3.5">
           <DownloadButton size="lg" />
         </div>
+        <Link href="/download" className="mb-5 text-[11.5px] text-[var(--color-ink-faint)] hover:text-[var(--color-ink-muted)] hover:underline">
+          See all download options
+        </Link>
         <div className="flex items-center gap-3">
           <Link
             href="/login"
