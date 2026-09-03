@@ -87,8 +87,8 @@ export function ForwardMessageModal({
               {dms.map((dm) => (
                 <ForwardTarget
                   key={dm.channel_id}
-                  label={dm.other_user.display_name}
-                  sublabel={`@${dm.other_user.username}`}
+                  label={dm.is_group ? dm.group_name || dm.other_users.map((u) => u.display_name).join(', ') || 'Group' : (dm.other_users[0]?.display_name ?? 'Unknown')}
+                  sublabel={dm.is_group ? `${dm.other_users.length + 1} members` : `@${dm.other_users[0]?.username ?? ''}`}
                   sending={sendingTo === dm.channel_id}
                   sent={sentTo.has(dm.channel_id)}
                   onClick={() => handleSend(dm.channel_id)}
