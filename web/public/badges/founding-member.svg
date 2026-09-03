@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="fm-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff3c4"/>
+      <stop offset="45%" stop-color="#ffd24a"/>
+      <stop offset="100%" stop-color="#c98a12"/>
+    </linearGradient>
+    <linearGradient id="fm-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff8de"/>
+      <stop offset="100%" stop-color="#e0a92e"/>
+    </linearGradient>
+  </defs>
+
+  <!-- laurel wreath, left -->
+  <g fill="#ffd24a" opacity="0.95">
+    <ellipse cx="10" cy="20" rx="4.5" ry="2.3" transform="rotate(-35 10 20)"/>
+    <ellipse cx="7" cy="28" rx="4.8" ry="2.4" transform="rotate(-15 7 28)"/>
+    <ellipse cx="7" cy="37" rx="4.8" ry="2.4" transform="rotate(10 7 37)"/>
+    <ellipse cx="10" cy="45" rx="4.5" ry="2.3" transform="rotate(35 10 45)"/>
+    <path d="M13 17 C7 24 6 40 13 48" fill="none" stroke="#c98a12" stroke-width="1.4"/>
+  </g>
+  <!-- laurel wreath, right (mirrored) -->
+  <g fill="#ffd24a" opacity="0.95">
+    <ellipse cx="54" cy="20" rx="4.5" ry="2.3" transform="rotate(35 54 20)"/>
+    <ellipse cx="57" cy="28" rx="4.8" ry="2.4" transform="rotate(15 57 28)"/>
+    <ellipse cx="57" cy="37" rx="4.8" ry="2.4" transform="rotate(-10 57 37)"/>
+    <ellipse cx="54" cy="45" rx="4.5" ry="2.3" transform="rotate(-35 54 45)"/>
+    <path d="M51 17 C57 24 58 40 51 48" fill="none" stroke="#c98a12" stroke-width="1.4"/>
+  </g>
+
+  <!-- ribbon tails -->
+  <path d="M26 42 L20 58 L27 55 L30 60 L33 47 Z" fill="#e0483f"/>
+  <path d="M38 42 L44 58 L37 55 L34 60 L31 47 Z" fill="#c23931"/>
+
+  <!-- medal disc -->
+  <circle cx="32" cy="26" r="18" fill="url(#fm-ring)"/>
+  <circle cx="32" cy="26" r="14.5" fill="url(#fm-gold)" stroke="#a3730d" stroke-width="1"/>
+
+  <!-- star -->
+  <path
+    d="M32 17 L34.4 23.6 L41.4 23.9 L35.8 28.1 L37.8 34.8 L32 30.9 L26.2 34.8 L28.2 28.1 L22.6 23.9 L29.6 23.6 Z"
+    fill="#fff8de"
+    stroke="#a3730d"
+    stroke-width="0.6"
+  />
+</svg>
