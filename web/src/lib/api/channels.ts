@@ -48,7 +48,13 @@ export async function createOrGetDM(otherUsername: string): Promise<string> {
 
 export interface DmSummary {
   channel_id: string;
-  other_user: { id: string; username: string; display_name: string; avatar_url: string; accent_color_top: string; accent_color_bottom: string };
+  is_group: boolean;
+  group_name: string;
+  // 1:1 DMs have exactly one; group DMs can have several. Kept as an
+  // array uniformly (rather than a separate `other_user` singular +
+  // `members` plural field) so callers don't need two branches for
+  // "which shape is this".
+  other_users: { id: string; username: string; display_name: string; avatar_url: string; accent_color_top: string; accent_color_bottom: string }[];
   last_message_preview: string;
   last_message_at: string | null;
 }
@@ -58,14 +64,18 @@ export async function listMyDMs(): Promise<DmSummary[]> {
   if (!userData.user) return [];
 
   // Same RLS scoping as createOrGetDM: this only ever returns channels
-  // I'm actually a member of.
+  // I'm actually a member of. No longer filters out is_group — that
+  // filter used to hide every group DM from this list entirely, which
+  // combined with there being no way to create one at all
+  // (see 032_group_dm.sql) meant group DMs were completely
+  // unreachable end to end.
   const { data: myChannels, error } = await supabase
     .from('channel_members')
-    .select('channel_id, channels!inner(is_group)')
-    .eq('user_id', userData.user.id)
-    .eq('channels.is_group', false);
+    .select('channel_id, channels!inner(is_group, name)')
+    .eq('user_id', userData.user.id);
   if (error) throw error;
-  const channelIds = (myChannels ?? []).map((r) => r.channel_id);
+  const channelMeta = new Map((myChannels ?? []).map((r) => [r.channel_id, r.channels as unknown as { is_group: boolean; name: string }]));
+  const channelIds = [...channelMeta.keys()];
   if (channelIds.length === 0) return [];
 
   const { data: allMembers, error: membersError } = await supabase
@@ -88,18 +98,50 @@ export async function listMyDMs(): Promise<DmSummary[]> {
     }
   }
 
-  return (allMembers ?? [])
-    .map((row) => {
-      const other = row.profiles as unknown as DmSummary['other_user'];
-      const last = lastByChannel.get(row.channel_id);
+  const othersByChannel = new Map<string, DmSummary['other_users']>();
+  for (const row of allMembers ?? []) {
+    const profile = row.profiles as unknown as DmSummary['other_users'][number];
+    const list = othersByChannel.get(row.channel_id) ?? [];
+    list.push(profile);
+    othersByChannel.set(row.channel_id, list);
+  }
+
+  return channelIds
+    .map((channelId) => {
+      const meta = channelMeta.get(channelId)!;
+      const last = lastByChannel.get(channelId);
       return {
-        channel_id: row.channel_id,
-        other_user: other,
+        channel_id: channelId,
+        is_group: meta.is_group,
+        group_name: meta.name,
+        other_users: othersByChannel.get(channelId) ?? [],
         last_message_preview: last?.preview ?? 'No messages yet',
         last_message_at: last?.at ?? null,
       };
     })
     .sort((a, b) => (b.last_message_at ?? '').localeCompare(a.last_message_at ?? ''));
+}
+
+/**
+ * See 032_group_dm.sql for why this couldn't just be a client-side
+ * insert (channel_members RLS only allows inserting your own
+ * membership row). Requires at least 2 other members — with just one,
+ * createOrGetDM already covers that (and dedupes to the existing 1:1).
+ */
+export async function createGroupDm(memberIds: string[], name?: string): Promise<string> {
+  const { data, error } = await supabase.rpc('create_group_dm', { p_member_ids: memberIds, p_name: name ?? null });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function addGroupDmMember(channelId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('add_group_dm_member', { p_channel_id: channelId, p_user_id: userId });
+  if (error) throw error;
+}
+
+export async function leaveGroupDm(channelId: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_group_dm', { p_channel_id: channelId });
+  if (error) throw error;
 }
 
 export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string; sender_display_name: string; sender_avatar_url: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
@@ -381,6 +423,14 @@ export async function forwardMessage(targetChannelId: string, message: Message &
 export async function getOtherDmParticipantId(channelId: string): Promise<string | null> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return null;
+  // Group DMs have more than one "other" member, so "the other
+  // person's last-read pointer" isn't a well-defined single value the
+  // way it is for a 1:1 — rather than arbitrarily picking one member
+  // and showing a "Seen" that's only true for them (misleading), this
+  // returns null for a group and the Seen indicator just doesn't show
+  // there at all.
+  const { data: channel } = await supabase.from('channels').select('is_group').eq('id', channelId).maybeSingle();
+  if (channel?.is_group) return null;
   const { data, error } = await supabase
     .from('channel_members')
     .select('user_id')
