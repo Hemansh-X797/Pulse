@@ -593,7 +593,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         </div>
       )}
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 md:px-7 md:py-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 md:px-9 md:py-7">
         <AnimatePresence initial={false}>
           {messages.map((m) => (
             <MessageRow
@@ -821,6 +821,8 @@ function MessageRow({
 }) {
   const [editValue, setEditValue] = useState(message.body_rendered);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuDropUp, setMenuDropUp] = useState(false);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
   const [longPressMenuOpen, setLongPressMenuOpen] = useState(false);
   const [quickReactOpen, setQuickReactOpen] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -849,7 +851,7 @@ function MessageRow({
 
   if (message.deleted) {
     return (
-      <div id={`msg-${message.id}`} className={`flex gap-2.5 ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}>
+      <div id={`msg-${message.id}`} className={`flex gap-3 ${compact ? 'py-1' : 'py-2'} ${isMine ? 'flex-row-reverse' : ''}`}>
         <div className="w-[30px] shrink-0" />
         <div className="rounded-2xl border border-dashed border-[var(--color-hairline-strong)] px-3.5 py-2 font-mono text-[13px] italic text-[var(--color-ink-muted)]">
           message deleted
@@ -871,7 +873,7 @@ function MessageRow({
       animate={{ opacity: message.pending ? 0.5 : 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className={`group relative flex gap-2.5 rounded-lg ${compact ? 'py-0.5' : 'py-1.5'} ${isMine ? 'flex-row-reverse' : ''}`}
+      className={`group relative flex gap-3 rounded-lg ${compact ? 'py-1' : 'py-2'} ${isMine ? 'flex-row-reverse' : ''}`}
       onTouchStart={handleTouchStart}
       onTouchEnd={cancelLongPress}
       onTouchMove={cancelLongPress}
@@ -899,7 +901,7 @@ function MessageRow({
         </button>
       )}
       {compact && <div className="w-[30px] shrink-0" />}
-      <div className={`relative flex flex-col ${bubbles ? 'max-w-[70%]' : 'max-w-full flex-1'} ${isMine ? 'items-end' : 'items-start'}`}>
+      <div className={`relative flex flex-col ${bubbles ? 'max-w-[74%]' : 'max-w-full flex-1'} ${isMine ? 'items-end' : 'items-start'}`}>
         <div ref={popoverAnchorRef} className={`mb-0.5 flex items-baseline gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
           <button onClick={() => setPopoverOpen((v) => !v)} className="text-[12.5px] font-semibold hover:opacity-80">
             <NameStyle name={message.sender_display_name} style={message.sender_name_style as NameStyleData} />
@@ -947,12 +949,12 @@ function MessageRow({
               <div
                 className={
                   bubbles
-                    ? `bubble-shape rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                    ? `bubble-shape rounded-2xl px-4 py-2.5 text-[13.5px] leading-[1.55] ${
                         isMine
                           ? 'rounded-br-md presence-fill font-medium text-black'
                           : 'rounded-bl-md border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink)]'
                       }`
-                    : 'text-sm leading-relaxed text-[var(--color-ink)]'
+                    : 'text-[13.5px] leading-[1.55] text-[var(--color-ink)]'
                 }
               >
                 {renderMarkdown(message.body_rendered)}
@@ -1024,14 +1026,30 @@ function MessageRow({
         </button>
         <div className="relative border-l border-[var(--color-hairline)] pl-1">
           <button
-            onClick={() => setMenuOpen((v) => !v)}
+            ref={moreButtonRef}
+            onClick={() => {
+              // Decide whether the menu should drop down or flip
+              // upward *before* it opens — it used to always open
+              // downward from this button, which is fine for messages
+              // near the top of the scroll area but meant every menu
+              // on the last handful of messages in a conversation (the
+              // ones people actually hover most) rendered partly or
+              // fully underneath the composer, effectively unusable.
+              // ~260px is a safe upper bound for this menu's rendered
+              // height (7 items + padding) — good enough for a
+              // direction decision without needing a second render to
+              // measure the real box.
+              const rect = moreButtonRef.current?.getBoundingClientRect();
+              if (rect) setMenuDropUp(window.innerHeight - rect.bottom < 260);
+              setMenuOpen((v) => !v);
+            }}
             title="More Actions"
             className="p-1 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]"
           >
             <MoreHorizontal size={13} />
           </button>
           {menuOpen && (
-            <div className={`absolute top-full z-20 mt-1 ${isMine ? 'right-0' : 'left-0'}`}>
+            <div className={`absolute z-20 ${menuDropUp ? 'bottom-full mb-1' : 'top-full mt-1'} ${isMine ? 'right-0' : 'left-0'}`}>
               <MessageContextMenu
                 onClose={() => setMenuOpen(false)}
                 onCopyText={onCopyText}
