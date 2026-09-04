@@ -69,10 +69,23 @@ export async function listMyDMs(): Promise<DmSummary[]> {
   // combined with there being no way to create one at all
   // (see 032_group_dm.sql) meant group DMs were completely
   // unreachable end to end.
+  // My mistake in the group-DM rewrite: I dropped the old
+  // `.eq('channels.is_group', false)` filter to stop excluding group
+  // DMs, but that filter was *also* incidentally the only thing
+  // keeping space channels out of this list — a space's text/voice
+  // channels get channel_members rows too (see 001/002's
+  // handle_new_server trigger), and they're is_group=false same as a
+  // 1:1 DM, so removing that filter let every space channel I'm a
+  // member of leak into the DM list. The actually-correct filter is on
+  // server_id, not is_group: a DM (1:1 or group) always has
+  // server_id = null, a space channel never does. This correctly
+  // includes both DM kinds and excludes space channels regardless of
+  // their is_group value.
   const { data: myChannels, error } = await supabase
     .from('channel_members')
-    .select('channel_id, channels!inner(is_group, name)')
-    .eq('user_id', userData.user.id);
+    .select('channel_id, channels!inner(is_group, name, server_id)')
+    .eq('user_id', userData.user.id)
+    .is('channels.server_id', null);
   if (error) throw error;
   const channelMeta = new Map((myChannels ?? []).map((r) => [r.channel_id, r.channels as unknown as { is_group: boolean; name: string }]));
   const channelIds = [...channelMeta.keys()];
