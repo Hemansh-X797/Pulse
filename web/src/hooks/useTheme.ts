@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'palspace-theme';
-export type ThemeName = 'bespoke' | 'classic' | 'sunroom' | 'signal';
-const VALID_THEMES: ThemeName[] = ['bespoke', 'classic', 'sunroom', 'signal'];
+export type ThemeName = 'bespoke' | 'classic' | 'sunroom' | 'signal' | 'grove';
+const VALID_THEMES: ThemeName[] = ['bespoke', 'classic', 'sunroom', 'signal', 'grove'];
 const DEFAULT_THEME: ThemeName = 'bespoke';
 
 function parseTheme(value: string | null): ThemeName {
