@@ -254,6 +254,70 @@ html[data-theme='bespoke'] .bespoke-timestamp {
   text-transform: uppercase;
   font-size: 0.92em;
 }
+/*
+  GROVE — green nature theme. Deliberately neither Bespoke's flattened
+  sharp corners nor Classic's uniform full roundness: cards get an
+  asymmetric "leaf" corner treatment instead (rounded on the two
+  diagonal-opposite corners, closer to square on the other two) via
+  .grove-leaf — organic rather than geometric, which is the actual
+  point of a nature theme's shape language, not just a green recolor of
+  an existing corner style. Deep moss/forest surfaces, sage/moss-gold
+  accent gradient, warm parchment ink (never pure white — nothing in
+  nature is that flat) for text.
+*/
+html[data-theme='grove'] {
+  --color-void: #0c130e;
+  --color-surface: #121b15;
+  --color-surface-raised: #1a271e;
+  --color-surface-overlay: #223327;
+  --color-hairline: rgba(168, 201, 155, 0.14);
+  --color-hairline-strong: rgba(168, 201, 155, 0.26);
+  --color-ink: #eef2e6;
+  --color-ink-muted: #9fb497;
+  --color-ink-faint: #5e7259;
+  --presence-default-a: #7cb87f;
+  --presence-default-b: #c9a24a;
+}
+html[data-theme='grove'] .presence-fill {
+  color: #0c130e;
+}
+html[data-theme='grove'] :focus-visible {
+  border-radius: 10px 3px 10px 3px;
+}
+/* The asymmetric leaf-corner treatment itself — applied to the same
+   card-like surfaces Bespoke's .bespoke-corner opts into (post cards,
+   modals, panels), never forced onto every rounded element, since
+   forcing it onto small chips/pills/avatars would just read as broken
+   rounding rather than a deliberate shape. */
+html[data-theme='grove']
+  :is(.rounded-lg, .rounded-xl, .rounded-2xl, .rounded-3xl):not(.rounded-full, .pill-shape, .bubble-shape) {
+  border-radius: 22px 6px 22px 6px;
+}
+html[data-theme='grove'] .composer-round {
+  border-radius: 22px 6px 22px 6px;
+}
+html[data-theme='grove'] .bubble-shape {
+  border-radius: 16px 4px 16px 16px;
+}
+/* A faint organic vein texture on elevated cards — opt-in like
+   .bespoke-corner, not global, so it reads as this theme's signature
+   detail on the surfaces it actually decorates rather than noise
+   everywhere. */
+html[data-theme='grove'] .grove-leaf {
+  position: relative;
+}
+html[data-theme='grove'] .grove-leaf::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 34px;
+  pointer-events: none;
+  background: radial-gradient(circle at 100% 0%, rgba(124, 184, 127, 0.16), transparent 70%);
+  border-radius: 22px 6px 22px 6px;
+}
+
 /* Fonts */
 .name-font-serif { font-family: var(--font-serif); }
 .name-font-gothic { font-family: var(--font-gothic), var(--font-serif); letter-spacing: 0.5px; }
