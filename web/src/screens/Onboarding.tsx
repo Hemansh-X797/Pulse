@@ -15,6 +15,7 @@ const THEME_SWATCHES: { name: ThemeName; a: string; b: string; corners: string }
   { name: 'classic', a: '#1a1a22', b: '#212129', corners: 'rounded-full' },
   { name: 'sunroom', a: '#fdfaf3', b: '#c96f4a', corners: 'rounded-full' },
   { name: 'signal', a: '#050806', b: '#3ddc63', corners: '' },
+  { name: 'grove', a: '#121b15', b: '#7cb87f', corners: 'rounded-[7px_2px_7px_2px]' },
 ];
 
 const INTEREST_OPTIONS = [
