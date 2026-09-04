@@ -7,11 +7,17 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithPassword, signUpWithPassword, signInWithGoogle, signInWithDiscord, signInWithGithub } from '../lib/api/auth';
 
 export function Login() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Used by /join/[code] to send someone here to log in, then land
+  // straight back on the invite instead of just dumping them at /home
+  // and losing the invite entirely — see the redirect-preserving note
+  // in app/join/[code]/page.tsx.
+  const redirectTo = searchParams.get('redirect');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,10 +34,14 @@ export function Login() {
         // starter spaces) before landing in the app; existing accounts
         // (backfilled to onboarding_completed = true by
         // 011_onboarding_and_public_spaces.sql) skip straight to /home.
+        // A pending invite redirect is intentionally not threaded
+        // through onboarding here (that flow has its own multi-step
+        // navigation) — the invite link itself doesn't expire, so a
+        // brand-new signup can just click it again once onboarding's done.
         router.push('/onboarding');
       } else {
         await signInWithPassword(email, password);
-        router.push('/home');
+        router.push(redirectTo || '/home');
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'something went wrong');
