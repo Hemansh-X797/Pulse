@@ -12,6 +12,7 @@ const THEME_SWATCHES: { name: ThemeName; a: string; b: string; corners: string }
   { name: 'classic', a: '#1a1a22', b: '#212129', corners: 'rounded-full' },
   { name: 'sunroom', a: '#fdfaf3', b: '#c96f4a', corners: 'rounded-full' },
   { name: 'signal', a: '#050806', b: '#3ddc63', corners: '' },
+  { name: 'grove', a: '#121b15', b: '#7cb87f', corners: 'rounded-[7px_2px_7px_2px]' },
 ];
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -66,7 +67,7 @@ export function AppearanceSettings() {
 
       <section className="mb-6 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
         <h2 className="mb-1 text-sm font-semibold text-[var(--color-ink)]">Theme</h2>
-        <p className="mb-3 text-[11.5px] text-[var(--color-ink-faint)]">Four real, equally-supported looks — pick whichever fits.</p>
+        <p className="mb-3 text-[11.5px] text-[var(--color-ink-faint)]">Five real, equally-supported looks — pick whichever fits.</p>
         <div className="grid grid-cols-2 gap-2.5">
           {THEME_SWATCHES.map(({ name, a, b, corners }) => (
             <button
