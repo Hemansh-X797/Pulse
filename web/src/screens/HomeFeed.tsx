@@ -25,6 +25,7 @@ import { ProfilePopover } from '../components/profile/ProfilePopover';
 import type { FeedItem } from '../lib/database.types';
 import { PostDetailModal } from '../components/PostDetailModal';
 import { NameStyle, type NameStyleData } from '../components/NameStyle';
+import { DecoratedAvatar } from '../components/DecoratedAvatar';
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -204,18 +205,10 @@ function EmptyFeed() {
   );
 }
 
-function Avatar({ url, name, size = 34, accentTop, accentBottom }: { url?: string; name: string; size?: number; accentTop?: string; accentBottom?: string }) {
-  if (url) {
-    return (
-      <img
-        src={url}
-        alt=""
-        style={{ width: size, height: size }}
-        className="shrink-0 rounded-full object-cover"
-      />
-    );
-  }
-  return (
+function Avatar({ url, name, size = 34, accentTop, accentBottom, decorationId }: { url?: string; name: string; size?: number; accentTop?: string; accentBottom?: string; decorationId?: string | null }) {
+  const inner = url ? (
+    <img src={url} alt="" style={{ width: size, height: size }} className="shrink-0 rounded-full object-cover" />
+  ) : (
     <div
       style={{
         width: size,
@@ -227,6 +220,11 @@ function Avatar({ url, name, size = 34, accentTop, accentBottom }: { url?: strin
     >
       {name.slice(0, 2).toUpperCase()}
     </div>
+  );
+  return (
+    <DecoratedAvatar decorationId={decorationId} size={size}>
+      {inner}
+    </DecoratedAvatar>
   );
 }
 
@@ -300,6 +298,7 @@ function PostCard({ post, autoOpen }: { post: FeedItem; autoOpen?: boolean }) {
             size={34}
             accentTop={post.author_accent_top}
             accentBottom={post.author_accent_bottom}
+            decorationId={post.author_avatar_decoration}
           />
         </button>
         <button onClick={() => setPopoverOpen((v) => !v)} className="min-w-0 flex-1 text-left hover:opacity-80">
