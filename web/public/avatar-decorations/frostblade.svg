@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <!-- Sharp Ice Glow Filter -->
+    <filter id="iceGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Metallic Steel Blade Gradient -->
+    <linearGradient id="bladeSteel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="50%" stop-color="#7dd3fc" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+
+    <!-- Ice Friction Flash Gradient -->
+    <linearGradient id="frostTrail" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#e0f2fe" stop-opacity="1" />
+      <stop offset="60%" stop-color="#38bdf8" stop-opacity="0.5" />
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <style>
+    /* Continuous Spin for the Slicing Blade */
+    .slice-spin {
+      transform-origin: 50px 50px;
+      animation: spin 5s linear infinite;
+    }
+
+    /* Reverse Spin for Spray & Ice Shards */
+    .spray-spin {
+      transform-origin: 50px 50px;
+      animation: spin-reverse 8s linear infinite;
+    }
+
+    /* Shard Pulse Animations */
+    .shard {
+      animation: flash 1.5s ease-in-out infinite alternate;
+    }
+    .d1 { animation-delay: 0.3s; }
+    .d2 { animation-delay: 0.7s; }
+    .d3 { animation-delay: 1.1s; }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes spin-reverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+    @keyframes flash {
+      0% { opacity: 0.3; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1.2); }
+    }
+  </style>
+
+  <g filter="url(#iceGlow)">
+    <!-- Inner Base Rim (Keeps Center Clear for PFP) -->
+    <circle cx="50" cy="50" r="43.5" fill="none" stroke="#0284c7" stroke-width="0.8" stroke-dasharray="2 4" opacity="0.5" />
+
+    <!-- Sharp Slicing Figure Skate Blades (Rotating Outer Orbit) -->
+    <g class="slice-spin">
+      <!-- Top Blade Curve with Toe Pick -->
+      <g transform="translate(50, 6.5)">
+        <path d="M -16,0 Q 0,3 16,0 L 18,-3 C 18,-3 15,-1 13,-1 L -13,-1 C -15,-1 -17,-2 -18,-4 Z" fill="url(#bladeSteel)" stroke="#ffffff" stroke-width="0.3" />
+        <!-- Toe Pick Teeth -->
+        <path d="M 16,0 L 18,1 L 17,-1.5 L 19,-0.5 L 18,-3" fill="none" stroke="#ffffff" stroke-width="0.5" stroke-linejoin="round" />
+        <!-- Blade Connectors -->
+        <rect x="-9" y="-3" width="2" height="2" fill="#7dd3fc" />
+        <rect x="7" y="-3" width="2" height="2" fill="#7dd3fc" />
+      </g>
+
+      <!-- Curved Ice Groove Trails Slicing Behind Blade -->
+      <path d="M 50,6.5 A 43.5 43.5 0 0 1 93.5,50" fill="none" stroke="url(#frostTrail)" stroke-width="1.8" stroke-linecap="round" />
+      <path d="M 50,93.5 A 43.5 43.5 0 0 1 6.5,50" fill="none" stroke="url(#frostTrail)" stroke-width="1.8" stroke-linecap="round" />
+
+      <!-- Bottom Opposing Blade -->
+      <g transform="translate(50, 93.5) rotate(180)">
+        <path d="M -16,0 Q 0,3 16,0 L 18,-3 C 18,-3 15,-1 13,-1 L -13,-1 C -15,-1 -17,-2 -18,-4 Z" fill="url(#bladeSteel)" stroke="#ffffff" stroke-width="0.3" />
+        <path d="M 16,0 L 18,1 L 17,-1.5 L 19,-0.5 L 18,-3" fill="none" stroke="#ffffff" stroke-width="0.5" stroke-linejoin="round" />
+        <rect x="-9" y="-3" width="2" height="2" fill="#7dd3fc" />
+        <rect x="7" y="-3" width="2" height="2" fill="#7dd3fc" />
+      </g>
+    </g>
+
+    <!-- Flying Ice Spray & Angular Crystal Shards -->
+    <g class="spray-spin">
+      <!-- Sharp Ice Crystals / Shards Bursting Out -->
+      <polygon points="90,20 94,18 92,23 96,22" fill="#e0f2fe" class="shard" />
+      <polygon points="10,80 6,82 8,77 4,78" fill="#e0f2fe" class="shard d1" />
+      <polygon points="82,85 86,88 81,89 84,93" fill="#7dd3fc" class="shard d2" />
+      <polygon points="18,15 14,12 19,11 16,7" fill="#7dd3fc" class="shard d3" />
+
+      <!-- Speed Spark Starbursts -->
+      <g class="shard d1" transform="translate(93, 50)">
+        <polygon points="0,-2.5 0.6,-0.6 2.5,0 0.6,0.6 0,2.5 -0.6,0.6 -2.5,0 -0.6,-0.6" fill="#ffffff" />
+      </g>
+      <g class="shard d3" transform="translate(7, 50)">
+        <polygon points="0,-2.5 0.6,-0.6 2.5,0 0.6,0.6 0,2.5 -0.6,0.6 -2.5,0 -0.6,-0.6" fill="#ffffff" />
+      </g>
+    </g>
+  </g>
+</svg>
