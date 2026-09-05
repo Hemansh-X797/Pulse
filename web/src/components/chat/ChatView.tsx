@@ -34,6 +34,7 @@ import { ProfilePopover } from '../profile/ProfilePopover';
 import { useCall } from '../../hooks/useCall';
 import { CallBar } from '../CallBar';
 import { NameStyle, type NameStyleData } from '../NameStyle';
+import { DecoratedAvatar } from '../DecoratedAvatar';
 import {
   subscribeToChannelMessages,
   subscribeToTyping,
@@ -54,7 +55,7 @@ import type { Message } from '../../lib/database.types';
 const EmojiPicker = dynamic(() => import('./EmojiPicker').then((m) => m.EmojiPicker), { ssr: false });
 const GifPicker = dynamic(() => import('./GifPicker').then((m) => m.GifPicker), { ssr: false });
 
-type DisplayMessage = (Message & { sender_username: string; sender_display_name: string; sender_avatar_url?: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null }) & { pending?: boolean };
+type DisplayMessage = (Message & { sender_username: string; sender_display_name: string; sender_avatar_url?: string; sender_avatar_decoration?: string | null; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null }) & { pending?: boolean };
 
 const EPHEMERAL_OPTIONS = [
   { label: 'Off', seconds: 0 },
@@ -221,7 +222,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
             const idx = prev.findIndex((m) => m.pending && m.client_ref === incoming.client_ref);
             if (idx !== -1) {
               const next = [...prev];
-              next[idx] = { ...incoming, sender_username: prev[idx].sender_username, sender_display_name: prev[idx].sender_display_name, sender_avatar_url: prev[idx].sender_avatar_url, sender_name_style: prev[idx].sender_name_style, pending: false };
+              next[idx] = { ...incoming, sender_username: prev[idx].sender_username, sender_display_name: prev[idx].sender_display_name, sender_avatar_url: prev[idx].sender_avatar_url, sender_avatar_decoration: prev[idx].sender_avatar_decoration, sender_name_style: prev[idx].sender_name_style, pending: false };
               return next;
             }
           }
@@ -236,8 +237,9 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
           const senderUsername = isMe ? profile.username : '…';
           const senderDisplayName = isMe ? profile.display_name : '…';
           const senderAvatarUrl = isMe ? (profile.avatar_url ?? undefined) : undefined;
+          const senderAvatarDecoration = isMe ? (profile.equipped_avatar_decoration ?? null) : null;
           const senderNameStyle = isMe ? (profile.name_style as DisplayMessage['sender_name_style']) : null;
-          return [...prev, { ...incoming, sender_username: senderUsername, sender_display_name: senderDisplayName, sender_avatar_url: senderAvatarUrl, sender_name_style: senderNameStyle }];
+          return [...prev, { ...incoming, sender_username: senderUsername, sender_display_name: senderDisplayName, sender_avatar_url: senderAvatarUrl, sender_avatar_decoration: senderAvatarDecoration, sender_name_style: senderNameStyle }];
         });
       },
       (updated) => {
@@ -292,6 +294,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       sender_username: profile.username,
       sender_display_name: profile.display_name,
       sender_avatar_url: profile.avatar_url ?? undefined,
+      sender_avatar_decoration: profile.equipped_avatar_decoration ?? null,
       sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
       body_raw: body,
       body_rendered: body, // rendered for real once the emoji lib runs in sendMessage; good enough for the instant local paint
@@ -338,6 +341,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         sender_username: profile.username,
         sender_display_name: profile.display_name,
         sender_avatar_url: profile.avatar_url ?? undefined,
+        sender_avatar_decoration: profile.equipped_avatar_decoration ?? null,
         sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
         body_raw: '',
         body_rendered: '',
@@ -375,6 +379,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       sender_username: profile.username,
       sender_display_name: profile.display_name,
       sender_avatar_url: profile.avatar_url ?? undefined,
+      sender_avatar_decoration: profile.equipped_avatar_decoration ?? null,
       sender_name_style: profile.name_style as DisplayMessage['sender_name_style'],
       body_raw: '',
       body_rendered: '',
@@ -595,29 +600,52 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 md:px-9 md:py-7">
         <AnimatePresence initial={false}>
-          {messages.map((m) => (
-            <MessageRow
-              key={m.client_ref ?? m.id}
-              message={m}
-              isMine={m.sender_id === profile?.id}
-              isEditing={editingId === m.id}
-              replySnippet={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : undefined}
-              compact={compactMode}
-              bubbles={chatBubbles}
-              onReply={() => setReplyTarget(m)}
-              onEdit={() => startEdit(m)}
-              onSaveEdit={(body) => saveEdit(m.id, body)}
-              onDelete={() => handleDelete(m.id)}
-              reactions={reactionsByMessage[m.id] ?? []}
-              onReact={(emoji) => handleReact(m.id, emoji)}
-              isPinned={pinnedIds.has(m.id)}
-              onTogglePin={() => handleTogglePin(m)}
-              onMarkUnread={() => handleMarkUnread(m)}
-              onCopyText={() => handleCopyText(m)}
-              onCopyLink={() => handleCopyLink(m)}
-              onForward={() => setForwardTarget(m)}
-            />
-          ))}
+          {messages.map((m, i) => {
+            const prev = messages[i - 1];
+            // Real message grouping — before this, every single message
+            // showed a full avatar + name header no matter what, so
+            // anyone sending a few short messages back-to-back (which is
+            // extremely normal chat behavior, not an edge case) got their
+            // name and picture repeated every single line. Grouped when:
+            // same sender, same channel, less than 5 minutes apart
+            // (Discord/Slack both use a similar window), and neither
+            // message is a reply (a reply always shows its own header
+            // since it's referencing something specific, not continuing
+            // a run). Deleted messages don't break a run visually since
+            // "message deleted" already renders as its own distinct row.
+            const isGrouped =
+              !!prev &&
+              prev.sender_id === m.sender_id &&
+              !m.reply_to_id &&
+              !prev.reply_to_id &&
+              !m.deleted &&
+              !prev.deleted &&
+              Math.abs(new Date(m.created_at).getTime() - new Date(prev.created_at).getTime()) < 5 * 60 * 1000;
+            return (
+              <MessageRow
+                key={m.client_ref ?? m.id}
+                message={m}
+                isMine={m.sender_id === profile?.id}
+                isEditing={editingId === m.id}
+                isGrouped={isGrouped}
+                replySnippet={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : undefined}
+                compact={compactMode}
+                bubbles={chatBubbles}
+                onReply={() => setReplyTarget(m)}
+                onEdit={() => startEdit(m)}
+                onSaveEdit={(body) => saveEdit(m.id, body)}
+                onDelete={() => handleDelete(m.id)}
+                reactions={reactionsByMessage[m.id] ?? []}
+                onReact={(emoji) => handleReact(m.id, emoji)}
+                isPinned={pinnedIds.has(m.id)}
+                onTogglePin={() => handleTogglePin(m)}
+                onMarkUnread={() => handleMarkUnread(m)}
+                onCopyText={() => handleCopyText(m)}
+                onCopyLink={() => handleCopyLink(m)}
+                onForward={() => setForwardTarget(m)}
+              />
+            );
+          })}
         </AnimatePresence>
 
         {(() => {
@@ -784,6 +812,7 @@ function MessageRow({
   message,
   isMine,
   isEditing,
+  isGrouped,
   replySnippet,
   compact,
   bubbles,
@@ -803,6 +832,7 @@ function MessageRow({
   message: DisplayMessage;
   isMine: boolean;
   isEditing: boolean;
+  isGrouped: boolean;
   replySnippet?: DisplayMessage;
   compact: boolean;
   bubbles: boolean;
@@ -852,7 +882,7 @@ function MessageRow({
   if (message.deleted) {
     return (
       <div id={`msg-${message.id}`} className={`flex gap-3 ${compact ? 'py-1' : 'py-2'} ${isMine ? 'flex-row-reverse' : ''}`}>
-        <div className="w-[30px] shrink-0" />
+        <div className="w-10 shrink-0" />
         <div className="rounded-2xl border border-dashed border-[var(--color-hairline-strong)] px-3.5 py-2 font-mono text-[13px] italic text-[var(--color-ink-muted)]">
           message deleted
         </div>
@@ -864,6 +894,7 @@ function MessageRow({
   const isExpiring = !!message.expires_at;
   const popoverAnchorRef = useRef<HTMLDivElement>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const hoverTime = new Date(message.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
   return (
     <motion.div
@@ -873,7 +904,7 @@ function MessageRow({
       animate={{ opacity: message.pending ? 0.5 : 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
-      className={`group relative flex gap-3 rounded-lg ${compact ? 'py-1' : 'py-2'} ${isMine ? 'flex-row-reverse' : ''}`}
+      className={`group relative flex gap-3 rounded-lg ${isGrouped ? 'py-0.5' : compact ? 'py-1' : 'py-2'} ${isMine ? 'flex-row-reverse' : ''}`}
       onTouchStart={handleTouchStart}
       onTouchEnd={cancelLongPress}
       onTouchMove={cancelLongPress}
@@ -886,29 +917,42 @@ function MessageRow({
         if (longPressFired.current) e.preventDefault();
       }}
     >
-      {!compact && (
-        <button
-          onClick={() => setPopoverOpen((v) => !v)}
-          className="mt-0.5 h-[30px] w-[30px] shrink-0 overflow-hidden rounded-full"
-        >
-          {message.sender_avatar_url ? (
-            <img src={message.sender_avatar_url} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center presence-fill text-[11px] font-bold text-black">
-              {initials}
+      {!compact && !isGrouped && (
+        <button onClick={() => setPopoverOpen((v) => !v)} className="mt-0.5 flex w-10 shrink-0 items-center justify-center">
+          <DecoratedAvatar decorationId={message.sender_avatar_decoration} size={30}>
+            <div className="h-[30px] w-[30px] overflow-hidden rounded-full">
+              {message.sender_avatar_url ? (
+                <img src={message.sender_avatar_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center presence-fill text-[11px] font-bold text-black">
+                  {initials}
+                </div>
+              )}
             </div>
-          )}
+          </DecoratedAvatar>
         </button>
       )}
-      {compact && <div className="w-[30px] shrink-0" />}
-      <div className={`relative flex flex-col ${bubbles ? 'max-w-[74%]' : 'max-w-full flex-1'} ${isMine ? 'items-end' : 'items-start'}`}>
-        <div ref={popoverAnchorRef} className={`mb-0.5 flex items-baseline gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
-          <button onClick={() => setPopoverOpen((v) => !v)} className="text-[12.5px] font-semibold hover:opacity-80">
-            <NameStyle name={message.sender_display_name} style={message.sender_name_style as NameStyleData} />
-          </button>
-          {message.edited_at && <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">edited</span>}
-          {isExpiring && <span className="font-mono text-[10px] text-[var(--presence-default-a)]">disappearing</span>}
+      {!compact && isGrouped && (
+        // Where the avatar would be on a non-grouped message — kept the
+        // same width so grouped lines stay perfectly aligned under the
+        // one avatar that started the run, and only reveals the time on
+        // hover (same idea as Discord/Slack), so the info's still
+        // reachable without repeating a full header on every line.
+        <div className="flex w-10 shrink-0 items-center justify-center">
+          <span className="hidden font-mono text-[9px] text-[var(--color-ink-faint)] group-hover:inline">{hoverTime}</span>
         </div>
+      )}
+      {compact && <div className="w-10 shrink-0" />}
+      <div className={`relative flex flex-col ${bubbles ? 'max-w-[74%]' : 'max-w-full flex-1'} ${isMine ? 'items-end' : 'items-start'}`}>
+        {!isGrouped && (
+          <div ref={popoverAnchorRef} className={`mb-0.5 flex items-baseline gap-2 ${isMine ? 'flex-row-reverse' : ''}`}>
+            <button onClick={() => setPopoverOpen((v) => !v)} className="text-[12.5px] font-semibold hover:opacity-80">
+              <NameStyle name={message.sender_display_name} style={message.sender_name_style as NameStyleData} />
+            </button>
+            {message.edited_at && <span className="font-mono text-[10px] text-[var(--color-ink-muted)]">edited</span>}
+            {isExpiring && <span className="font-mono text-[10px] text-[var(--presence-default-a)]">disappearing</span>}
+          </div>
+        )}
         {popoverOpen && (
           <ProfilePopover username={message.sender_username} anchorRef={popoverAnchorRef} onClose={() => setPopoverOpen(false)} />
         )}
