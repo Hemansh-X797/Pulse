@@ -9,8 +9,8 @@ import { createOrGetDM } from '../../lib/api/channels';
 import { listFriends, listOutgoingRequests, sendFriendRequest } from '../../lib/api/friends';
 import { useAppStore } from '../../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../NameStyle';
-import { isValidNameplateId, nameplateSrc } from '../../lib/nameplates';
 import { DecoratedAvatar } from '../DecoratedAvatar';
+import { ProfileDecorBackground } from '../ProfileDecorBackground';
 import { ProfileBadges } from '../ProfileBadges';
 import { StatusDot } from '../StatusDot';
 
@@ -101,12 +101,10 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
             }}
           />
           <div className="relative px-4 pb-4">
-            {isValidNameplateId(profile.equipped_nameplate) && (
-              <div className="nameplate-shimmer pointer-events-none absolute inset-x-0 bottom-0 h-24 w-full">
-                <img src={nameplateSrc(profile.equipped_nameplate)} alt="" className="h-full w-full object-cover object-bottom" />
-              </div>
-            )}
-            <div className="relative">
+            {/* Profile Decor now covers the whole card body, not just a
+                bottom strip — see ProfileDecorBackground. */}
+            <ProfileDecorBackground decorId={profile.equipped_nameplate} />
+            <div className="relative z-10">
             {/* Click enlarges the avatar in place (lightbox), per your
                 screenshot — it no longer navigates away on click.
                 "View Full Profile" below is the new, explicit way to
