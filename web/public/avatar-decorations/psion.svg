@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <!-- Background Glow Filter -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Linear Gradients -->
+    <linearGradient id="psyArc1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#3b82f6" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.8" />
+    </linearGradient>
+
+    <linearGradient id="psyArc2" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0.2" />
+    </linearGradient>
+
+    <!-- Synapse Sparkle Pattern -->
+    <radialGradient id="nodeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="1" />
+      <stop offset="100%" stop-color="#a855f7" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <style>
+    /* Continuous Ring Rotations */
+    .rotate-cw {
+      transform-origin: 50px 50px;
+      animation: spin 12s linear infinite;
+    }
+    .rotate-ccw {
+      transform-origin: 50px 50px;
+      animation: spin-reverse 16s linear infinite;
+    }
+
+    /* Pulse Breathing Effect */
+    .pulse-frame {
+      transform-origin: 50px 50px;
+      animation: breathe 4s ease-in-out infinite alternate;
+    }
+
+    /* Firing Neural Synapses */
+    .synapse {
+      animation: flash 2.5s ease-in-out infinite alternate;
+    }
+    .delay-1 { animation-delay: 0.6s; }
+    .delay-2 { animation-delay: 1.2s; }
+    .delay-3 { animation-delay: 1.8s; }
+
+    /* Keyframes */
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes spin-reverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+    @keyframes breathe {
+      0% { transform: scale(0.98); opacity: 0.85; }
+      100% { transform: scale(1.02); opacity: 1; }
+    }
+    @keyframes flash {
+      0%, 100% { opacity: 0.2; transform: scale(0.8); }
+      50% { opacity: 1; transform: scale(1.3); }
+    }
+  </style>
+
+  <!-- Outer Neural Network Circuit Structure (Framing Only) -->
+  <g class="pulse-frame" filter="url(#glow)">
+    
+    <!-- Base Sleek Frame Boundary (Keeps Center Clear for PFP) -->
+    <circle cx="50" cy="50" r="45.5" fill="none" stroke="#3b82f6" stroke-opacity="0.25" stroke-dasharray="1 3" stroke-width="0.5" />
+    <circle cx="50" cy="50" r="43.5" fill="none" stroke="#a855f7" stroke-opacity="0.3" stroke-width="0.4" />
+
+    <!-- Counter-Rotating Accent Arcs -->
+    <g class="rotate-cw">
+      <path d="M 50,5 A 45 45 0 0 1 95,50" fill="none" stroke="url(#psyArc1)" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="20 10 35 15" />
+      <path d="M 50,95 A 45 45 0 0 1 5,50" fill="none" stroke="url(#psyArc1)" stroke-width="1.2" stroke-linecap="round" stroke-dasharray="10 15 40 10" />
+    </g>
+
+    <g class="rotate-ccw">
+      <path d="M 50,6 A 44 44 0 0 1 88,20" fill="none" stroke="url(#psyArc2)" stroke-width="0.8" stroke-linecap="round" />
+      <path d="M 12,80 A 44 44 0 0 1 50,94" fill="none" stroke="url(#psyArc2)" stroke-width="0.8" stroke-linecap="round" />
+    </g>
+
+    <!-- Psychological / Neural Nodes (Top Right) -->
+    <g class="synapse" style="transform-origin: 82px 18px;">
+      <circle cx="82" cy="18" r="2.5" fill="url(#nodeGlow)" />
+      <circle cx="82" cy="18" r="1" fill="#ec4899" />
+    </g>
+    
+    <!-- Psychological / Neural Nodes (Bottom Right) -->
+    <g class="synapse delay-1" style="transform-origin: 85px 75px;">
+      <circle cx="85" cy="75" r="3" fill="url(#nodeGlow)" />
+      <circle cx="85" cy="75" r="1.2" fill="#06b6d4" />
+    </g>
+
+    <!-- Psychological / Neural Nodes (Bottom Left) -->
+    <g class="synapse delay-2" style="transform-origin: 18px 82px;">
+      <circle cx="18" cy="82" r="2.5" fill="url(#nodeGlow)" />
+      <circle cx="18" cy="82" r="1" fill="#a855f7" />
+    </g>
+
+    <!-- Psychological / Neural Nodes (Top Left) -->
+    <g class="synapse delay-3" style="transform-origin: 15px 25px;">
+      <circle cx="15" cy="25" r="3" fill="url(#nodeGlow)" />
+      <circle cx="15" cy="25" r="1.2" fill="#3b82f6" />
+    </g>
+
+    <!-- Geometric Waveform Accent (Bottom Edge) -->
+    <path d="M 38,93 Q 44,91 50,93 T 62,93" fill="none" stroke="#06b6d4" stroke-width="0.8" opacity="0.7" />
+  </g>
+</svg>
