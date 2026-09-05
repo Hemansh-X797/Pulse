@@ -240,6 +240,18 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      avatar_decoration_catalog: {
+        Row: { id: string; label: string; icon: string; is_animated: boolean; category: string; sort_order: number };
+        Insert: never; // curated catalog, seeded by migration only — see 034_decoration_catalogs.sql
+        Update: never;
+        Relationships: [];
+      };
+      nameplate_catalog: {
+        Row: { id: string; label: string; icon: string; is_animated: boolean; category: string; sort_order: number };
+        Insert: never; // curated catalog, seeded by migration only — see 034_decoration_catalogs.sql
+        Update: never;
+        Relationships: [];
+      };
       friend_requests: {
         Row: {
           id: number;
@@ -305,6 +317,7 @@ export interface Database {
           author_username: string;
           author_display_name: string;
           author_avatar_url: string;
+          author_avatar_decoration: string | null;
           author_accent_top: string;
           author_accent_bottom: string;
           author_name_style: { font?: string; effect?: string; colors?: string[] } | null;
