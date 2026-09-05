@@ -157,14 +157,17 @@ export async function leaveGroupDm(channelId: string): Promise<void> {
   if (error) throw error;
 }
 
-export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string; sender_display_name: string; sender_avatar_url: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
+export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string; sender_display_name: string; sender_avatar_url: string; sender_avatar_decoration: string | null; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
   const { data, error } = await supabase
     .from('messages')
     // avatar_url wasn't selected here before, so the sender's profile
     // picture never made it into a message row at all — ChatView had no
     // choice but to always fall back to initials, even for users who do
-    // have an avatar set.
-    .select('*, profiles!messages_sender_id_fkey(username, display_name, avatar_url, name_style)')
+    // have an avatar set. equipped_avatar_decoration has the same gap:
+    // the column exists and the settings picker saves to it, but chat
+    // never selected it, so a decoration you equipped never showed up
+    // anywhere you'd actually see yourself chatting.
+    .select('*, profiles!messages_sender_id_fkey(username, display_name, avatar_url, equipped_avatar_decoration, name_style)')
     .eq('channel_id', channelId)
     .order('id', { ascending: false })
     .limit(limit);
@@ -172,12 +175,13 @@ export async function listMessages(channelId: string, limit = 50): Promise<(Mess
 
   return (data ?? [])
     .map((row) => {
-      const profile = row.profiles as unknown as { username: string; display_name: string; avatar_url: string | null; name_style: { font?: string; effect?: string; colors?: string[] } | null } | null;
+      const profile = row.profiles as unknown as { username: string; display_name: string; avatar_url: string | null; equipped_avatar_decoration: string | null; name_style: { font?: string; effect?: string; colors?: string[] } | null } | null;
       return {
         ...row,
         sender_username: profile?.username ?? '?',
         sender_display_name: profile?.display_name ?? profile?.username ?? '?',
         sender_avatar_url: profile?.avatar_url ?? '',
+        sender_avatar_decoration: profile?.equipped_avatar_decoration ?? null,
         sender_name_style: profile?.name_style ?? null,
       };
     })
