@@ -11,8 +11,8 @@ import { listBlockedUsers, blockUser, unblockUser } from '../lib/api/blocking';
 import { followUser, unfollowUser, isFollowing, getFollowCounts } from '../lib/api/follows';
 import { useAppStore } from '../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../components/NameStyle';
-import { isValidNameplateId, nameplateSrc } from '../lib/nameplates';
 import { DecoratedAvatar } from '../components/DecoratedAvatar';
+import { ProfileDecorBackground } from '../components/ProfileDecorBackground';
 import { ProfileBadges } from '../components/ProfileBadges';
 
 export function UserProfile() {
@@ -137,12 +137,15 @@ export function UserProfile() {
           </div>
         )}
         <div className="relative">
-          {isValidNameplateId(profile.equipped_nameplate) && (
-            <div className="nameplate-shimmer pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-28 w-full">
-              <img src={nameplateSrc(profile.equipped_nameplate)} alt="" className="h-full w-full object-cover object-bottom" />
-            </div>
-          )}
-        <div className="flex items-end justify-between">
+          {/* Profile Decor now covers the whole card body — see
+              ProfileDecorBackground. The old version used a raw -z-10
+              on this element, which (depending on ancestor stacking
+              contexts elsewhere on the page) could push it fully
+              behind unrelated content and make it invisible outright,
+              not just visually subtle. Proper z-0/z-10 layering here
+              instead. */}
+          <ProfileDecorBackground decorId={profile.equipped_nameplate} />
+        <div className="relative z-10 flex items-end justify-between">
           <DecoratedAvatar decorationId={profile.equipped_avatar_decoration} size={80}>
             <div
               className="-mt-10 mb-4 flex h-20 w-20 items-center justify-center rounded-full border-4 border-[var(--color-void)] text-2xl font-bold text-black"
