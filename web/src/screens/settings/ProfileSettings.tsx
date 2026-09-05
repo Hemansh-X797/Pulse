@@ -14,9 +14,11 @@ import { NameStyle, type NameStyleData } from '../../components/NameStyle';
 // keeps them off Settings' initial chunk. Neither needs SSR.
 const CropModal = dynamic(() => import('../../components/settings/CropModal').then((m) => m.CropModal), { ssr: false });
 const NameStyleModal = dynamic(() => import('../../components/NameStyleModal').then((m) => m.NameStyleModal), { ssr: false });
-import { NAMEPLATES, nameplateSrc } from '../../lib/nameplates';
-import { AVATAR_DECORATIONS } from '../../lib/avatarDecorations';
+import { listProfileDecorCatalog } from '../../lib/profileDecor';
+import { listAvatarDecorationCatalog } from '../../lib/avatarDecorations';
 import { DecoratedAvatar } from '../../components/DecoratedAvatar';
+import { ProfileDecorBackground } from '../../components/ProfileDecorBackground';
+import { DecorationPickerModal } from '../../components/DecorationPickerModal';
 import { ProfilePreviewCard } from '../../components/ProfilePreviewCard';
 
 const ACCENT_PRESETS: [string, string][] = [
@@ -49,6 +51,14 @@ export function ProfileSettings() {
   const [bannerUploading, setBannerUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [cropTarget, setCropTarget] = useState<{ file: File; kind: 'avatar' | 'banner' } | null>(null);
+  const [decorPickerOpen, setDecorPickerOpen] = useState(false);
+  const [avatarDecorPickerOpen, setAvatarDecorPickerOpen] = useState(false);
+  const { data: decorCatalog = [] } = useQuery({ queryKey: ['profile-decor-catalog'], queryFn: listProfileDecorCatalog, staleTime: Infinity });
+  const { data: avatarDecorCatalog = [] } = useQuery({ queryKey: ['avatar-decoration-catalog'], queryFn: listAvatarDecorationCatalog, staleTime: Infinity });
+  const currentDecorLabel = profile?.equipped_nameplate ? (decorCatalog.find((d) => d.id === profile.equipped_nameplate)?.label ?? 'Unknown') : 'None equipped';
+  const currentAvatarDecorLabel = profile?.equipped_avatar_decoration
+    ? (avatarDecorCatalog.find((d) => d.id === profile.equipped_avatar_decoration)?.label ?? 'Unknown')
+    : 'None equipped';
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
@@ -143,35 +153,37 @@ export function ProfileSettings() {
         </div>
 
         <div className="px-5 pb-5">
-          <div
-            className="group relative -mt-8 mb-3 flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border-4 border-[var(--color-surface)] text-lg font-bold text-black"
-            style={
-              avatarUrl
-                ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                : { ['--p-a' as string]: accentTop, ['--p-b' as string]: accentBottom, background: 'linear-gradient(150deg, var(--p-a), var(--p-b))' }
-            }
-            onClick={() => avatarInputRef.current?.click()}
-          >
-            {!avatarUrl && (displayName || '?').slice(0, 2).toUpperCase()}
-            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 opacity-0 transition-all group-hover:bg-black/50 group-hover:opacity-100">
-              {avatarUploading ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              ) : (
-                <Camera size={14} className="text-white" />
-              )}
+          <DecoratedAvatar decorationId={profile?.equipped_avatar_decoration} size={64}>
+            <div
+              className="group relative -mt-8 mb-3 flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border-4 border-[var(--color-surface)] text-lg font-bold text-black"
+              style={
+                avatarUrl
+                  ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                  : { ['--p-a' as string]: accentTop, ['--p-b' as string]: accentBottom, background: 'linear-gradient(150deg, var(--p-a), var(--p-b))' }
+              }
+              onClick={() => avatarInputRef.current?.click()}
+            >
+              {!avatarUrl && (displayName || '?').slice(0, 2).toUpperCase()}
+              <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 opacity-0 transition-all group-hover:bg-black/50 group-hover:opacity-100">
+                {avatarUploading ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                ) : (
+                  <Camera size={14} className="text-white" />
+                )}
+              </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setCropTarget({ file: f, kind: 'avatar' });
+                  e.target.value = '';
+                }}
+              />
             </div>
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              hidden
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) setCropTarget({ file: f, kind: 'avatar' });
-                e.target.value = '';
-              }}
-            />
-          </div>
+          </DecoratedAvatar>
 
           {uploadError && (
             <div className="mb-4 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
@@ -209,85 +221,86 @@ export function ProfileSettings() {
 
           <div>
             <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
-              Nameplate <span className="normal-case text-[var(--color-ink-faint)]">(shows behind your name on your profile)</span>
+              Profile Decor <span className="normal-case text-[var(--color-ink-faint)]">(a background that covers your whole profile card)</span>
             </div>
-            <div className="grid grid-cols-6 gap-2">
-              <button
-                onClick={async () => {
-                  const updated = await updateProfile({ equipped_nameplate: null });
+            <button
+              onClick={() => setDecorPickerOpen(true)}
+              className="flex w-full items-center gap-3 rounded-xl border border-[var(--color-hairline)] p-2 text-left hover:border-[var(--color-hairline-strong)]"
+            >
+              <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg bg-[var(--color-void)]">
+                <ProfileDecorBackground decorId={profile?.equipped_nameplate ?? null} />
+                {!profile?.equipped_nameplate && (
+                  <div className="flex h-full items-center justify-center text-[9px] text-[var(--color-ink-faint)]">None</div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[12.5px] font-medium">{currentDecorLabel}</div>
+                <div className="text-[11px] text-[var(--color-ink-faint)]">Tap to browse{decorCatalog.length > 0 ? ` (${decorCatalog.length})` : ''}</div>
+              </div>
+            </button>
+            {decorPickerOpen && (
+              <DecorationPickerModal
+                title="Profile Decor"
+                items={decorCatalog}
+                selectedId={profile?.equipped_nameplate}
+                onClose={() => setDecorPickerOpen(false)}
+                onSelect={async (id) => {
+                  const updated = await updateProfile({ equipped_nameplate: id });
                   setStoreProfile(updated);
                   queryClient.invalidateQueries({ queryKey: ['my-profile'] });
                 }}
-                className={`flex h-12 items-center justify-center rounded-lg border text-[10.5px] text-[var(--color-ink-muted)] ${
-                  !profile?.equipped_nameplate ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
-                }`}
-              >
-                None
-              </button>
-              {NAMEPLATES.map((n) => (
-                <button
-                  key={n.id}
-                  onClick={async () => {
-                    const updated = await updateProfile({ equipped_nameplate: n.id });
-                    setStoreProfile(updated);
-                    queryClient.invalidateQueries({ queryKey: ['my-profile'] });
-                  }}
-                  title={n.label}
-                  className={`h-12 overflow-hidden rounded-lg border bg-[var(--color-void)] ${
-                    profile?.equipped_nameplate === n.id ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
-                  }`}
-                >
-                  <img src={nameplateSrc(n.id)} alt={n.label} className="h-full w-full object-cover" />
-                </button>
-              ))}
-            </div>
+                renderPreview={(item) => (
+                  <div className="relative h-9 w-full overflow-hidden rounded-md">
+                    <img src={item.icon} alt="" className="h-full w-full object-cover" />
+                  </div>
+                )}
+              />
+            )}
           </div>
 
           <div>
             <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--color-ink-faint)]">
               Avatar decoration <span className="normal-case text-[var(--color-ink-faint)]">(a ring/frame around your profile picture)</span>
             </div>
-            <div className="grid grid-cols-6 gap-2">
-              <button
-                onClick={async () => {
-                  const updated = await updateProfile({ equipped_avatar_decoration: null });
+            <button
+              onClick={() => setAvatarDecorPickerOpen(true)}
+              className="flex items-center gap-3 rounded-xl border border-[var(--color-hairline)] p-2 text-left hover:border-[var(--color-hairline-strong)]"
+            >
+              <DecoratedAvatar decorationId={profile?.equipped_avatar_decoration} size={40}>
+                <div
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-[11px] font-bold text-black"
+                  style={{
+                    background: profile?.avatar_url
+                      ? `url(${profile.avatar_url}) center/cover`
+                      : `linear-gradient(150deg, ${profile?.accent_color_top ?? '#888'}, ${profile?.accent_color_bottom ?? '#444'})`,
+                  }}
+                >
+                  {!profile?.avatar_url && (displayName || profile?.display_name || '?').slice(0, 2).toUpperCase()}
+                </div>
+              </DecoratedAvatar>
+              <div className="min-w-0 flex-1">
+                <div className="text-[12.5px] font-medium">{currentAvatarDecorLabel}</div>
+                <div className="text-[11px] text-[var(--color-ink-faint)]">Tap to browse{avatarDecorCatalog.length > 0 ? ` (${avatarDecorCatalog.length})` : ''}</div>
+              </div>
+            </button>
+            {avatarDecorPickerOpen && (
+              <DecorationPickerModal
+                title="Avatar Decoration"
+                items={avatarDecorCatalog}
+                selectedId={profile?.equipped_avatar_decoration}
+                onClose={() => setAvatarDecorPickerOpen(false)}
+                onSelect={async (id) => {
+                  const updated = await updateProfile({ equipped_avatar_decoration: id });
                   setStoreProfile(updated);
                   queryClient.invalidateQueries({ queryKey: ['my-profile'] });
                 }}
-                className={`flex h-14 items-center justify-center rounded-lg border text-[10.5px] text-[var(--color-ink-muted)] ${
-                  !profile?.equipped_avatar_decoration ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
-                }`}
-              >
-                None
-              </button>
-              {AVATAR_DECORATIONS.map((d) => (
-                <button
-                  key={d.id}
-                  onClick={async () => {
-                    const updated = await updateProfile({ equipped_avatar_decoration: d.id });
-                    setStoreProfile(updated);
-                    queryClient.invalidateQueries({ queryKey: ['my-profile'] });
-                  }}
-                  title={d.label}
-                  className={`flex h-14 items-center justify-center overflow-hidden rounded-lg border bg-[var(--color-void)] ${
-                    profile?.equipped_avatar_decoration === d.id ? 'border-[var(--presence-default-a)]' : 'border-[var(--color-hairline)] hover:border-[var(--color-hairline-strong)]'
-                  }`}
-                >
-                  <DecoratedAvatar decorationId={d.id} size={30}>
-                    <div
-                      className="flex h-[30px] w-[30px] items-center justify-center rounded-full text-[10px] font-bold text-black"
-                      style={{
-                        background: profile?.avatar_url
-                          ? `url(${profile.avatar_url}) center/cover`
-                          : `linear-gradient(150deg, ${profile?.accent_color_top ?? '#888'}, ${profile?.accent_color_bottom ?? '#444'})`,
-                      }}
-                    >
-                      {!profile?.avatar_url && (displayName || profile?.display_name || '?').slice(0, 2).toUpperCase()}
-                    </div>
+                renderPreview={(item) => (
+                  <DecoratedAvatar decorationId={item.id} size={30}>
+                    <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-[var(--color-surface-raised)] text-[9px] font-bold text-black" />
                   </DecoratedAvatar>
-                </button>
-              ))}
-            </div>
+                )}
+              />
+            )}
           </div>
 
           <Field label="Status">
@@ -387,6 +400,7 @@ export function ProfileSettings() {
         bannerUrl={bannerUrl}
         nameStyle={(profile?.name_style as NameStyleData) ?? null}
         equippedNameplate={profile?.equipped_nameplate ?? null}
+        equippedAvatarDecoration={profile?.equipped_avatar_decoration ?? null}
         memberSince={profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
       />
     </div>
