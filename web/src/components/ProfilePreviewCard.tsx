@@ -2,7 +2,8 @@
 
 import { MessageSquare, UserPlus, MoreHorizontal } from 'lucide-react';
 import { NameStyle, type NameStyleData } from './NameStyle';
-import { isValidNameplateId, nameplateSrc } from '../lib/nameplates';
+import { ProfileDecorBackground } from './ProfileDecorBackground';
+import { DecoratedAvatar } from './DecoratedAvatar';
 
 /**
  * Real-time mirror of the edit form's current draft state — reads the
@@ -25,6 +26,7 @@ export function ProfilePreviewCard({
   bannerUrl,
   nameStyle,
   equippedNameplate,
+  equippedAvatarDecoration,
   memberSince,
 }: {
   displayName: string;
@@ -38,6 +40,7 @@ export function ProfilePreviewCard({
   bannerUrl: string;
   nameStyle: NameStyleData | null;
   equippedNameplate: string | null;
+  equippedAvatarDecoration: string | null;
   memberSince: string;
 }) {
   return (
@@ -52,22 +55,23 @@ export function ProfilePreviewCard({
       />
 
       <div className="relative px-4 pb-4">
-        {isValidNameplateId(equippedNameplate) && (
-          <div className="nameplate-shimmer pointer-events-none absolute inset-x-0 bottom-0 h-28 w-full">
-            <img src={nameplateSrc(equippedNameplate)} alt="" className="h-full w-full object-cover object-bottom" />
-          </div>
-        )}
-        <div className="relative">
-          <div
-            className="-mt-9 mb-2.5 flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full border-4 border-[var(--color-void)] bg-[var(--color-surface-raised)] text-xl font-bold"
-            style={
-              avatarUrl
-                ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                : { background: `linear-gradient(150deg, ${accentTop}, ${accentBottom})`, color: '#000' }
-            }
-          >
-            {!avatarUrl && (displayName || '?').slice(0, 2).toUpperCase()}
-          </div>
+        {/* Profile Decor now covers the whole card body (everything
+            below the banner), not just a strip along the bottom — see
+            ProfileDecorBackground for why. */}
+        <ProfileDecorBackground decorId={equippedNameplate} />
+        <div className="relative z-10">
+          <DecoratedAvatar decorationId={equippedAvatarDecoration} size={72}>
+            <div
+              className="-mt-9 mb-2.5 flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-full border-4 border-[var(--color-void)] bg-[var(--color-surface-raised)] text-xl font-bold"
+              style={
+                avatarUrl
+                  ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                  : { background: `linear-gradient(150deg, ${accentTop}, ${accentBottom})`, color: '#000' }
+              }
+            >
+              {!avatarUrl && (displayName || '?').slice(0, 2).toUpperCase()}
+            </div>
+          </DecoratedAvatar>
 
           <div className="mb-3">
             <div className="text-[17px] font-bold">
