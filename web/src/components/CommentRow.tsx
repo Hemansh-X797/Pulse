@@ -133,7 +133,7 @@ export function CommentRow({
               @{comment.author_username} · {timeAgo(comment.created_at)}
               {comment.edited_at && ' · edited'}
             </span>
-            <div className="text-[13.5px] leading-relaxed">{renderMarkdown(comment.body_rendered)}</div>
+            <div className="text-[13.5px] leading-relaxed">{renderMarkdown(comment.body_rendered, profile?.username)}</div>
           </div>
         )}
       </div>
