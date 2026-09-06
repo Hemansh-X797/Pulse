@@ -50,7 +50,7 @@ What it does, concretely:
 
 **Regenerate `database.types.ts` for real** once this is live:
 ```bash
-supabase gen types typescript --project-id zfuctxrbvdvrkxagqtvg > src/lib/database.types.ts
+supabase gen types typescript --project-id zfucxtrbvdvrkxagqtvg > src/lib/database.types.ts
 ```
 The version in this project is hand-edited to match the migration, same
 as the original was hand-written — treat it as a starting point, not the
