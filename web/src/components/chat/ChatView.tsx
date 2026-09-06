@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,9 +19,12 @@ import {
   unpinMessage,
   getOtherDmParticipantId,
   getReadReceipt,
+  listChannelMembersForMention,
   type MessageReactionSummary,
   type PinnedMessage,
 } from '../../lib/api/channels';
+import { EMOJI_MAP } from '../../lib/emoji';
+import { getRecentEmojiCodes, recordEmojiUsed } from '../../lib/recentEmoji';
 import { MessageContextMenu } from './MessageContextMenu';
 import { ForwardMessageModal } from './ForwardMessageModal';
 import { uploadMedia } from '../../lib/api/media';
@@ -108,6 +111,52 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const { data: mentionCandidates = [] } = useQuery({
+    queryKey: ['channel-members-for-mention', channelId],
+    queryFn: () => listChannelMembersForMention(channelId),
+    staleTime: 30_000,
+  });
+  const mentionMatches =
+    mentionQuery === null
+      ? []
+      : mentionCandidates.filter((m) => m.username.toLowerCase().startsWith(mentionQuery.toLowerCase())).slice(0, 6);
+
+  const [emojiQuery, setEmojiQuery] = useState<string | null>(null);
+  const [emojiActiveIndex, setEmojiActiveIndex] = useState(0);
+  // ":fir" should suggest ":fire:" as you type it — before this, the
+  // only way to discover a shortcode's exact spelling was already
+  // knowing it (typing the full ":fire:" got auto-expanded on send,
+  // but there was zero assistance getting there, unlike the emoji
+  // picker button which requires abandoning the keyboard entirely).
+  const emojiMatches = useMemo(() => {
+    if (emojiQuery === null || emojiQuery.length === 0) return [];
+    const q = emojiQuery.toLowerCase();
+    const recents = getRecentEmojiCodes();
+    const entries = Object.entries(EMOJI_MAP);
+    // Discord-style ranking, not just alphabetical-first-match: an
+    // exact prefix match ranks above a mid-word substring match (typing
+    // ":fir" should put "fire" ahead of "campfire"), and within each of
+    // those tiers your own recently-used emoji come first — matches how
+    // Discord's own picker/autocomplete behaves, rather than a flat
+    // definition-order list.
+    return entries
+      .filter(([code]) => code.toLowerCase().includes(q))
+      .sort(([codeA], [codeB]) => {
+        const aPrefix = codeA.toLowerCase().startsWith(q) ? 0 : 1;
+        const bPrefix = codeB.toLowerCase().startsWith(q) ? 0 : 1;
+        if (aPrefix !== bPrefix) return aPrefix - bPrefix;
+        const aRecent = recents.indexOf(codeA);
+        const bRecent = recents.indexOf(codeB);
+        if (aRecent !== -1 && bRecent !== -1) return aRecent - bRecent;
+        if (aRecent !== -1) return -1;
+        if (bRecent !== -1) return 1;
+        return codeA.localeCompare(codeB);
+      })
+      .slice(0, 8);
+  }, [emojiQuery]);
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<DisplayMessage | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -280,6 +329,52 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
     if (!profile) return;
     broadcastTyping(channelId, profile.username);
   }, [channelId, profile]);
+
+  // Replaces the in-progress "@partial" token (right before the caret)
+  // with the chosen username, then refocuses so typing continues
+  // seamlessly — this is the actual autocomplete accept step, the
+  // dropdown itself is purely a list of clickable/keyboard-navigable
+  // suggestions built on top of it.
+  function acceptMention(username: string) {
+    const el = inputRef.current;
+    const caret = el?.selectionStart ?? input.length;
+    const before = input.slice(0, caret);
+    const after = input.slice(caret);
+    const replaced = before.replace(/(?:^|\s)@([a-zA-Z0-9_]{0,32})$/, (whole) => {
+      const leadingSpace = whole.startsWith(' ') ? ' ' : '';
+      return `${leadingSpace}@${username} `;
+    });
+    const newValue = replaced + after;
+    setInput(newValue);
+    setMentionQuery(null);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const newCaret = replaced.length;
+      el?.setSelectionRange(newCaret, newCaret);
+    });
+  }
+
+  // Same mechanic as acceptMention: replace the in-progress ":partial"
+  // token with the actual emoji character (not the shortcode text) —
+  // picking a suggestion drops the finished emoji straight in, rather
+  // than completing the shortcode text and still relying on send-time
+  // expansion.
+  function acceptEmoji(code: string) {
+    recordEmojiUsed(code);
+    const el = inputRef.current;
+    const caret = el?.selectionStart ?? input.length;
+    const before = input.slice(0, caret);
+    const after = input.slice(caret);
+    const replaced = before.replace(/:([a-zA-Z0-9_+-]*)$/, `${EMOJI_MAP[code]} `);
+    const newValue = replaced + after;
+    setInput(newValue);
+    setEmojiQuery(null);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const newCaret = replaced.length;
+      el?.setSelectionRange(newCaret, newCaret);
+    });
+  }
 
   async function handleSend() {
     if (!input.trim() || !profile) return;
@@ -628,6 +723,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
                 isMine={m.sender_id === profile?.id}
                 isEditing={editingId === m.id}
                 isGrouped={isGrouped}
+                knownUsernames={mentionCandidates.map((c) => c.username)}
                 replySnippet={m.reply_to_id ? messages.find((x) => x.id === m.reply_to_id) : undefined}
                 compact={compactMode}
                 bubbles={chatBubbles}
@@ -686,14 +782,134 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       )}
 
       <div className="px-4 pb-4 pt-3 md:px-7 md:pb-6">
-        <div className="rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface)] p-3">
+        <div className="relative rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface)] p-3">
+          {mentionQuery !== null && mentionMatches.length > 0 && (
+            <div className="absolute bottom-full left-0 z-20 mb-1.5 w-56 overflow-hidden rounded-lg border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] py-1 shadow-2xl">
+              {mentionMatches.map((m, idx) => (
+                <button
+                  key={m.id}
+                  onMouseDown={(e) => {
+                    // mousedown (not click) so this fires before the
+                    // input's own blur — a click would let the input
+                    // blur first and the dropdown unmount before the
+                    // selection registers.
+                    e.preventDefault();
+                    acceptMention(m.username);
+                  }}
+                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[12.5px] ${idx === mentionActiveIndex ? 'bg-[var(--color-surface-raised)]' : ''}`}
+                >
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full presence-fill text-[8px] font-bold text-black">
+                    {m.avatar_url ? <img src={m.avatar_url} alt="" className="h-full w-full object-cover" /> : m.display_name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <span className="min-w-0 flex-1 truncate">{m.display_name}</span>
+                  <span className="shrink-0 text-[var(--color-ink-faint)]">@{m.username}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {emojiQuery !== null && emojiMatches.length > 0 && (
+            <div className="absolute bottom-full left-0 z-20 mb-1.5 w-52 overflow-hidden rounded-lg border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] shadow-2xl">
+              <div className="border-b border-[var(--color-hairline)] px-2.5 py-1.5 font-mono text-[9.5px] uppercase tracking-wide text-[var(--color-ink-faint)]">
+                Emoji matching :{emojiQuery}
+              </div>
+              <div className="py-1">
+                {emojiMatches.map(([code, char], idx) => (
+                  <button
+                    key={code}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      acceptEmoji(code);
+                    }}
+                    className={`flex w-full items-center gap-2.5 px-2.5 py-1.5 text-left text-[12.5px] ${idx === emojiActiveIndex ? 'bg-[var(--color-surface-raised)]' : ''}`}
+                  >
+                    <span className="text-[20px] leading-none">{char}</span>
+                    <span className="text-[var(--color-ink-muted)]">:{code}:</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <input
+            ref={inputRef}
             value={input}
             onChange={(e) => {
-              setInput(e.target.value);
-              if (e.target.value.trim()) handleTyping();
+              const value = e.target.value;
+              setInput(value);
+              if (value.trim()) handleTyping();
+
+              // Detect an in-progress, unterminated "@partial" token
+              // right before the caret — this is what turns mentions
+              // from "type the exact username and hope" into a real
+              // autocomplete. Only looks behind the caret (not the
+              // whole message) so a completed earlier @mention doesn't
+              // reopen the dropdown while typing further along.
+              const caret = e.target.selectionStart ?? value.length;
+              const uptoCaret = value.slice(0, caret);
+              const mentionMatch = /(?:^|\s)@([a-zA-Z0-9_]{0,32})$/.exec(uptoCaret);
+              if (mentionMatch) {
+                setMentionQuery(mentionMatch[1]);
+                setMentionActiveIndex(0);
+              } else {
+                setMentionQuery(null);
+              }
+
+              // Only triggers once at least one letter follows the ':'
+              // — ":partial" with zero characters yet would otherwise
+              // match on every single colon typed (including ones
+              // meant as plain punctuation, e.g. "9:30").
+              const emojiMatch = /:([a-zA-Z0-9_+-]{1,})$/.exec(uptoCaret);
+              if (emojiMatch && !mentionMatch) {
+                setEmojiQuery(emojiMatch[1]);
+                setEmojiActiveIndex(0);
+              } else {
+                setEmojiQuery(null);
+              }
             }}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            onKeyDown={(e) => {
+              if (mentionQuery !== null && mentionMatches.length > 0) {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setMentionActiveIndex((i) => (i + 1) % mentionMatches.length);
+                  return;
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setMentionActiveIndex((i) => (i - 1 + mentionMatches.length) % mentionMatches.length);
+                  return;
+                }
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  e.preventDefault();
+                  acceptMention(mentionMatches[mentionActiveIndex].username);
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  setMentionQuery(null);
+                  return;
+                }
+              }
+              if (emojiQuery !== null && emojiMatches.length > 0) {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setEmojiActiveIndex((i) => (i + 1) % emojiMatches.length);
+                  return;
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setEmojiActiveIndex((i) => (i - 1 + emojiMatches.length) % emojiMatches.length);
+                  return;
+                }
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  e.preventDefault();
+                  acceptEmoji(emojiMatches[emojiActiveIndex][0]);
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  setEmojiQuery(null);
+                  return;
+                }
+              }
+              if (e.key === 'Enter') handleSend();
+            }}
             placeholder={ephemeralSeconds ? `Disappearing in ${ephemeralSeconds}s… try :fire:` : 'Type a message... try :fire: :heart: :rocket:'}
             className="w-full bg-transparent text-sm text-[var(--color-ink)] placeholder-[var(--color-ink-faint)] outline-none"
           />
@@ -813,6 +1029,7 @@ function MessageRow({
   isMine,
   isEditing,
   isGrouped,
+  knownUsernames,
   replySnippet,
   compact,
   bubbles,
@@ -833,6 +1050,7 @@ function MessageRow({
   isMine: boolean;
   isEditing: boolean;
   isGrouped: boolean;
+  knownUsernames: string[];
   replySnippet?: DisplayMessage;
   compact: boolean;
   bubbles: boolean;
@@ -891,6 +1109,10 @@ function MessageRow({
   }
 
   const initials = message.sender_username.slice(0, 2).toUpperCase();
+  const viewerUsername = useAppStore((s) => s.profile?.username);
+  const mentionsMe =
+    !!viewerUsername &&
+    new RegExp(`@${viewerUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(message.body_raw ?? '');
   const isExpiring = !!message.expires_at;
   const popoverAnchorRef = useRef<HTMLDivElement>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -996,12 +1218,14 @@ function MessageRow({
                     ? `bubble-shape rounded-2xl px-4 py-2.5 text-[13.5px] leading-[1.55] ${
                         isMine
                           ? 'rounded-br-md presence-fill font-medium text-black'
-                          : 'rounded-bl-md border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink)]'
+                          : mentionsMe
+                            ? 'rounded-bl-md border border-[#f0b429]/50 bg-[#f0b429]/[0.08] text-[var(--color-ink)]'
+                            : 'rounded-bl-md border border-[var(--color-hairline)] bg-[var(--color-surface)] text-[var(--color-ink)]'
                       }`
-                    : 'text-[13.5px] leading-[1.55] text-[var(--color-ink)]'
+                    : `text-[13.5px] leading-[1.55] text-[var(--color-ink)] ${mentionsMe && !isMine ? 'border-l-2 border-[#f0b429]/60 pl-2' : ''}`
                 }
               >
-                {renderMarkdown(message.body_rendered)}
+                {renderMarkdown(message.body_rendered, viewerUsername, knownUsernames)}
               </div>
             )}
             {message.body_rendered && extractFirstUrl(message.body_rendered) && (
@@ -1027,13 +1251,12 @@ function MessageRow({
             )}
           </>
         )}
-      </div>
 
-      <div
-        className={`hover-toolbar absolute -top-3 z-20 flex items-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] px-1.5 py-1 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 ${
+        <div
+          className={`hover-toolbar absolute -top-3 z-20 flex items-center gap-0.5 whitespace-nowrap rounded-md border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] px-1.5 py-1 opacity-0 shadow-xl transition-opacity duration-150 group-hover:opacity-100 ${
           isMine ? 'right-full mr-2' : 'left-full ml-2'
         }`}
-      >
+        >
         <button onClick={onCopyText} title="Copy Text" className="p-1 text-[var(--color-ink-muted)] transition-colors hover:text-[var(--color-ink)]">
           <Copy size={13} />
         </button>
@@ -1111,6 +1334,7 @@ function MessageRow({
             </div>
           )}
         </div>
+      </div>
       </div>
 
       {longPressMenuOpen && (
