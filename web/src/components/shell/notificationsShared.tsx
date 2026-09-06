@@ -16,6 +16,7 @@ const TYPE_LABEL: Record<string, string> = {
   friend_accept: 'accepted your friend request',
   new_post: 'posted something new',
   follow: 'started following you',
+  mention: 'mentioned you',
 };
 
 function timeAgo(iso: string) {
@@ -72,16 +73,18 @@ export function useNotificationsData() {
 }
 
 export function NotificationRow({ n, onClick }: { n: PalSpaceNotification; onClick: () => void }) {
+  const isMention = n.type === 'mention';
   return (
     <button
       onClick={onClick}
       className={`flex w-full items-start justify-between gap-2.5 border-b border-[var(--color-hairline)] px-3.5 py-2.5 text-left last:border-b-0 hover:bg-[var(--color-surface-raised)] ${
-        !n.read ? 'bg-[var(--presence-default-b)]/[0.08]' : ''
+        isMention ? 'border-l-2 border-l-[var(--presence-default-a)] bg-[var(--presence-default-a)]/[0.06]' : !n.read ? 'bg-[var(--presence-default-b)]/[0.08]' : ''
       }`}
     >
       <div className="text-[12.5px] leading-relaxed text-[var(--color-ink-muted)]">
+        {isMention && <span className="mr-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-[var(--presence-default-a)]">@</span>}
         <b className="font-semibold text-[var(--color-ink)]">{n.actor_username}</b> {TYPE_LABEL[n.type] ?? n.type}
-        {n.type === 'message' && n.body && <div className="mt-0.5 text-[11.5px] text-[var(--color-ink-muted)]">{n.body}</div>}
+        {(n.type === 'message' || n.type === 'mention') && n.body && <div className="mt-0.5 text-[11.5px] text-[var(--color-ink-muted)]">{n.body}</div>}
       </div>
       <span className="shrink-0 whitespace-nowrap text-[10px] text-[var(--color-ink-muted)]">{timeAgo(n.created_at)}</span>
     </button>
