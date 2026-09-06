@@ -64,3 +64,53 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Real push notifications — this is the actual handler that makes a
+// push arrive at the OS/browser level even when PalSpace isn't the
+// focused tab or isn't open at all. Everything upstream of this (the
+// send-push edge function, the on_notification_created_push trigger)
+// is just plumbing to get a payload here; this is where it actually
+// becomes a notification the person sees.
+self.addEventListener('push', (event) => {
+  let payload = { title: 'PalSpace', body: 'You have a new notification', url: '/notifications' };
+  try {
+    if (event.data) payload = { ...payload, ...event.data.json() };
+  } catch {
+    // Not JSON — fall back to the default payload above rather than
+    // showing a blank/broken notification.
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      // No dedicated 192x192/512x512 PNG icon set exists yet (see
+      // public/ASSETS.md) — using the real SVG favicon rather than a
+      // nonexistent icon-192.png, which would just silently 404 into a
+      // generic/blank notification icon in most browsers.
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
+      data: { url: payload.url },
+      tag: payload.url, // collapses multiple pushes to the same destination into one, instead of stacking duplicates
+    })
+  );
+});
+
+// Clicking the OS notification focuses an already-open PalSpace tab
+// (navigating it to the right place) rather than always opening a new
+// one — the same behavior Discord/Slack's desktop notifications have.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || '/notifications';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ('focus' in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});
