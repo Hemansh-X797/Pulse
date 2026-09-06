@@ -157,6 +157,23 @@ export async function leaveGroupDm(channelId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Everyone in a given channel (works for a DM, group DM, or a space's
+ * text/voice channel alike — channel_members backs all three) with
+ * enough profile info to power @mention autocomplete in the composer.
+ * Mentions were previously type-it-and-hope: findMentionMatch in
+ * markdown.tsx only ever rendered a mention if you spelled someone's
+ * exact username correctly, with zero assistance actually finding it.
+ */
+export async function listChannelMembersForMention(channelId: string): Promise<{ id: string; username: string; display_name: string; avatar_url: string }[]> {
+  const { data, error } = await supabase
+    .from('channel_members')
+    .select('profiles!inner(id, username, display_name, avatar_url)')
+    .eq('channel_id', channelId);
+  if (error) throw error;
+  return (data ?? []).map((row) => row.profiles as unknown as { id: string; username: string; display_name: string; avatar_url: string });
+}
+
 export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string; sender_display_name: string; sender_avatar_url: string; sender_avatar_decoration: string | null; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
   const { data, error } = await supabase
     .from('messages')
