@@ -129,7 +129,7 @@ export function PostDetailModal({
             </button>
           </div>
 
-          <div className="mb-3.5 text-[15px] leading-relaxed">{renderMarkdown(post.body_rendered)}</div>
+          <div className="mb-3.5 text-[15px] leading-relaxed">{renderMarkdown(post.body_rendered, profile?.username)}</div>
           {!post.media_url && extractFirstUrl(post.body_rendered) && (
             <div className="mb-3.5">
               <LinkPreviewCard url={extractFirstUrl(post.body_rendered)!} />
