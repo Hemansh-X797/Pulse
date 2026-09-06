@@ -215,7 +215,11 @@ export interface Database {
         Row: {
           id: number;
           user_id: string;
-          type: 'message' | 'reaction' | 'comment' | 'space_invite' | 'friend_request' | 'friend_accept';
+          // Client type was missing 'new_post' and 'follow' even though
+          // the DB constraint has allowed them since 017_follow_system.sql
+          // — fixed alongside adding 'mention' (035) rather than leaving
+          // that pre-existing gap in place.
+          type: 'message' | 'reaction' | 'comment' | 'space_invite' | 'friend_request' | 'friend_accept' | 'new_post' | 'follow' | 'mention';
           actor_id: string | null;
           actor_username: string;
           channel_id: string | null;
@@ -249,6 +253,18 @@ export interface Database {
       nameplate_catalog: {
         Row: { id: string; label: string; icon: string; is_animated: boolean; category: string; sort_order: number };
         Insert: never; // curated catalog, seeded by migration only — see 034_decoration_catalogs.sql
+        Update: never;
+        Relationships: [];
+      };
+      app_admins: {
+        Row: { user_id: string; granted_at: string };
+        Insert: never; // granted by migration only, never client-side — see 036_app_admins.sql
+        Update: never;
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: { id: number; user_id: string; endpoint: string; p256dh: string; auth: string; created_at: string };
+        Insert: { user_id: string; endpoint: string; p256dh: string; auth: string };
         Update: never;
         Relationships: [];
       };
@@ -369,6 +385,22 @@ export interface Database {
       leave_group_dm: {
         Args: { p_channel_id: string };
         Returns: void;
+      };
+      is_app_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      admin_get_stats: {
+        Args: Record<string, never>;
+        Returns: { total_users: number; total_posts: number; total_spaces: number; total_messages: number; signups_last_7d: number }[];
+      };
+      admin_search_users: {
+        Args: { p_query: string };
+        Returns: { id: string; username: string; display_name: string; avatar_url: string; created_at: string; status: string }[];
+      };
+      admin_list_recent_signups: {
+        Args: { p_limit?: number };
+        Returns: { id: string; username: string; display_name: string; avatar_url: string; created_at: string }[];
       };
       get_mutual_friends: {
         Args: { other_user_id: string };
