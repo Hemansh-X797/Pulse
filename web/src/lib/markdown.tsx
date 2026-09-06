@@ -87,7 +87,7 @@ function SpoilerSpan({ children }: { children: ReactNode }) {
 
 // depth guard: markdown pasted from somewhere hostile could nest
 // delimiters absurdly deep and blow the stack via recursion.
-function parseInline(text: string, depth = 0): ReactNode[] {
+function parseInline(text: string, depth = 0, viewerUsername?: string, knownUsernames?: string[]): ReactNode[] {
   if (depth > 20) return [text];
   const out: ReactNode[] = [];
   let i = 0;
@@ -122,7 +122,7 @@ function parseInline(text: string, depth = 0): ReactNode[] {
             rel="noreferrer noopener"
             className="text-[var(--presence-default-a)] underline decoration-[var(--presence-default-a)]/40 underline-offset-2 hover:decoration-[var(--presence-default-a)]"
           >
-            {parseInline(link.label, depth + 1)}
+            {parseInline(link.label, depth + 1, viewerUsername, knownUsernames)}
           </a>
         );
         i += link.length;
@@ -136,19 +136,46 @@ function parseInline(text: string, depth = 0): ReactNode[] {
     if (token === '@') {
       const mention = findMentionMatch(rest);
       if (mention) {
-        flushPlain(i);
-        out.push(
-          <a
-            key={nextKey()}
-            href={`/${mention.handle}`}
-            className="rounded bg-[var(--presence-default-a)]/15 px-1 font-medium text-[var(--presence-default-a)] hover:underline"
-          >
-            @{mention.handle}
-          </a>
-        );
-        i += mention.length;
-        plainStart = i;
-        continue;
+        // The actual bug: this used to style/link *any* "@word" that
+        // matched the syntax, with no check that such a user even
+        // exists — so "@totallyMadeUpHandle123" rendered as a real,
+        // clickable mention identically to a genuine one. When a known-
+        // usernames list is provided (chat always has one — every
+        // channel's own member list, see mentionCandidates in
+        // ChatView), an unrecognized handle now falls through to plain
+        // text instead of being treated as a mention at all. Feed
+        // posts/comments don't pass this list (no cheap way to
+        // validate against every user on the platform synchronously),
+        // so mentions there still render optimistically — a real,
+        // known limitation, not the same bug.
+        const isKnown = !knownUsernames || knownUsernames.some((u) => u.toLowerCase() === mention.handle.toLowerCase());
+        if (isKnown) {
+          flushPlain(i);
+          const isYou = !!viewerUsername && mention.handle.toLowerCase() === viewerUsername.toLowerCase();
+          out.push(
+            <a
+              key={nextKey()}
+              href={`/${mention.handle}`}
+              className={
+                isYou
+                  // A mention of the person actually reading it gets a
+                  // distinct, louder treatment (solid amber chip) instead
+                  // of the same subdued link everyone else's @mentions
+                  // get — the whole point of a mention is to stand out to
+                  // the one person it's for, and a message full of other
+                  // people's @handles shouldn't look identical to one
+                  // that's actually calling you out.
+                  ? 'rounded bg-[#f0b429] px-1 font-semibold text-black hover:brightness-110'
+                  : 'rounded bg-[var(--presence-default-a)]/15 px-1 font-medium text-[var(--presence-default-a)] hover:underline'
+              }
+            >
+              @{mention.handle}
+            </a>
+          );
+          i += mention.length;
+          plainStart = i;
+          continue;
+        }
       }
       i += 1;
       continue;
@@ -192,7 +219,7 @@ function parseInline(text: string, depth = 0): ReactNode[] {
       continue;
     }
     flushPlain(i);
-    out.push(spec.render(parseInline(inner, depth + 1), nextKey()));
+    out.push(spec.render(parseInline(inner, depth + 1, viewerUsername, knownUsernames), nextKey()));
     i += closeIdx + token.length;
     plainStart = i;
   }
@@ -203,18 +230,18 @@ function parseInline(text: string, depth = 0): ReactNode[] {
 
 // ---- block parsing ----
 
-function renderList(items: string[], ordered: boolean): ReactNode {
+function renderList(items: string[], ordered: boolean, viewerUsername?: string, knownUsernames?: string[]): ReactNode {
   const Tag = ordered ? 'ol' : 'ul';
   return (
     <Tag key={nextKey()} className={ordered ? 'my-1 ml-5 list-decimal space-y-0.5' : 'my-1 ml-5 list-disc space-y-0.5'}>
       {items.map((item) => (
-        <li key={nextKey()}>{parseInline(item)}</li>
+        <li key={nextKey()}>{parseInline(item, 0, viewerUsername, knownUsernames)}</li>
       ))}
     </Tag>
   );
 }
 
-export function renderMarkdown(input: string): ReactNode {
+export function renderMarkdown(input: string, viewerUsername?: string, knownUsernames?: string[]): ReactNode {
   const lines = input.split('\n');
   const blocks: ReactNode[] = [];
 
@@ -262,7 +289,7 @@ export function renderMarkdown(input: string): ReactNode {
           className="my-1.5 border-l-2 border-[var(--color-hairline-strong)] pl-3 text-[var(--color-ink-muted)]"
         >
           {quoted.map((q, idx) => (
-            <div key={idx}>{parseInline(q)}</div>
+            <div key={idx}>{parseInline(q, 0, viewerUsername, knownUsernames)}</div>
           ))}
         </blockquote>
       );
@@ -273,7 +300,7 @@ export function renderMarkdown(input: string): ReactNode {
     const headerMatch = /^(#{1,4})\s+(.*)$/.exec(line);
     if (headerMatch) {
       const level = headerMatch[1].length;
-      const content = parseInline(headerMatch[2]);
+      const content = parseInline(headerMatch[2], 0, viewerUsername, knownUsernames);
       const classes: Record<number, string> = {
         1: 'text-[1.4em] font-bold mt-1 mb-0.5',
         2: 'text-[1.25em] font-bold mt-1 mb-0.5',
@@ -297,7 +324,7 @@ export function renderMarkdown(input: string): ReactNode {
         items.push(lines[i].replace(/^\s*[-*]\s+/, ''));
         i += 1;
       }
-      blocks.push(renderList(items, false));
+      blocks.push(renderList(items, false, viewerUsername, knownUsernames));
       continue;
     }
 
@@ -308,7 +335,7 @@ export function renderMarkdown(input: string): ReactNode {
         items.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
         i += 1;
       }
-      blocks.push(renderList(items, true));
+      blocks.push(renderList(items, true, viewerUsername, knownUsernames));
       continue;
     }
 
@@ -336,7 +363,7 @@ export function renderMarkdown(input: string): ReactNode {
       <p key={nextKey()} className="leading-relaxed">
         {paraLines.map((l, idx) => (
           <span key={idx}>
-            {parseInline(l)}
+            {parseInline(l, 0, viewerUsername, knownUsernames)}
             {idx < paraLines.length - 1 && <br />}
           </span>
         ))}
