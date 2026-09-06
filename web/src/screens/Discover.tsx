@@ -263,7 +263,7 @@ export function Discover() {
                     </span>
                   </div>
                   <div className="mb-2 line-clamp-3 text-[13.5px] leading-relaxed text-[var(--color-ink)]/90">
-                    {renderMarkdown(post.body_rendered)}
+                    {renderMarkdown(post.body_rendered, profile?.username)}
                   </div>
                   <div className="flex items-center gap-4 text-[11.5px] text-[var(--color-ink-muted)]">
                     <span className="flex items-center gap-1">
