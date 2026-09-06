@@ -129,11 +129,18 @@ html[data-theme='bespoke'] {
   --color-surface: #080808;
   --color-surface-raised: #111112;
   --color-surface-overlay: #1a1a1b;
-  --color-hairline: #1c1c1c;
-  --color-hairline-strong: #333333;
+  /* Contrast bump: ink-faint/ink-muted/hairlines were all measurably
+     low-contrast against this theme's near-black surfaces — ink-faint
+     at #444 on #080808 comes out around ~2:1, well under WCAG AA's
+     4.5:1 floor for text, and the hairlines were subtle to the point
+     of being hard to register as borders at all. Lightened all four
+     while keeping the same near-black/near-white foundation that makes
+     Bespoke read as "bespoke" in the first place. */
+  --color-hairline: #262626;
+  --color-hairline-strong: #454545;
   --color-ink: #f0f0f0;
-  --color-ink-muted: #888888;
-  --color-ink-faint: #444444;
+  --color-ink-muted: #a3a3a3;
+  --color-ink-faint: #6b6b6b;
 }
 
 html[data-theme='bespoke'] :focus-visible {
