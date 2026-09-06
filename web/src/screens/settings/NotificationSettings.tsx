@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getNotificationPreferences, updateNotificationPreferences } from '../../lib/api/notification-prefs';
 import { getNotificationSoundEnabled, setNotificationSoundEnabled } from '../../lib/notificationSound';
+import { isPushSupported, getPushPermissionState, enablePushNotifications, disablePushNotifications } from '../../lib/push';
 
 const TOGGLES = [
   { key: 'reactions', label: 'Reactions', hint: 'When someone reacts to your posts.' },
@@ -33,10 +34,43 @@ export function NotificationSettings() {
   const queryClient = useQueryClient();
   const { data: prefs } = useQuery({ queryKey: ['notification-prefs'], queryFn: getNotificationPreferences });
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [pushState, setPushState] = useState<NotificationPermission | 'unsupported'>('default');
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+
+  async function refreshPushState() {
+    const state = await getPushPermissionState();
+    setPushState(state);
+    if (state === 'granted' && 'serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready.catch(() => null);
+      const sub = await registration?.pushManager.getSubscription();
+      setPushSubscribed(!!sub);
+    } else {
+      setPushSubscribed(false);
+    }
+  }
 
   useEffect(() => {
     setSoundEnabled(getNotificationSoundEnabled());
+    refreshPushState();
   }, []);
+
+  async function handleTogglePush() {
+    setPushError(null);
+    setPushBusy(true);
+    try {
+      if (pushSubscribed) {
+        await disablePushNotifications();
+      } else {
+        const result = await enablePushNotifications();
+        if (!result.ok) setPushError(result.reason ?? 'Could not enable push notifications.');
+      }
+      await refreshPushState();
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   const mutation = useMutation({
     mutationFn: updateNotificationPreferences,
@@ -68,6 +102,24 @@ export function NotificationSettings() {
           </div>
           <Toggle on={masterOn} onClick={() => mutation.mutate({ notifications_enabled: !masterOn })} />
         </div>
+      </section>
+
+      <section className="mb-4 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--color-ink)]">Push notifications</h2>
+            <p className="mt-0.5 text-[11.5px] text-[var(--color-ink-faint)]">
+              {pushState === 'unsupported'
+                ? 'Not supported in this browser.'
+                : pushState === 'denied'
+                  ? 'Blocked — enable notifications for this site in your browser settings first.'
+                  : "Real notifications on this device, even when PalSpace isn't open — like Discord or Instagram."}
+            </p>
+          </div>
+          <Toggle on={pushSubscribed} onClick={handleTogglePush} />
+        </div>
+        {pushBusy && <p className="mt-2 text-[11px] text-[var(--color-ink-faint)]">Working…</p>}
+        {pushError && <p className="mt-2 text-[11px] text-red-400">{pushError}</p>}
       </section>
 
       <section className="mb-4 rounded-xl border border-[var(--color-hairline)] bg-[var(--color-surface)] p-5">
