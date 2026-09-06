@@ -379,7 +379,7 @@ function PostCard({ post, autoOpen }: { post: FeedItem; autoOpen?: boolean }) {
       ) : (
         <>
           <div className="mb-3.5 cursor-pointer text-[15px] leading-relaxed" onClick={() => setDetailOpen(true)}>
-            {renderMarkdown(post.body_rendered)}
+            {renderMarkdown(post.body_rendered, profile?.username)}
           </div>
           {!post.media_url && extractFirstUrl(post.body_rendered) && (
             <div className="mb-3.5">
