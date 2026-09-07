@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Hash, Check, Search as SearchIcon, Heart, MessageCircle } from 'lucide-react';
@@ -12,7 +12,18 @@ import { useAppStore } from '../store/useAppStore';
 
 type Category = 'spaces' | 'feed';
 
+// See Login.tsx for why this Suspense wrapper is required, not
+// optional — useSearchParams() (used below for the ?tag= deep link)
+// fails static prerendering outright without it.
 export function Discover() {
+  return (
+    <Suspense fallback={null}>
+      <DiscoverInner />
+    </Suspense>
+  );
+}
+
+function DiscoverInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const highlightId = searchParams?.get('highlight');
