@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft, MoreHorizontal, Copy, Forward as ForwardIcon, Phone } from 'lucide-react';
+import { Send, ImagePlus, Mic, Timer, Square, Reply, Pencil, X, Smile, Sticker, ArrowLeft, MoreHorizontal, Copy, Forward as ForwardIcon, Phone, Search as SearchIcon, Users } from 'lucide-react';
 import {
   listMessages,
   sendMessage,
@@ -20,12 +20,17 @@ import {
   getOtherDmParticipantId,
   getReadReceipt,
   listChannelMembersForMention,
+  getChannelInfo,
+  searchMessages,
+  listMessagesAround,
   type MessageReactionSummary,
   type PinnedMessage,
 } from '../../lib/api/channels';
 import { EMOJI_MAP } from '../../lib/emoji';
 import { getRecentEmojiCodes, recordEmojiUsed } from '../../lib/recentEmoji';
 import { MessageContextMenu } from './MessageContextMenu';
+import { MessageSearchPanel } from './MessageSearchPanel';
+import { GroupDmSettingsModal } from './GroupDmSettingsModal';
 import { ForwardMessageModal } from './ForwardMessageModal';
 import { uploadMedia } from '../../lib/api/media';
 import { renderMarkdown } from '../../lib/markdown';
@@ -71,6 +76,18 @@ const EPHEMERAL_OPTIONS = [
 // reactions" strip pattern from Discord/Slack rather than opening the
 // full EmojiPicker for the common case of a single quick reaction.
 const QUICK_REACT_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+
+// Discord-style formatting for however many people are typing at once
+// — "Alex is typing…" / "Alex and Sam are typing…" /
+// "Alex, Sam, and 2 others are typing…" — rather than only ever being
+// able to name one person regardless of how many are actually typing.
+function formatTypingLabel(users: string[]): string {
+  if (users.length === 0) return '';
+  if (users.length === 1) return `${users[0]} is typing…`;
+  if (users.length === 2) return `${users[0]} and ${users[1]} are typing…`;
+  if (users.length === 3) return `${users[0]}, ${users[1]}, and ${users[2]} are typing…`;
+  return `${users[0]}, ${users[1]}, and ${users.length - 2} others are typing…`;
+}
 
 export function ChatView({ channelId, channelLabel }: { channelId: string; channelLabel: string }) {
   const router = useRouter();
@@ -157,7 +174,16 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
       })
       .slice(0, 8);
   }, [emojiQuery]);
-  const [typingUser, setTypingUser] = useState<string | null>(null);
+  // Was a single string + single shared timeout — meant only the most
+  // recent typer's indicator could ever show, and it could vanish
+  // early if a second person started typing (their timeout would
+  // clear/replace the first person's), even though the first person
+  // might still be actively typing. Tracked per-username now, each
+  // with its own independent expiry, so "Alex and Sam are typing…"
+  // actually works in a group DM/space channel — this bug specifically
+  // never mattered in a 1:1 DM (only ever one other possible typer),
+  // which is presumably why it went unnoticed until group DMs existed.
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [replyTarget, setReplyTarget] = useState<DisplayMessage | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [ephemeralSeconds, setEphemeralSeconds] = useState(0);
@@ -170,6 +196,9 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const [reactionsByMessage, setReactionsByMessage] = useState<Record<number, MessageReactionSummary[]>>({});
   const [pinnedIds, setPinnedIds] = useState<Set<number>>(new Set());
   const [pinsBarOpen, setPinsBarOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
+  const { data: channelInfo } = useQuery({ queryKey: ['channel-info', channelId], queryFn: () => getChannelInfo(channelId) });
   const [pinnedList, setPinnedList] = useState<PinnedMessage[]>([]);
   const [forwardTarget, setForwardTarget] = useState<(Message & { sender_username: string; sender_display_name: string; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null }) | null>(null);
   const [otherLastRead, setOtherLastRead] = useState<number | null>(null);
@@ -178,7 +207,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const { data: history } = useQuery({
     queryKey: ['messages', channelId],
@@ -298,14 +327,28 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
     const typingChannel = subscribeToTyping(channelId, (username) => {
       if (username === profile?.username) return;
-      setTypingUser(username);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2500);
+      const existing = typingTimeoutsRef.current.get(username);
+      if (existing) clearTimeout(existing);
+      setTypingUsers((prev) => (prev.includes(username) ? prev : [...prev, username]));
+      typingTimeoutsRef.current.set(
+        username,
+        setTimeout(() => {
+          setTypingUsers((prev) => prev.filter((u) => u !== username));
+          typingTimeoutsRef.current.delete(username);
+        }, 2500)
+      );
     });
 
     return () => {
       unsubscribe(channel);
       unsubscribe(typingChannel);
+      // Without this, a typing indicator from the channel you just left
+      // could keep showing for up to 2.5s after switching to a
+      // different one — its timeout was still pending and nothing
+      // reset the displayed list on channel change.
+      typingTimeoutsRef.current.forEach((t) => clearTimeout(t));
+      typingTimeoutsRef.current.clear();
+      setTypingUsers([]);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, profile?.id]);
@@ -612,6 +655,34 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
     navigator.clipboard.writeText(message.body_raw || message.body_rendered).catch(() => {});
   }
 
+  // Shared "jump to a specific message" used by search results, and
+  // reusable for the pin bar too — handles the case a simple
+  // scrollIntoView can't: the target might be older than the 50-most-
+  // recent-messages window listMessages() loads, meaning there's
+  // nothing in the DOM to scroll to at all yet. Falls back to loading
+  // a fresh window centered on that message when it isn't already
+  // present.
+  function jumpToMessage(messageId: number) {
+    const existing = document.getElementById(`msg-${messageId}`);
+    if (existing) {
+      existing.scrollIntoView({ block: 'center' });
+      existing.classList.add('message-link-highlight');
+      setTimeout(() => existing.classList.remove('message-link-highlight'), 1800);
+      return;
+    }
+    listMessagesAround(channelId, messageId).then((around) => {
+      setMessages(around.map((m) => ({ ...m })));
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`msg-${messageId}`);
+        if (el) {
+          el.scrollIntoView({ block: 'center' });
+          el.classList.add('message-link-highlight');
+          setTimeout(() => el.classList.remove('message-link-highlight'), 1800);
+        }
+      });
+    });
+  }
+
   function handleCopyLink(message: DisplayMessage) {
     const url = `${window.location.origin}${window.location.pathname}#msg-${message.id}`;
     navigator.clipboard.writeText(url).catch(() => {});
@@ -652,10 +723,28 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
             📌 {pinnedList.length}
           </button>
         )}
+        <button
+          onClick={() => setSearchOpen((v) => !v)}
+          className={`ml-auto flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)] ${searchOpen ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]' : ''}`}
+          aria-label="Search this conversation"
+          title="Search this conversation"
+        >
+          <SearchIcon size={15} />
+        </button>
+        {channelInfo?.is_group && (
+          <button
+            onClick={() => setGroupSettingsOpen(true)}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
+            aria-label="Group members"
+            title="Group members"
+          >
+            <Users size={15} />
+          </button>
+        )}
         {call.status === 'idle' && (
           <button
             onClick={call.join}
-            className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
             aria-label="Start voice call"
             title="Start voice call"
           >
@@ -663,10 +752,20 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
           </button>
         )}
         <span
-          className={`${call.status === 'idle' ? '' : 'ml-auto'} h-1.5 w-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400' : 'bg-[var(--color-ink-faint)]'}`}
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400' : 'bg-[var(--color-ink-faint)]'}`}
           title={connectionStatus}
         />
       </div>
+
+      {searchOpen && (
+        <MessageSearchPanel
+          channelId={channelId}
+          onClose={() => setSearchOpen(false)}
+          onJumpTo={jumpToMessage}
+        />
+      )}
+
+      {groupSettingsOpen && <GroupDmSettingsModal channelId={channelId} onClose={() => setGroupSettingsOpen(false)} />}
 
       <CallBar call={call} label={`Voice — ${channelLabel}`} />
 
@@ -679,7 +778,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
                 key={pin.message_id}
                 onClick={() => {
                   setPinsBarOpen(false);
-                  document.getElementById(`msg-${pin.message_id}`)?.scrollIntoView({ block: 'center' });
+                  jumpToMessage(pin.message_id);
                 }}
                 className="flex w-full items-start gap-1.5 rounded-lg px-1.5 py-1 text-left text-[12px] hover:bg-[var(--color-surface-raised)]"
               >
@@ -755,8 +854,8 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
         })()}
       </div>
 
-      <div className={`px-4 md:px-7 text-[11.5px] text-[var(--color-ink-muted)] transition-opacity ${typingUser ? 'opacity-100' : 'opacity-0'}`}>
-        {typingUser && `${typingUser} is typing…`}
+      <div className={`px-4 md:px-7 text-[11.5px] text-[var(--color-ink-muted)] transition-opacity ${typingUsers.length > 0 ? 'opacity-100' : 'opacity-0'}`}>
+        {formatTypingLabel(typingUsers)}
       </div>
 
       {attachError && (
