@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -41,7 +41,18 @@ function timeAgo(iso: string) {
 // this UI just only ever uses the ❤️ slot of it now.
 const LIKE_EMOJI = '❤️';
 
+// See Login.tsx for why this Suspense wrapper is required, not
+// optional — useSearchParams() (used below for the ?post= deep link)
+// fails static prerendering outright without it.
 export function HomeFeed() {
+  return (
+    <Suspense fallback={null}>
+      <HomeFeedInner />
+    </Suspense>
+  );
+}
+
+function HomeFeedInner() {
   const queryClient = useQueryClient();
   const session = useAppStore((s) => s.session);
   const [feedTab, setFeedTab] = useState<'for-you' | 'following'>('for-you');
