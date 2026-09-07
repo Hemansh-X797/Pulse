@@ -5,12 +5,29 @@
 // else after" flow you asked for is a Phase 3 item (auth overhaul) — see
 // MIGRATION_GUIDE.md — so it's intentionally not changed here yet.
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithPassword, signUpWithPassword, signInWithGoogle, signInWithDiscord, signInWithGithub } from '../lib/api/auth';
 
+// Next.js requires any component calling useSearchParams() to be
+// wrapped in a Suspense boundary, or static prerendering fails the
+// build outright (confirmed — this exact page failed a real Vercel
+// build without it: "useSearchParams() should be wrapped in a
+// suspense boundary"). LoginForm holds all the actual logic/JSX;
+// this just satisfies that requirement without changing anything
+// about how the page behaves for a real visitor — the fallback is
+// only ever visible for a fraction of a second during the initial
+// render, not a real loading state anyone will consciously see.
 export function Login() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // Used by /join/[code] to send someone here to log in, then land
