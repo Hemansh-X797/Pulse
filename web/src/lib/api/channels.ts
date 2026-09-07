@@ -174,7 +174,50 @@ export async function listChannelMembersForMention(channelId: string): Promise<{
   return (data ?? []).map((row) => row.profiles as unknown as { id: string; username: string; display_name: string; avatar_url: string });
 }
 
-export async function listMessages(channelId: string, limit = 50): Promise<(Message & { sender_username: string; sender_display_name: string; sender_avatar_url: string; sender_avatar_decoration: string | null; sender_name_style: { font?: string; effect?: string; colors?: string[] } | null })[]> {
+/**
+ * Whether a channel is a group DM (vs 1:1 or a space channel) and its
+ * custom name, if any — needed by ChatView to decide whether to show
+ * group-management UI (member list / add / leave) at all. Real gap
+ * this closes: addGroupDmMember/leaveGroupDm (032_group_dm.sql) have
+ * existed since group DMs were built, with zero UI ever calling
+ * either — once you created a group you could never add anyone else
+ * or leave it, full stop.
+ */
+export async function getChannelInfo(channelId: string): Promise<{ is_group: boolean; name: string } | null> {
+  const { data, error } = await supabase.from('channels').select('is_group, name').eq('id', channelId).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export type DisplayMessageRow = Message & {
+  sender_username: string;
+  sender_display_name: string;
+  sender_avatar_url: string;
+  sender_avatar_decoration: string | null;
+  sender_name_style: { font?: string; effect?: string; colors?: string[] } | null;
+};
+
+function mapMessageRow(row: Message & { profiles: unknown }): DisplayMessageRow {
+  const profile = row.profiles as unknown as {
+    username: string;
+    display_name: string;
+    avatar_url: string | null;
+    equipped_avatar_decoration: string | null;
+    name_style: { font?: string; effect?: string; colors?: string[] } | null;
+  } | null;
+  return {
+    ...row,
+    sender_username: profile?.username ?? '?',
+    sender_display_name: profile?.display_name ?? profile?.username ?? '?',
+    sender_avatar_url: profile?.avatar_url ?? '',
+    sender_avatar_decoration: profile?.equipped_avatar_decoration ?? null,
+    sender_name_style: profile?.name_style ?? null,
+  };
+}
+
+const MESSAGE_SELECT = '*, profiles!messages_sender_id_fkey(username, display_name, avatar_url, equipped_avatar_decoration, name_style)';
+
+export async function listMessages(channelId: string, limit = 50): Promise<DisplayMessageRow[]> {
   const { data, error } = await supabase
     .from('messages')
     // avatar_url wasn't selected here before, so the sender's profile
@@ -184,25 +227,57 @@ export async function listMessages(channelId: string, limit = 50): Promise<(Mess
     // the column exists and the settings picker saves to it, but chat
     // never selected it, so a decoration you equipped never showed up
     // anywhere you'd actually see yourself chatting.
-    .select('*, profiles!messages_sender_id_fkey(username, display_name, avatar_url, equipped_avatar_decoration, name_style)')
+    .select(MESSAGE_SELECT)
     .eq('channel_id', channelId)
     .order('id', { ascending: false })
     .limit(limit);
   if (error) throw error;
+  return (data ?? []).map(mapMessageRow).reverse();
+}
 
-  return (data ?? [])
-    .map((row) => {
-      const profile = row.profiles as unknown as { username: string; display_name: string; avatar_url: string | null; equipped_avatar_decoration: string | null; name_style: { font?: string; effect?: string; colors?: string[] } | null } | null;
-      return {
-        ...row,
-        sender_username: profile?.username ?? '?',
-        sender_display_name: profile?.display_name ?? profile?.username ?? '?',
-        sender_avatar_url: profile?.avatar_url ?? '',
-        sender_avatar_decoration: profile?.equipped_avatar_decoration ?? null,
-        sender_name_style: profile?.name_style ?? null,
-      };
-    })
-    .reverse();
+/**
+ * Full-text-ish search (ilike, case-insensitive substring) within one
+ * channel — there was no way to find an older message at all before
+ * this short of scrolling back manually. Kept simple (ilike, not a
+ * dedicated tsvector column) since this app's message volume per
+ * channel doesn't call for full Postgres FTS infrastructure yet; easy
+ * to upgrade later without changing this function's signature.
+ */
+export async function searchMessages(channelId: string, query: string, limit = 30): Promise<DisplayMessageRow[]> {
+  if (!query.trim()) return [];
+  const { data, error } = await supabase
+    .from('messages')
+    .select(MESSAGE_SELECT)
+    .eq('channel_id', channelId)
+    .eq('deleted', false)
+    .ilike('body_raw', `%${query.trim()}%`)
+    .order('id', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(mapMessageRow);
+}
+
+/**
+ * Loads a window of messages centered on a specific id — needed
+ * because `listMessages` only ever loads the most recent N messages,
+ * so a search result (or any other deep link) pointing at something
+ * older than that window has nothing in the DOM to scroll to. Splits
+ * into two queries (older half, newer half) since a single "id between
+ * X-radius and X+radius" range query would fetch a lot of nothing on a
+ * quiet channel with big gaps between message ids... actually ids are
+ * sequential regardless of gaps, so this is really just "N before" +
+ * "N after", merged and sorted.
+ */
+export async function listMessagesAround(channelId: string, messageId: number, radius = 25): Promise<DisplayMessageRow[]> {
+  const [olderRes, newerRes] = await Promise.all([
+    supabase.from('messages').select(MESSAGE_SELECT).eq('channel_id', channelId).lte('id', messageId).order('id', { ascending: false }).limit(radius),
+    supabase.from('messages').select(MESSAGE_SELECT).eq('channel_id', channelId).gt('id', messageId).order('id', { ascending: true }).limit(radius),
+  ]);
+  if (olderRes.error) throw olderRes.error;
+  if (newerRes.error) throw newerRes.error;
+  const older = (olderRes.data ?? []).map(mapMessageRow).reverse();
+  const newer = (newerRes.data ?? []).map(mapMessageRow);
+  return [...older, ...newer];
 }
 
 export async function sendMessage(
