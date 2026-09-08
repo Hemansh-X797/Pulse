@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UserPlus, Check, X } from 'lucide-react';
 import { getProfileByUsername } from '../../lib/api/profile';
-import { createOrGetDM } from '../../lib/api/channels';
+import { useOpenDm } from '../../hooks/useOpenDm';
 import { listFriends, listOutgoingRequests, sendFriendRequest } from '../../lib/api/friends';
 import { useAppStore } from '../../store/useAppStore';
 import { NameStyle, type NameStyleData } from '../NameStyle';
@@ -26,6 +26,7 @@ function lastSeenLabel(iso: string) {
 export function ProfilePopover({ username, anchorRef, onClose }: { username: string; anchorRef: React.RefObject<HTMLElement | null>; onClose: () => void }) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const openDm = useOpenDm();
   const queryClient = useQueryClient();
   const myProfile = useAppStore((s) => s.profile);
   const [avatarLightboxOpen, setAvatarLightboxOpen] = useState(false);
@@ -72,9 +73,8 @@ export function ProfilePopover({ username, anchorRef, onClose }: { username: str
 
   async function handleMessage() {
     if (!profile) return;
-    const channelId = await createOrGetDM(profile.username);
     onClose();
-    router.push(`/channels/me/${channelId}`);
+    await openDm(profile.username);
   }
 
   function handleOpenFullProfile() {
