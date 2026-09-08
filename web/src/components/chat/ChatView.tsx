@@ -23,6 +23,7 @@ import {
   getChannelInfo,
   searchMessages,
   listMessagesAround,
+  getMessagePreview,
   type MessageReactionSummary,
   type PinnedMessage,
 } from '../../lib/api/channels';
@@ -838,6 +839,7 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
                 onCopyText={() => handleCopyText(m)}
                 onCopyLink={() => handleCopyLink(m)}
                 onForward={() => setForwardTarget(m)}
+                onJumpToReply={jumpToMessage}
               />
             );
           })}
@@ -1123,6 +1125,43 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   );
 }
 
+// The reply-preview line above a message — before this, it only ever
+// showed anything when the replied-to message happened to already be
+// in the currently-loaded messages window (a plain array .find()).
+// Reply to something older than that window and the entire "↩
+// replying to…" line silently disappeared, with zero indication a
+// reply had even happened, and there was no way to jump to the
+// original either way. This always resolves (falling back to
+// getMessagePreview for anything not already loaded) and the whole
+// line is clickable.
+function ReplyPreviewLine({ replyToId, snippet, onJump }: { replyToId: number; snippet?: DisplayMessage; onJump: () => void }) {
+  const { data: fallback } = useQuery({
+    queryKey: ['message-preview', replyToId],
+    queryFn: () => getMessagePreview(replyToId),
+    enabled: !snippet,
+    staleTime: 60_000,
+  });
+
+  const senderName = snippet?.sender_display_name ?? fallback?.sender_display_name;
+  const preview = snippet ? (snippet.deleted ? 'Message deleted' : snippet.body_rendered) : fallback ? (fallback.deleted ? 'Message deleted' : fallback.body_rendered) : null;
+
+  if (!senderName || preview === null) {
+    // Still loading, or the message genuinely doesn't exist anymore
+    // (deleted at the DB row level, not just soft-deleted) — either
+    // way, showing nothing is better than a broken-looking line.
+    return null;
+  }
+
+  return (
+    <button
+      onClick={onJump}
+      className="mb-0.5 max-w-[320px] truncate rounded font-mono text-[10.5px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:underline"
+    >
+      ↩ {senderName}: {preview}
+    </button>
+  );
+}
+
 function MessageRow({
   message,
   isMine,
@@ -1144,6 +1183,7 @@ function MessageRow({
   onCopyText,
   onCopyLink,
   onForward,
+  onJumpToReply,
 }: {
   message: DisplayMessage;
   isMine: boolean;
@@ -1165,6 +1205,7 @@ function MessageRow({
   onCopyText: () => void;
   onCopyLink: () => void;
   onForward: () => void;
+  onJumpToReply: (messageId: number) => void;
 }) {
   const [editValue, setEditValue] = useState(message.body_rendered);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1278,10 +1319,12 @@ function MessageRow({
           <ProfilePopover username={message.sender_username} anchorRef={popoverAnchorRef} onClose={() => setPopoverOpen(false)} />
         )}
 
-        {replySnippet && (
-          <div className="mb-0.5 max-w-[320px] truncate font-mono text-[10.5px] text-[var(--color-ink-muted)]">
-            ↩ {replySnippet.sender_username}: {replySnippet.body_rendered}
-          </div>
+        {(replySnippet || message.reply_to_id) && (
+          <ReplyPreviewLine
+            replyToId={message.reply_to_id!}
+            snippet={replySnippet}
+            onJump={() => onJumpToReply(message.reply_to_id!)}
+          />
         )}
 
         {isEditing ? (
