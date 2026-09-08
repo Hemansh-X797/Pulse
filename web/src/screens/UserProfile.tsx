@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal, UserPlus, Check, ShieldOff, Shield, X, Users } from 'lucide-react';
 import { getProfileByUsername } from '../lib/api/profile';
-import { createOrGetDM } from '../lib/api/channels';
+import { useOpenDm } from '../hooks/useOpenDm';
 import { listFriends, listOutgoingRequests, sendFriendRequest, getMutualFriends } from '../lib/api/friends';
 import { listBlockedUsers, blockUser, unblockUser } from '../lib/api/blocking';
 import { followUser, unfollowUser, isFollowing, getFollowCounts } from '../lib/api/follows';
@@ -18,7 +18,7 @@ import { ProfileBadges } from '../components/ProfileBadges';
 export function UserProfile() {
   const params = useParams<{ username: string }>()!;
   const username = params.username;
-  const router = useRouter();
+  const openDm = useOpenDm();
   const queryClient = useQueryClient();
   const myProfile = useAppStore((s) => s.profile);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -96,9 +96,8 @@ export function UserProfile() {
   async function handleMessage() {
     setMessageError(null);
     try {
-      const channelId = await createOrGetDM(username);
+      await openDm(username);
       queryClient.invalidateQueries({ queryKey: ['my-dms'] });
-      router.push(`/channels/me/${channelId}`);
     } catch (e) {
       setMessageError(e instanceof Error ? e.message : 'Could not start conversation.');
     }
