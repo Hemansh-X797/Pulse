@@ -63,31 +63,38 @@ export async function listMyDMs(): Promise<DmSummary[]> {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) return [];
 
-  // Same RLS scoping as createOrGetDM: this only ever returns channels
-  // I'm actually a member of. No longer filters out is_group — that
-  // filter used to hide every group DM from this list entirely, which
-  // combined with there being no way to create one at all
-  // (see 032_group_dm.sql) meant group DMs were completely
-  // unreachable end to end.
-  // My mistake in the group-DM rewrite: I dropped the old
-  // `.eq('channels.is_group', false)` filter to stop excluding group
-  // DMs, but that filter was *also* incidentally the only thing
-  // keeping space channels out of this list — a space's text/voice
-  // channels get channel_members rows too (see 001/002's
-  // handle_new_server trigger), and they're is_group=false same as a
-  // 1:1 DM, so removing that filter let every space channel I'm a
-  // member of leak into the DM list. The actually-correct filter is on
-  // server_id, not is_group: a DM (1:1 or group) always has
-  // server_id = null, a space channel never does. This correctly
-  // includes both DM kinds and excludes space channels regardless of
-  // their is_group value.
-  const { data: myChannels, error } = await supabase
+  // Rewritten as two plain queries instead of one query with a filter
+  // on an embedded/joined resource (`channels!inner(...)` +
+  // `.is('channels.server_id', null)`). The real bug that version had
+  // was much dumber than an embedded-filter edge case: it used the
+  // column name `server_id`, which hasn't existed since
+  // 002_rename_servers_to_spaces.sql renamed it to `space_id` —
+  // meaning every single call to this function was throwing a
+  // "column does not exist" error at runtime, and useQuery's default
+  // `data: []` fallback silently rendered that failure as an empty DM
+  // list instead of surfacing it. That matches the exact bug report:
+  // real conversations existed (confirmed by real notifications
+  // arriving), but the list appeared completely empty. Splitting into
+  // two plain, single-table queries here — rather than one query
+  // filtering an embedded resource — so a mistake like this becomes a
+  // type error against a plain `channels` select next time, not a
+  // silently wrong runtime string.
+  const { data: myMemberships, error: membershipError } = await supabase
     .from('channel_members')
-    .select('channel_id, channels!inner(is_group, name, server_id)')
-    .eq('user_id', userData.user.id)
-    .is('channels.server_id', null);
-  if (error) throw error;
-  const channelMeta = new Map((myChannels ?? []).map((r) => [r.channel_id, r.channels as unknown as { is_group: boolean; name: string }]));
+    .select('channel_id')
+    .eq('user_id', userData.user.id);
+  if (membershipError) throw membershipError;
+  const myChannelIds = (myMemberships ?? []).map((r) => r.channel_id);
+  if (myChannelIds.length === 0) return [];
+
+  const { data: channelRows, error: channelsError } = await supabase
+    .from('channels')
+    .select('id, is_group, name, space_id')
+    .in('id', myChannelIds)
+    .is('space_id', null);
+  if (channelsError) throw channelsError;
+
+  const channelMeta = new Map((channelRows ?? []).map((c) => [c.id, { is_group: c.is_group, name: c.name }]));
   const channelIds = [...channelMeta.keys()];
   if (channelIds.length === 0) return [];
 
@@ -278,6 +285,28 @@ export async function listMessagesAround(channelId: string, messageId: number, r
   const older = (olderRes.data ?? []).map(mapMessageRow).reverse();
   const newer = (newerRes.data ?? []).map(mapMessageRow);
   return [...older, ...newer];
+}
+
+/**
+ * A lightweight, single-message lookup for the reply-preview line
+ * above a message — before this, that preview only ever showed
+ * anything when the replied-to message happened to already be in the
+ * currently-loaded 50-message window (messages.find(...) in
+ * ChatView). Reply to something older than that window and the entire
+ * "↩ replying to…" context silently vanished, with no indication a
+ * reply had even happened. This lets the reply line always resolve,
+ * regardless of what's currently loaded.
+ */
+export async function getMessagePreview(messageId: number): Promise<{ sender_display_name: string; body_rendered: string; deleted: boolean } | null> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('body_rendered, deleted, profiles!messages_sender_id_fkey(display_name)')
+    .eq('id', messageId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const profile = data.profiles as unknown as { display_name: string } | null;
+  return { sender_display_name: profile?.display_name ?? '?', body_rendered: data.body_rendered, deleted: data.deleted };
 }
 
 export async function sendMessage(
