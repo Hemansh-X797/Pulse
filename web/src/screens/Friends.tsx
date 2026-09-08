@@ -14,7 +14,7 @@ import {
   respondToFriendRequest,
   type FriendProfile,
 } from '../lib/api/friends';
-import { createOrGetDM } from '../lib/api/channels';
+import { useOpenDm } from '../hooks/useOpenDm';
 
 type Tab = 'all' | 'pending' | 'add';
 
@@ -43,6 +43,7 @@ export function Friends() {
   const [query, setQuery] = useState('');
   const [messageError, setMessageError] = useState<string | null>(null);
   const router = useRouter();
+  const openDm = useOpenDm();
   const queryClient = useQueryClient();
 
   const { data: friends = [] } = useQuery({ queryKey: ['friends'], queryFn: listFriends });
@@ -75,11 +76,10 @@ export function Friends() {
   async function handleMessage(username: string) {
     setMessageError(null);
     try {
-      const channelId = await createOrGetDM(username);
+      await openDm(username);
       // Same reasoning as GlobalNav's space create/join: don't make the
       // DM sidebar wait on the realtime round-trip for your own action.
       queryClient.invalidateQueries({ queryKey: ['my-dms'] });
-      router.push(`/channels/me/${channelId}`);
     } catch (e) {
       setMessageError(e instanceof Error ? e.message : 'Could not start conversation.');
     }
