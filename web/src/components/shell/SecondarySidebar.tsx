@@ -168,7 +168,7 @@ function SpaceTopicList() {
   }
 
   return (
-    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
+    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[288px]">
       <div className="flex h-[62px] shrink-0 items-center justify-between border-b border-[var(--color-hairline)] px-4">
         <span className="font-serif text-[15px] font-semibold">Space</span>
         <button
@@ -180,7 +180,7 @@ function SpaceTopicList() {
           <Settings2 size={15} />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto px-3.5 py-2">
+      <div className="flex-1 overflow-y-auto px-4 py-2.5">
         {uncategorized.length > 0 && (
           <div className="mb-2">
             {uncategorized.map((t) => (
@@ -226,27 +226,27 @@ function DmList() {
   const [newGroupOpen, setNewGroupOpen] = useState(false);
 
   return (
-    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
+    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[288px]">
       <SidebarHeader title="PalSpace" />
-      <div className="flex flex-1 flex-col px-3.5">
+      <div className="flex flex-1 flex-col overflow-y-auto px-4">
         <Link
           href="/friends"
-          className={`mb-1 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-medium transition-colors ${
+          className={`mb-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-colors ${
             pathname === '/friends' ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)]/60 hover:text-[var(--color-ink)]'
           }`}
         >
-          <Users size={16} /> Friends
+          <Users size={17} /> Friends
         </Link>
 
-        <div className="flex items-center justify-between px-2.5 pb-2 pt-3">
+        <div className="flex items-center justify-between px-3 pb-2.5 pt-4">
           <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">Direct Messages</span>
           <button
             onClick={() => setNewGroupOpen(true)}
-            className="flex h-5 w-5 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--color-ink-faint)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-ink)]"
             aria-label="New group"
             title="New group"
           >
-            <Plus size={13} />
+            <Plus size={14} />
           </button>
         </div>
 
@@ -287,7 +287,7 @@ function DmList() {
             <Link
               key={dm.channel_id}
               href={href}
-              className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors ${
                 active ? 'bg-[var(--color-surface-raised)] text-[var(--color-ink)]' : 'text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-raised)]/60 hover:text-[var(--color-ink)]'
               }`}
             >
@@ -297,26 +297,26 @@ function DmList() {
                 ) : (
                   <>
                     {dm.other_users[0]?.avatar_url ? (
-                      <img src={dm.other_users[0].avatar_url} alt="" className="h-8 w-8 rounded-full object-cover" />
+                      <img src={dm.other_users[0].avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" />
                     ) : (
                       <div
                         style={{ ['--p-a' as string]: dm.other_users[0]?.accent_color_top, ['--p-b' as string]: dm.other_users[0]?.accent_color_bottom }}
-                        className="flex h-8 w-8 items-center justify-center rounded-full presence-fill text-[11px] font-bold text-black"
+                        className="flex h-10 w-10 items-center justify-center rounded-full presence-fill text-[12px] font-bold text-black"
                       >
                         {(dm.other_users[0]?.display_name ?? '?').slice(0, 2).toUpperCase()}
                       </div>
                     )}
                     {dm.other_users[0] && (
                       <span className="absolute -bottom-0.5 -right-0.5">
-                        <StatusDot userId={dm.other_users[0].id} size={10} />
+                        <StatusDot userId={dm.other_users[0].id} size={11} />
                       </span>
                     )}
                   </>
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className={`truncate text-[13px] ${unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : 'font-medium'}`}>{label}</div>
-                <div className="truncate text-[11.5px] text-[var(--color-ink-faint)]">{dm.last_message_preview}</div>
+                <div className={`truncate text-[13.5px] ${unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : 'font-medium'}`}>{label}</div>
+                <div className="truncate text-[12px] text-[var(--color-ink-faint)]">{dm.last_message_preview}</div>
               </div>
               {unread > 0 && (
                 <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full presence-fill px-1 font-mono text-[10px] font-bold text-black">
@@ -348,33 +348,33 @@ function FeedFilters() {
   });
 
   return (
-    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[260px]">
+    <div className="flex w-full shrink-0 flex-col border-r border-[var(--color-hairline)] bg-[var(--color-surface)] md:w-[288px]">
       <SidebarHeader title="PalSpace" />
-      <div className="flex-1 overflow-y-auto px-3.5">
-        <div className="px-2.5 pb-2 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">Feed</div>
+      <div className="flex-1 overflow-y-auto px-4 py-1">
+        <div className="px-3 pb-2.5 pt-3 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">Feed</div>
         <div className="rounded-xl bg-[var(--color-surface-raised)] px-3 py-2.5 text-[13.5px] font-medium text-[var(--color-ink)]">For You</div>
 
         {suggestions.length > 0 && (
           <>
-            <div className="px-2.5 pb-2 pt-5 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
+            <div className="px-3 pb-2.5 pt-5 font-mono text-[10px] font-medium uppercase tracking-wider text-[var(--color-ink-faint)]">
               Suggested for you
             </div>
-            <div className="space-y-0.5 pb-4">
+            <div className="space-y-1 pb-4">
               {suggestions.map((s) => (
                 <Link
                   key={s.id}
                   href={`/${s.username}`}
-                  className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-[var(--color-surface-raised)]/60"
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-[var(--color-surface-raised)]/60"
                 >
                   <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-black presence-fill"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-bold text-black presence-fill"
                     style={{ ['--p-a' as string]: s.accent_color_top, ['--p-b' as string]: s.accent_color_bottom }}
                   >
                     {s.avatar_url ? <img src={s.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : s.display_name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[12.5px] font-medium">{s.display_name}</div>
-                    <div className="truncate text-[10.5px] text-[var(--color-ink-faint)]">@{s.username}</div>
+                    <div className="truncate text-[11px] text-[var(--color-ink-faint)]">@{s.username}</div>
                   </div>
                 </Link>
               ))}
@@ -395,12 +395,12 @@ function FeedFilters() {
 function GroupAvatar({ members }: { members: DmSummary['other_users'] }) {
   const shown = members.slice(0, 3);
   return (
-    <div className="relative flex h-8 w-8 shrink-0 items-center justify-center">
-      <div className="flex -space-x-2">
+    <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+      <div className="flex -space-x-2.5">
         {shown.map((m) => (
           <div
             key={m.id}
-            className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--color-surface)] text-[8px] font-bold text-black presence-fill"
+            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-[var(--color-surface)] text-[9px] font-bold text-black presence-fill"
             style={{ ['--p-a' as string]: m.accent_color_top, ['--p-b' as string]: m.accent_color_bottom }}
           >
             {m.avatar_url ? <img src={m.avatar_url} alt="" className="h-full w-full rounded-full object-cover" /> : m.display_name.slice(0, 1).toUpperCase()}
@@ -408,7 +408,7 @@ function GroupAvatar({ members }: { members: DmSummary['other_users'] }) {
         ))}
       </div>
       {members.length > 3 && (
-        <span className="absolute -bottom-1 -right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-[var(--color-surface-overlay)] px-0.5 font-mono text-[7px] font-bold text-[var(--color-ink-muted)]">
+        <span className="absolute -bottom-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--color-surface-overlay)] px-0.5 font-mono text-[7.5px] font-bold text-[var(--color-ink-muted)]">
           +{members.length - 3}
         </span>
       )}
