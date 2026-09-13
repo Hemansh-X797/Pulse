@@ -190,8 +190,8 @@ export async function listChannelMembersForMention(channelId: string): Promise<{
  * either — once you created a group you could never add anyone else
  * or leave it, full stop.
  */
-export async function getChannelInfo(channelId: string): Promise<{ is_group: boolean; name: string } | null> {
-  const { data, error } = await supabase.from('channels').select('is_group, name').eq('id', channelId).maybeSingle();
+export async function getChannelInfo(channelId: string): Promise<{ is_group: boolean; name: string; space_id: string | null } | null> {
+  const { data, error } = await supabase.from('channels').select('is_group, name, space_id').eq('id', channelId).maybeSingle();
   if (error) throw error;
   return data;
 }
@@ -236,6 +236,28 @@ export async function listMessages(channelId: string, limit = 50): Promise<Displ
     // anywhere you'd actually see yourself chatting.
     .select(MESSAGE_SELECT)
     .eq('channel_id', channelId)
+    .order('id', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map(mapMessageRow).reverse();
+}
+
+/**
+ * The other half of listMessages()'s 50-message window: loads the next
+ * page of *older* history, strictly before `beforeId`. Before this
+ * existed, scrolling up simply hit a wall at whatever the initial
+ * window happened to load — older messages weren't gone, there was
+ * just no code path that ever asked for them, so it read exactly like
+ * "the older ones are disappearing." Used by ChatView's scroll-to-top
+ * infinite-scroll handler, which prepends the result and preserves
+ * scroll position.
+ */
+export async function listOlderMessages(channelId: string, beforeId: number, limit = 50): Promise<DisplayMessageRow[]> {
+  const { data, error } = await supabase
+    .from('messages')
+    .select(MESSAGE_SELECT)
+    .eq('channel_id', channelId)
+    .lt('id', beforeId)
     .order('id', { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -456,25 +478,37 @@ export interface MessageReactionSummary {
   emoji: string;
   count: number;
   reactedByMe: boolean;
+  // Display names of everyone who reacted with this emoji, in the order
+  // they reacted — powers the "Alex, Sam react with 🔥" hover tooltip,
+  // same pattern Discord/Slack use. Capped implicitly by count (nobody
+  // reacts hundreds of times with the same emoji in practice), so no
+  // separate truncation needed here; the tooltip itself decides how
+  // many names to spell out vs. "and N others".
+  reactedByNames: string[];
 }
 
 export async function listMessageReactions(messageIds: number[]): Promise<Record<number, MessageReactionSummary[]>> {
   if (messageIds.length === 0) return {};
   const { data: userData } = await supabase.auth.getUser();
-  const { data, error } = await supabase.from('message_reactions').select('message_id, emoji, user_id').in('message_id', messageIds);
+  const { data, error } = await supabase
+    .from('message_reactions')
+    .select('message_id, emoji, user_id, profiles!inner(display_name)')
+    .in('message_id', messageIds);
   if (error) throw error;
 
-  const grouped: Record<number, Map<string, { count: number; reactedByMe: boolean }>> = {};
+  const grouped: Record<number, Map<string, { count: number; reactedByMe: boolean; names: string[] }>> = {};
   for (const row of data ?? []) {
     grouped[row.message_id] ??= new Map();
-    const entry = grouped[row.message_id].get(row.emoji) ?? { count: 0, reactedByMe: false };
+    const entry = grouped[row.message_id].get(row.emoji) ?? { count: 0, reactedByMe: false, names: [] };
     entry.count += 1;
     if (row.user_id === userData.user?.id) entry.reactedByMe = true;
+    const profile = row.profiles as unknown as { display_name: string } | null;
+    if (profile?.display_name) entry.names.push(profile.display_name);
     grouped[row.message_id].set(row.emoji, entry);
   }
   const out: Record<number, MessageReactionSummary[]> = {};
   for (const [messageId, map] of Object.entries(grouped)) {
-    out[Number(messageId)] = Array.from(map.entries()).map(([emoji, v]) => ({ emoji, ...v }));
+    out[Number(messageId)] = Array.from(map.entries()).map(([emoji, v]) => ({ emoji, count: v.count, reactedByMe: v.reactedByMe, reactedByNames: v.names }));
   }
   return out;
 }
@@ -589,4 +623,45 @@ export async function getReadReceipt(channelId: string, userId: string): Promise
     .maybeSingle();
   if (error) throw error;
   return data?.last_read_message_id ?? null;
+}
+
+export interface ChannelStreak {
+  currentStreak: number;
+  longestStreak: number;
+  lastCompletedDate: string | null;
+}
+
+// Backed by get_channel_streak() (038) — server-computed and read-only
+// from here on purpose (see the migration's own comment): a streak is
+// only worth anything if nobody, including a savvy client-side user, can
+// fake it, so this table has zero client-write policy and everything
+// past "read the current value" happens in the trigger/RPC instead.
+export async function getChannelStreak(channelId: string): Promise<ChannelStreak | null> {
+  const { data, error } = await supabase.rpc('get_channel_streak', { p_channel_id: channelId }).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return { currentStreak: data.current_streak, longestStreak: data.longest_streak, lastCompletedDate: data.last_completed_date };
+}
+
+// Batched version for the DM sidebar list — reads the raw table directly
+// (RLS already scopes it to channels you're a member of) rather than
+// calling get_channel_streak() once per row, which would be an N+1 RPC
+// call for every conversation in the list. This skips that RPC's
+// "correct a stale-but-not-yet-reset streak" logic, but for a list badge
+// that's a fine trade: the raw stored value is only ever wrong for the
+// single rare case where a streak died today and nobody's opened that
+// specific chat since, which self-corrects the moment they do.
+export async function listStreaksForChannels(channelIds: string[]): Promise<Record<string, ChannelStreak>> {
+  if (channelIds.length === 0) return {};
+  const { data, error } = await supabase
+    .from('channel_streaks')
+    .select('channel_id, current_streak, longest_streak, last_completed_date')
+    .in('channel_id', channelIds)
+    .gt('current_streak', 0);
+  if (error) throw error;
+  const out: Record<string, ChannelStreak> = {};
+  for (const row of data ?? []) {
+    out[row.channel_id] = { currentStreak: row.current_streak, longestStreak: row.longest_streak, lastCompletedDate: row.last_completed_date };
+  }
+  return out;
 }
