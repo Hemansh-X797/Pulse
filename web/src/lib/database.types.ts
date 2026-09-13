@@ -171,6 +171,25 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['read_receipts']['Row']>;
         Relationships: [];
       };
+      channel_streaks: {
+        Row: {
+          channel_id: string;
+          current_streak: number;
+          longest_streak: number;
+          last_completed_date: string | null;
+          today_date: string | null;
+          today_senders: string[];
+          updated_at: string;
+        };
+        // Trigger-only table (see 038_channel_streaks.sql) — there is no
+        // client-write policy at all, so Insert/Update are typed as
+        // `never` the same way message_reactions/pinned_messages type
+        // their append-only columns, signaling at the type level that
+        // the client should never attempt to write here directly.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       pinned_messages: {
         Row: { message_id: number; channel_id: string; pinned_by: string; pinned_at: string };
         Insert: { message_id: number; channel_id: string; pinned_by: string };
@@ -357,6 +376,10 @@ export interface Database {
       channel_unread_counts: {
         Args: Record<string, never>;
         Returns: { channel_id: string; unread: number }[];
+      };
+      get_channel_streak: {
+        Args: { p_channel_id: string };
+        Returns: { current_streak: number; longest_streak: number; last_completed_date: string | null }[];
       };
       transfer_space_ownership: {
         Args: { p_space_id: string; p_new_owner: string };
