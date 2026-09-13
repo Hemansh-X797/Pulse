@@ -182,6 +182,25 @@ html[data-theme='bespoke'] .bespoke-corner::after {
   height: 12px;
 }
 
+/* Bubble rounding, corrected: the reference this theme is built from
+   keeps bubbles softly rounded (rounded-xl-ish, ~10-12px) with a small,
+   barely-there tail corner — not the fully round rounded-2xl + rounded-
+   [b]{l,r}-md combo ChatView.tsx's Tailwind classes actually produce.
+   Bespoke's whole identity is "flat/sharp, round corners look AI" — a
+   heavily rounded bubble undercuts that everywhere else in the theme.
+   Higher specificity (attribute selector + two classes) than the plain
+   .bubble-shape / .rounded-br-md utility classes wins without needing
+   !important. */
+html[data-theme='bespoke'] .bubble-shape {
+  border-radius: 12px;
+}
+html[data-theme='bespoke'] .bubble-shape.rounded-br-md {
+  border-radius: 12px 12px 4px 12px;
+}
+html[data-theme='bespoke'] .bubble-shape.rounded-bl-md {
+  border-radius: 12px 12px 12px 4px;
+}
+
 /*
   SUNROOM — warm/light theme. The soft opposite of Bespoke: cream paper
   surfaces, terracotta accent, no corner-flattening (keeps the app's
