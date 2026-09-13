@@ -9,6 +9,7 @@ import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signInWithPassword, signUpWithPassword, signInWithGoogle, signInWithDiscord, signInWithGithub } from '../lib/api/auth';
+import { setPendingInviteRedirect } from '../lib/pendingInvite';
 
 // Next.js requires any component calling useSearchParams() to be
 // wrapped in a Suspense boundary, or static prerendering fails the
@@ -47,15 +48,22 @@ function LoginForm() {
     try {
       if (mode === 'signup') {
         await signUpWithPassword(email, password, username, displayName || username);
-        // New signups go through onboarding (interests + avatar +
-        // starter spaces) before landing in the app; existing accounts
-        // (backfilled to onboarding_completed = true by
-        // 011_onboarding_and_public_spaces.sql) skip straight to /home.
-        // A pending invite redirect is intentionally not threaded
-        // through onboarding here (that flow has its own multi-step
-        // navigation) — the invite link itself doesn't expire, so a
-        // brand-new signup can just click it again once onboarding's done.
-        router.push('/onboarding');
+        // This used to unconditionally go to /onboarding and drop
+        // `redirectTo` on the floor entirely — meaning someone who
+        // clicked a friend's invite link, signed up specifically to
+        // join that space, then sat through the full onboarding wizard
+        // would land on the generic /home feed at the end, not the
+        // space they came here for. The invite link itself doesn't
+        // expire, so nothing broke outright, but "click the link again
+        // and hope you remember it" is a real, avoidable drop-off point
+        // right at the exact moment someone converts through a friend's
+        // invite — the highest-value signup this app can get. Now
+        // threaded through onboarding (see Onboarding.tsx), which skips
+        // straight to that destination once the mandatory age check is
+        // done instead of also running them through discovery steps
+        // that only make sense for someone who doesn't already have a
+        // reason to be here.
+        router.push(redirectTo ? `/onboarding?redirect=${encodeURIComponent(redirectTo)}` : '/onboarding');
       } else {
         await signInWithPassword(email, password);
         router.push(redirectTo || '/home');
@@ -63,6 +71,15 @@ function LoginForm() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'something went wrong');
     }
+  }
+
+  // OAuth sends the browser away and back, so a plain query-param
+  // redirect (what the password-signup path above uses) can't survive
+  // the round-trip — this is the same invite destination, just carried
+  // across differently. See pendingInvite.ts for why.
+  function handleOAuthClick(signIn: () => Promise<void>) {
+    if (redirectTo) setPendingInviteRedirect(redirectTo);
+    signIn();
   }
 
   return (
@@ -150,21 +167,21 @@ function LoginForm() {
 
           <div className="flex justify-center gap-3.5">
             <button
-              onClick={() => signInWithGoogle()}
+              onClick={() => handleOAuthClick(signInWithGoogle)}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] transition hover:-translate-y-0.5 hover:bg-[var(--color-surface-raised)]"
               aria-label="Continue with Google"
             >
               <GoogleIcon />
             </button>
             <button
-              onClick={() => signInWithDiscord()}
+              onClick={() => handleOAuthClick(signInWithDiscord)}
               className="flex h-11 w-11 items-center justify-center rounded-full bg-[#5865F2] transition hover:-translate-y-0.5 hover:bg-[#6771f5]"
               aria-label="Continue with Discord"
             >
               <DiscordIcon />
             </button>
             <button
-              onClick={() => signInWithGithub()}
+              onClick={() => handleOAuthClick(signInWithGithub)}
               className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--color-hairline)] bg-[#181717] transition hover:-translate-y-0.5 hover:bg-[#24292e]"
               aria-label="Continue with GitHub"
             >
