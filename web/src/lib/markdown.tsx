@@ -159,14 +159,15 @@ function parseInline(text: string, depth = 0, viewerUsername?: string, knownUser
               className={
                 isYou
                   // A mention of the person actually reading it gets a
-                  // distinct, louder treatment (solid amber chip) instead
-                  // of the same subdued link everyone else's @mentions
-                  // get — the whole point of a mention is to stand out to
-                  // the one person it's for, and a message full of other
+                  // distinct, louder treatment — solid, high-contrast
+                  // chip with its own hover/press states — instead of
+                  // the same subdued link everyone else's @mentions get.
+                  // The whole point of a mention is to stand out to the
+                  // one person it's for, and a message full of other
                   // people's @handles shouldn't look identical to one
                   // that's actually calling you out.
-                  ? 'rounded bg-[#f0b429] px-1 font-semibold text-black hover:brightness-110'
-                  : 'rounded bg-[var(--presence-default-a)]/15 px-1 font-medium text-[var(--presence-default-a)] hover:underline'
+                  ? 'rounded-md bg-[#f0b429] px-1.5 py-[1px] font-semibold text-black shadow-[0_0_0_1px_rgba(240,180,41,0.4)] transition-[filter] hover:brightness-110 active:brightness-95'
+                  : 'rounded-md bg-[var(--presence-default-a)]/[0.16] px-1.5 py-[1px] font-medium text-[var(--presence-default-a)] transition-colors hover:bg-[var(--presence-default-a)]/25'
               }
             >
               @{mention.handle}
