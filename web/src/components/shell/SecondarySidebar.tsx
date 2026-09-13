@@ -12,7 +12,7 @@ import {
   listSpaceCategories,
   hasSpacePermission,
 } from '../../lib/api/spaces';
-import { listMyDMs, createGroupDm, type DmSummary } from '../../lib/api/channels';
+import { listMyDMs, createGroupDm, listStreaksForChannels, type DmSummary } from '../../lib/api/channels';
 import { listFriends } from '../../lib/api/friends';
 import { getSuggestedAccounts } from '../../lib/api/feed';
 import { useAppStore } from '../../store/useAppStore';
@@ -223,6 +223,17 @@ function DmList() {
   const router = useRouter();
   const unreadByChannel = useAppStore((s) => s.unreadByChannel);
   const { data: dms = [], isLoading } = useQuery({ queryKey: ['my-dms'], queryFn: listMyDMs });
+  // One batched query for every conversation's streak, not one query per
+  // row — see listStreaksForChannels' own comment on why. Refetches
+  // whenever the DM list itself does (same staleness model as the list
+  // preview text/unread counts already have), so a streak that changes
+  // shows up without a manual refresh being required.
+  const { data: streaks = {} } = useQuery({
+    queryKey: ['dm-streaks', dms.map((d) => d.channel_id).join(',')],
+    queryFn: () => listStreaksForChannels(dms.map((d) => d.channel_id)),
+    enabled: dms.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
   const [newGroupOpen, setNewGroupOpen] = useState(false);
 
   return (
@@ -315,7 +326,14 @@ function DmList() {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className={`truncate text-[13.5px] ${unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : 'font-medium'}`}>{label}</div>
+                <div className={`flex items-center gap-1.5 truncate text-[13.5px] ${unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : 'font-medium'}`}>
+                  <span className="truncate">{label}</span>
+                  {streaks[dm.channel_id] && (
+                    <span className="flex shrink-0 items-center gap-0.5 text-[11px] font-bold text-orange-400">
+                      🔥{streaks[dm.channel_id].currentStreak}
+                    </span>
+                  )}
+                </div>
                 <div className="truncate text-[12px] text-[var(--color-ink-faint)]">{dm.last_message_preview}</div>
               </div>
               {unread > 0 && (
