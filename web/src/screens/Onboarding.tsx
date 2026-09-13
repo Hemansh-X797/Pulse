@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Check, Camera, Sparkles } from 'lucide-react';
 import { updateProfile, getMyProfile } from '../lib/api/profile';
 import { uploadMedia, MediaUploadError } from '../lib/api/media';
@@ -22,8 +22,32 @@ const INTEREST_OPTIONS = [
   'gaming', 'art', 'music', 'coding', 'anime', 'study', 'sports', 'movies', 'books', 'food', 'photography', 'fitness',
 ];
 
+// Same Next.js requirement as Login.tsx — useSearchParams() needs a
+// Suspense boundary or static prerendering fails the build outright.
 export function Onboarding() {
+  return (
+    <Suspense fallback={null}>
+      <OnboardingForm />
+    </Suspense>
+  );
+}
+
+function OnboardingForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Set when this signup started from a friend's invite link (see
+  // Login.tsx + pendingInvite.ts) rather than a cold, organic signup.
+  // Someone who already has a specific reason and destination to be here
+  // shouldn't be run through interest tags, an avatar picker, a theme
+  // picker, and "spaces you might like" — those steps exist to help a
+  // cold signup *find* a reason to stick around, which an invited person
+  // already has. They still go through the (legally necessary) age
+  // check, then straight to the friend they came here for; everything
+  // this flow would have set up for them (avatar, theme, interests) is
+  // still just as available afterward in Settings, same as the copy on
+  // each of those steps already says.
+  const redirectTo = searchParams.get('redirect');
+  const isInviteFlow = !!redirectTo;
   const setStoreProfile = useAppStore((s) => s.setProfile);
   const session = useAppStore((s) => s.session);
 
@@ -47,7 +71,7 @@ export function Onboarding() {
       .then((p) => {
         if (cancelled) return;
         if (p.onboarding_completed) {
-          router.replace('/home');
+          router.replace(redirectTo || '/home');
           return;
         }
         setProfileState(p);
@@ -58,7 +82,7 @@ export function Onboarding() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, redirectTo]);
 
   function toggleInterest(tag: string) {
     setSelectedInterests((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
@@ -86,6 +110,15 @@ export function Onboarding() {
     }
     try {
       await updateProfile({ date_of_birth: dob });
+      if (isInviteFlow) {
+        // The one real gate (age verification) is done — everything
+        // past this point is discovery/personalization for someone who
+        // doesn't have a destination yet, which isn't this person's
+        // situation. Straight to finish(), which lands them on the
+        // invite itself instead of a generic home feed.
+        finish();
+        return;
+      }
       setStep('interests');
     } catch (e) {
       setDobError(e instanceof Error ? e.message : 'Could not save — try again.');
@@ -145,7 +178,7 @@ export function Onboarding() {
     try {
       const updated = await updateProfile({ onboarding_completed: true });
       setStoreProfile(updated);
-      router.replace('/home');
+      router.replace(redirectTo || '/home');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not finish onboarding.');
       setFinishing(false);
@@ -159,19 +192,20 @@ export function Onboarding() {
   return (
     <div className="flex h-screen w-full items-center justify-center bg-[var(--color-void)] p-4">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-1.5">
-          {(['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).map((s) => (
-            <div
-              key={s}
-              className={`h-1 flex-1 rounded-full transition-colors ${
-                (['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).indexOf(step as never) >= (['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).indexOf(s)
-                  ? 'presence-fill'
-                  : 'bg-[var(--color-hairline)]'
-              }`}
-            />
-          ))}
-        </div>
-
+        {!isInviteFlow && (
+          <div className="mb-6 flex items-center gap-1.5">
+            {(['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).map((s) => (
+              <div
+                key={s}
+                className={`h-1 flex-1 rounded-full transition-colors ${
+                  (['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).indexOf(step as never) >= (['dob', 'interests', 'avatar', 'theme', 'spaces'] as const).indexOf(s)
+                    ? 'presence-fill'
+                    : 'bg-[var(--color-hairline)]'
+                }`}
+              />
+            ))}
+          </div>
+        )}
         {error && (
           <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">{error}</div>
         )}
@@ -179,7 +213,11 @@ export function Onboarding() {
         {step === 'dob' && (
           <>
             <h1 className="mb-1 font-serif text-2xl font-semibold">When&apos;s your birthday?</h1>
-            <p className="mb-5 text-[13px] text-[var(--color-ink-muted)]">Never shown to other users — just used to confirm you meet the minimum age.</p>
+            <p className="mb-5 text-[13px] text-[var(--color-ink-muted)]">
+              {isInviteFlow
+                ? "Just this one quick check, then straight to the chat you were invited to — everything else here (avatar, theme, interests) can wait until you're actually in."
+                : 'Never shown to other users — just used to confirm you meet the minimum age.'}
+            </p>
             {dobError && (
               <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">{dobError}</div>
             )}
@@ -190,8 +228,12 @@ export function Onboarding() {
               max={new Date().toISOString().slice(0, 10)}
               className="mb-6 w-full rounded-lg border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-3 py-2.5 text-[14px] outline-none focus:border-[var(--presence-default-a)]"
             />
-            <button onClick={handleDobSubmit} className="w-full rounded-lg presence-fill py-2.5 text-[13.5px] font-semibold text-black">
-              Continue
+            <button
+              onClick={handleDobSubmit}
+              disabled={finishing}
+              className="w-full rounded-lg presence-fill py-2.5 text-[13.5px] font-semibold text-black disabled:opacity-60"
+            >
+              {finishing ? 'Taking you there…' : isInviteFlow ? 'Continue to your invite' : 'Continue'}
             </button>
           </>
         )}
