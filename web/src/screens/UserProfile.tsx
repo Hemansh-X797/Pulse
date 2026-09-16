@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MoreHorizontal, UserPlus, Check, ShieldOff, Shield, X, Users } from 'lucide-react';
 import { getProfileByUsername } from '../lib/api/profile';
+import { listUserPosts, listComments, addComment, toggleReaction as togglePostReaction, deletePost, editPost } from '../lib/api/feed';
 import { useOpenDm } from '../hooks/useOpenDm';
 import { listFriends, listOutgoingRequests, sendFriendRequest, getMutualFriends } from '../lib/api/friends';
 import { listBlockedUsers, blockUser, unblockUser } from '../lib/api/blocking';
@@ -14,6 +15,8 @@ import { NameStyle, type NameStyleData } from '../components/NameStyle';
 import { DecoratedAvatar } from '../components/DecoratedAvatar';
 import { ProfileDecorBackground } from '../components/ProfileDecorBackground';
 import { ProfileBadges } from '../components/ProfileBadges';
+import { PostDetailModal } from '../components/PostDetailModal';
+import type { FeedItem } from '../lib/database.types';
 
 export function UserProfile() {
   const params = useParams<{ username: string }>()!;
@@ -266,13 +269,137 @@ export function UserProfile() {
         </div>
         {profile.bio && <p className="mt-3 max-w-lg text-[14px] text-[var(--color-ink)]/80">{profile.bio}</p>}
 
-        {/* Instagram-style media grid: still a follow-up slice, not
-            stubbed here on purpose — see notes in the original component. */}
-        <div className="mt-10 border-t border-[var(--color-hairline)] pt-6">
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">Shared Media</h2>
-          <p className="text-sm text-[var(--color-ink-muted)]">Media grid — next slice, not stubbed here on purpose.</p>
-        </div>
+        {/* Real media grid now — this used to be an explicit placeholder
+            ("Media grid — next slice, not stubbed here on purpose") and
+            was the one genuine dead end on an otherwise complete profile
+            page: there was no way to see someone's post history from
+            their profile at all, only the global/following feed. */}
+        {profile && <ProfilePostsGrid authorId={profile.id} />}
       </div>
     </div>
+  );
+}
+
+function ProfilePostsGrid({ authorId }: { authorId: string }) {
+  const { data: posts = [], isLoading } = useQuery({
+    queryKey: ['user-posts', authorId],
+    queryFn: () => listUserPosts(authorId),
+  });
+  const [selected, setSelected] = useState<FeedItem | null>(null);
+  // "Shared Media" is specifically about posts with an attached image —
+  // a text-only post has nowhere sensible to render as a grid thumbnail,
+  // and this section already existed with that exact label rather than
+  // a generic "Posts" heading, so scoping to media-bearing posts matches
+  // what was already promised rather than silently redefining the
+  // section to mean something else.
+  const mediaPosts = posts.filter((p) => p.media_url);
+
+  return (
+    <div className="mt-10 border-t border-[var(--color-hairline)] pt-6">
+      <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-[var(--color-ink-muted)]">Shared Media</h2>
+      {isLoading ? (
+        <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="aspect-square animate-pulse rounded-md bg-[var(--color-surface-raised)]" />
+          ))}
+        </div>
+      ) : mediaPosts.length === 0 ? (
+        <p className="text-sm text-[var(--color-ink-muted)]">No shared media yet.</p>
+      ) : (
+        <div className="grid grid-cols-3 gap-1 sm:grid-cols-4">
+          {mediaPosts.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setSelected(p)}
+              className="group relative aspect-square overflow-hidden rounded-md bg-[var(--color-surface-raised)]"
+            >
+              <img src={p.media_url} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+              {(p.reaction_count > 0 || p.comment_count > 0) && (
+                <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/0 text-[12px] font-semibold text-white opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+                  {p.reaction_count > 0 && <span>♥ {p.reaction_count}</span>}
+                  {p.comment_count > 0 && <span>💬 {p.comment_count}</span>}
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+      {selected && <ProfilePostModal post={selected} onClose={() => setSelected(null)} />}
+    </div>
+  );
+}
+
+// Same interaction wiring PostCard uses in HomeFeed.tsx (comments query,
+// like-toggle mutation, share via Web Share API with a clipboard
+// fallback) — duplicated rather than importing PostCard directly, since
+// PostCard also owns its own feed-row layout (avatar/name header, action
+// bar) that doesn't apply here; only the *modal* behavior needed reusing,
+// which is what PostDetailModal already encapsulates.
+function ProfilePostModal({ post, onClose }: { post: FeedItem; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const profile = useAppStore((s) => s.profile);
+  const isMine = profile?.id === post.author_id;
+  const LIKE_EMOJI = '❤️';
+
+  const { data: comments = [], isLoading: commentsLoading } = useQuery({
+    queryKey: ['comments', post.id],
+    queryFn: () => listComments(post.id),
+  });
+
+  const reactMutation = useMutation({
+    mutationFn: (emoji: string) => togglePostReaction(post.id, emoji, post.my_reactions.includes(emoji)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['user-posts', post.author_id] });
+    },
+  });
+
+  async function handleShare() {
+    const url = `${window.location.origin}/${post.author_username}#post-${post.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ url, title: `${post.author_display_name} on PalSpace` });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // navigator.share throws on user cancel — not an error worth surfacing.
+    }
+  }
+
+  return (
+    <PostDetailModal
+      post={post}
+      comments={comments}
+      commentsLoading={commentsLoading}
+      liked={post.my_reactions.includes(LIKE_EMOJI)}
+      onToggleLike={() => reactMutation.mutate(LIKE_EMOJI)}
+      onShare={handleShare}
+      onClose={onClose}
+      isMine={isMine}
+      onSubmitComment={async (body, parentCommentId) => {
+        await addComment(post.id, body, parentCommentId);
+        queryClient.invalidateQueries({ queryKey: ['comments', post.id] });
+        queryClient.invalidateQueries({ queryKey: ['user-posts', post.author_id] });
+      }}
+      onEdit={isMine ? () => {
+        const next = window.prompt('Edit post', post.body_rendered);
+        if (next && next.trim()) {
+          editPost(post.id, next.trim()).then(() => queryClient.invalidateQueries({ queryKey: ['user-posts', post.author_id] }));
+        }
+      } : undefined}
+      onDelete={
+        isMine
+          ? () => {
+              if (window.confirm('Delete this post?')) {
+                deletePost(post.id).then(() => {
+                  queryClient.invalidateQueries({ queryKey: ['user-posts', post.author_id] });
+                  onClose();
+                });
+              }
+            }
+          : undefined
+      }
+    />
   );
 }
