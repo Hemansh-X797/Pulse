@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getNotificationPreferences, updateNotificationPreferences } from '../../lib/api/notification-prefs';
 import { getNotificationSoundEnabled, setNotificationSoundEnabled } from '../../lib/notificationSound';
 import { isPushSupported, getPushPermissionState, enablePushNotifications, disablePushNotifications } from '../../lib/push';
+import { Toggle } from './shared';
 
 const TOGGLES = [
   { key: 'reactions', label: 'Reactions', hint: 'When someone reacts to your posts.' },
@@ -14,21 +15,6 @@ const TOGGLES = [
   { key: 'follow_posts', label: 'Posts from people you follow', hint: 'New feed posts from accounts you follow.' },
   { key: 'friend_posts', label: 'Posts from friends', hint: 'New feed posts from your friends.' },
 ] as const;
-
-function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      role="switch"
-      aria-checked={on}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? 'presence-fill' : 'bg-[var(--color-surface-overlay)]'}`}
-    >
-      <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${on ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
-      />
-    </button>
-  );
-}
 
 export function NotificationSettings() {
   const queryClient = useQueryClient();
