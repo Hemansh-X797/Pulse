@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, MessageCircle, Camera, Plus, Compass, Search } from 'lucide-react';
+import { Home, MessageCircle, Camera, Plus, Compass, Search, Clapperboard } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppStore } from '../../store/useAppStore';
 import { listMySpaces, createSpace, joinSpaceByInvite } from '../../lib/api/spaces';
@@ -125,6 +125,10 @@ export function GlobalNav() {
 
       <RailItem href="/stories" active={pathname === '/stories'} label="Stories">
         <Camera size={19} strokeWidth={2} />
+      </RailItem>
+
+      <RailItem href="/reels" active={pathname === '/reels'} label="Reels">
+        <Clapperboard size={19} strokeWidth={2} />
       </RailItem>
 
       {/* Discover (public spaces) — directly below Stories, per your
