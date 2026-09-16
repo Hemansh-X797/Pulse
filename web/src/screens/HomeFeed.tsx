@@ -55,6 +55,7 @@ export function HomeFeed() {
 function HomeFeedInner() {
   const queryClient = useQueryClient();
   const session = useAppStore((s) => s.session);
+  const profile = useAppStore((s) => s.profile);
   const [feedTab, setFeedTab] = useState<'for-you' | 'following'>('for-you');
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ['feed', feedTab],
@@ -79,13 +80,69 @@ function HomeFeedInner() {
 
   const postMutation = useMutation({
     mutationFn: () => createPost(body, pendingImage ?? undefined),
-    onSuccess: () => {
+    // This used to wait for the full round-trip (insert -> select-back ->
+    // refetch the whole feed) before the new post appeared anywhere —
+    // meaning hitting "Post" looked and felt like nothing happened for
+    // however long that took. Same optimistic-paint pattern the chat
+    // side of the app already uses for sendMessage(): prepend a locally-
+    // built post to the cache immediately, clear the composer instantly,
+    // then reconcile for real once the server responds. The temporary id
+    // is negative specifically so it can never collide with a real
+    // bigint identity id from the DB.
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['feed', feedTab] });
+      const previous = queryClient.getQueryData<FeedItem[]>(['feed', feedTab]);
+      // Captured before clearing below, so a failed post can restore
+      // exactly what was typed instead of just silently discarding it —
+      // clearing the composer optimistically is fine when it works, but
+      // losing someone's actual text on a failure would be worse than
+      // the "felt slow" problem this is meant to fix in the first place.
+      const previousBody = body;
+      const previousImage = pendingImage;
+      if (profile) {
+        const optimisticPost: FeedItem = {
+          id: -Date.now(),
+          author_id: profile.id,
+          author_username: profile.username,
+          author_display_name: profile.display_name,
+          author_avatar_url: profile.avatar_url ?? '',
+          author_avatar_decoration: profile.equipped_avatar_decoration ?? null,
+          author_accent_top: profile.accent_color_top,
+          author_accent_bottom: profile.accent_color_bottom,
+          author_name_style: profile.name_style as FeedItem['author_name_style'],
+          body_rendered: body.trim(),
+          media_url: pendingImage ?? '',
+          hashtags: [],
+          created_at: new Date().toISOString(),
+          edited_at: null,
+          reaction_count: 0,
+          comment_count: 0,
+          my_reactions: [],
+        };
+        queryClient.setQueryData<FeedItem[]>(['feed', feedTab], (old) => [optimisticPost, ...(old ?? [])]);
+      }
       setBody('');
       setPendingImage(null);
       setComposeError(null);
+      return { previous, previousBody, previousImage };
+    },
+    onSuccess: () => {
+      // The realtime-free feed (unlike chat, there's no live subscription
+      // reconciling by client_ref) needs an actual refetch to swap the
+      // optimistic row for the real one — but the swap now happens
+      // invisibly behind a post that already looked posted, not before
+      // one appears at all.
       queryClient.invalidateQueries({ queryKey: ['feed'] });
     },
-    onError: (e) => setComposeError(e instanceof Error ? e.message : 'Failed to post.'),
+    onError: (e, _vars, context) => {
+      // Roll back to exactly what was cached before the optimistic
+      // insert — not just "refetch and hope," since a refetch could race
+      // with other in-flight cache updates. Restore the typed text too.
+      if (context?.previous) queryClient.setQueryData(['feed', feedTab], context.previous);
+      if (context?.previousBody) setBody(context.previousBody);
+      if (context?.previousImage) setPendingImage(context.previousImage);
+      setComposeError(e instanceof Error ? e.message : 'Failed to post.');
+    },
   });
 
   async function handleAttach(file: File) {
@@ -455,8 +512,8 @@ function PostCard({ post, autoOpen }: { post: FeedItem; autoOpen?: boolean }) {
           onToggleLike={() => reactMutation.mutate(LIKE_EMOJI)}
           onShare={handleShare}
           onClose={() => setDetailOpen(false)}
-          onSubmitComment={async (body) => {
-            await addComment(post.id, body);
+          onSubmitComment={async (body, parentCommentId) => {
+            await addComment(post.id, body, parentCommentId);
             queryClient.invalidateQueries({ queryKey: ['comments', post.id] });
             queryClient.invalidateQueries({ queryKey: ['feed'] });
           }}
