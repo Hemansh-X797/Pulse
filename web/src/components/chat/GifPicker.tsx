@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Star } from 'lucide-react';
+import { getFavoriteGifs, toggleFavoriteGif, type FavoriteGif } from '../../lib/favoriteGifs';
 
 // Normalized shape both providers get mapped into, so the render code
 // below doesn't care which one answered the query.
@@ -62,6 +64,21 @@ export function GifPicker({ onSelect, onClose }: { onSelect: (gifUrl: string) =>
   const [results, setResults] = useState<NormalizedGif[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  // Loaded lazily on mount rather than via useState(getFavoriteGifs())
+  // directly — that initializer form still runs during SSR/hydration on
+  // the server, where localStorage doesn't exist, so it'd have to guard
+  // there anyway; simplest to just start empty and hydrate once mounted.
+  const [favorites, setFavorites] = useState<FavoriteGif[]>([]);
+  const [showFavorites, setShowFavorites] = useState(false);
+
+  useEffect(() => {
+    setFavorites(getFavoriteGifs());
+  }, []);
+
+  function handleToggleFavorite(gif: NormalizedGif, e: React.MouseEvent) {
+    e.stopPropagation();
+    setFavorites(toggleFavoriteGif({ id: gif.id, previewUrl: gif.previewUrl, fullUrl: gif.fullUrl }));
+  }
 
   const activeKey = provider === 'giphy' ? GIPHY_KEY : TENOR_KEY;
 
@@ -87,31 +104,73 @@ export function GifPicker({ onSelect, onClose }: { onSelect: (gifUrl: string) =>
   return (
     <div className="absolute bottom-full right-0 z-20 mb-2 w-80 rounded-2xl border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] p-3 shadow-xl">
       <div className="mb-2 flex items-center justify-between px-1">
-        {bothAvailable ? (
-          <div className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider">
-            {(['giphy', 'tenor'] as Provider[]).map((p) => (
-              <button
-                key={p}
-                onClick={() => setProvider(p)}
-                className={`rounded px-1.5 py-0.5 transition-colors ${
-                  provider === p ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-faint)] hover:text-[var(--color-ink-muted)]'
-                }`}
-              >
-                {p === 'giphy' ? 'Giphy' : 'Tenor'}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--color-ink-faint)]">
-            GIFs · {provider === 'giphy' ? 'Giphy' : 'Tenor'}
-          </span>
-        )}
+        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider">
+          {bothAvailable && (
+            <div className="flex items-center gap-1">
+              {(['giphy', 'tenor'] as Provider[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setProvider(p);
+                    setShowFavorites(false);
+                  }}
+                  className={`rounded px-1.5 py-0.5 transition-colors ${
+                    !showFavorites && provider === p ? 'text-[var(--color-ink)]' : 'text-[var(--color-ink-faint)] hover:text-[var(--color-ink-muted)]'
+                  }`}
+                >
+                  {p === 'giphy' ? 'Giphy' : 'Tenor'}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setShowFavorites((v) => !v)}
+            className={`flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors ${
+              showFavorites ? 'text-amber-400' : 'text-[var(--color-ink-faint)] hover:text-[var(--color-ink-muted)]'
+            }`}
+          >
+            <Star size={11} fill={showFavorites ? 'currentColor' : 'none'} />
+            Favorites{favorites.length > 0 ? ` (${favorites.length})` : ''}
+          </button>
+        </div>
         <button onClick={onClose} className="text-[11px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]">
           Close
         </button>
       </div>
 
-      {!activeKey ? (
+      {showFavorites ? (
+        <div className="grid max-h-64 min-h-[80px] grid-cols-2 gap-1.5 overflow-y-auto">
+          {favorites.length === 0 ? (
+            <div className="col-span-2 flex flex-col items-center gap-1.5 py-8 text-center text-[12px] text-[var(--color-ink-faint)]">
+              <Star size={18} />
+              No favorites yet — hover any GIF and tap the star to save it here.
+            </div>
+          ) : (
+            favorites.map((gif) => (
+              <button
+                key={gif.id}
+                onClick={() => {
+                  onSelect(gif.fullUrl);
+                  onClose();
+                }}
+                className="group relative overflow-hidden rounded-lg border border-[var(--color-hairline)] hover:border-[var(--presence-default-a)]"
+              >
+                <img src={gif.previewUrl} alt="" className="h-full w-full object-cover" />
+                <span
+                  role="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFavorites(toggleFavoriteGif(gif));
+                  }}
+                  className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-amber-400 opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                  <Star size={12} fill="currentColor" />
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      ) : !activeKey ? (
         <div className="p-3 text-[12.5px] text-[var(--color-ink-muted)]">
           {provider === 'giphy' ? (
             <>
@@ -148,18 +207,30 @@ export function GifPicker({ onSelect, onClose }: { onSelect: (gifUrl: string) =>
           <div className="grid max-h-64 grid-cols-2 gap-1.5 overflow-y-auto">
             {loading && <div className="col-span-2 py-6 text-center text-[12px] text-[var(--color-ink-faint)]">Loading…</div>}
             {!loading &&
-              results.map((gif) => (
-                <button
-                  key={gif.id}
-                  onClick={() => {
-                    onSelect(gif.fullUrl);
-                    onClose();
-                  }}
-                  className="overflow-hidden rounded-lg border border-[var(--color-hairline)] hover:border-[var(--presence-default-a)]"
-                >
-                  <img src={gif.previewUrl} alt="" className="h-full w-full object-cover" />
-                </button>
-              ))}
+              results.map((gif) => {
+                const favorited = favorites.some((f) => f.id === gif.id);
+                return (
+                  <button
+                    key={gif.id}
+                    onClick={() => {
+                      onSelect(gif.fullUrl);
+                      onClose();
+                    }}
+                    className="group relative overflow-hidden rounded-lg border border-[var(--color-hairline)] hover:border-[var(--presence-default-a)]"
+                  >
+                    <img src={gif.previewUrl} alt="" className="h-full w-full object-cover" />
+                    <span
+                      role="button"
+                      onClick={(e) => handleToggleFavorite(gif, e)}
+                      className={`absolute right-1 top-1 rounded-full bg-black/60 p-1 transition-opacity ${
+                        favorited ? 'text-amber-400 opacity-100' : 'text-white opacity-0 group-hover:opacity-100'
+                      }`}
+                    >
+                      <Star size={12} fill={favorited ? 'currentColor' : 'none'} />
+                    </span>
+                  </button>
+                );
+              })}
           </div>
         </>
       )}
