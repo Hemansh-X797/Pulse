@@ -53,7 +53,7 @@ export function PostDetailModal({
   onToggleLike: () => void;
   onShare: () => void;
   onClose: () => void;
-  onSubmitComment: (body: string) => Promise<void>;
+  onSubmitComment: (body: string, parentCommentId?: number) => Promise<void>;
   isMine: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -61,7 +61,30 @@ export function PostDetailModal({
   const profile = useAppStore((s) => s.profile);
   const [commentBody, setCommentBody] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Who a reply is currently aimed at — cleared after posting or via the
+  // cancel button on the "Replying to @x" chip. Only ever a top-level
+  // comment's id (enforced server-side too, see
+  // 040_comment_replies.sql's single-level trigger), matching the
+  // deliberate one-level-of-nesting design.
+  const [replyTarget, setReplyTarget] = useState<FeedComment | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Comments arrive as one flat list (order by id) — group them into
+  // top-level comments with their replies attached, once per render
+  // rather than making CommentRow re-derive this per row. A reply whose
+  // parent got deleted (parent_comment_id no longer matches anything
+  // live) is deliberately dropped rather than promoted to top-level or
+  // shown orphaned — post_comments.parent_comment_id cascades on delete
+  // at the DB level, so this case is mostly defensive.
+  const topLevel = comments.filter((c) => !c.parent_comment_id);
+  const repliesByParent = new Map<number, FeedComment[]>();
+  for (const c of comments) {
+    if (c.parent_comment_id) {
+      const list = repliesByParent.get(c.parent_comment_id) ?? [];
+      list.push(c);
+      repliesByParent.set(c.parent_comment_id, list);
+    }
+  }
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
@@ -80,11 +103,17 @@ export function PostDetailModal({
     if (!trimmed || submitting) return;
     setSubmitting(true);
     try {
-      await onSubmitComment(trimmed);
+      await onSubmitComment(trimmed, replyTarget?.id);
       setCommentBody('');
+      setReplyTarget(null);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleReply(comment: FeedComment) {
+    setReplyTarget(comment);
+    inputRef.current?.focus();
   }
 
   return (
@@ -169,34 +198,55 @@ export function PostDetailModal({
               <div className="text-[13px] text-[var(--color-ink-muted)]">No comments yet — say something.</div>
             )}
             <div className="space-y-3">
-              {comments.map((c) => (
-                <CommentRow key={c.id} comment={c} postId={post.id} />
+              {topLevel.map((c) => (
+                <div key={c.id}>
+                  <CommentRow comment={c} postId={post.id} onReply={() => handleReply(c)} />
+                  {(repliesByParent.get(c.id) ?? []).length > 0 && (
+                    <div className="ml-8 mt-1.5 space-y-2 border-l-2 border-[var(--color-hairline)] pl-3">
+                      {(repliesByParent.get(c.id) ?? []).map((r) => (
+                        <CommentRow key={r.id} comment={r} postId={post.id} onReply={() => handleReply(c)} isReply />
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 border-t border-[var(--color-hairline)] p-3">
-            <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-black presence-fill"
-              style={profile ? { ['--p-a' as string]: profile.accent_color_top, ['--p-b' as string]: profile.accent_color_bottom } : undefined}
-            >
-              {profile?.display_name.slice(0, 2).toUpperCase()}
+          <div className="shrink-0 border-t border-[var(--color-hairline)]">
+            {replyTarget && (
+              <div className="flex items-center justify-between border-b border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-3 py-1.5">
+                <span className="truncate text-[11.5px] text-[var(--color-ink-muted)]">
+                  Replying to <span className="font-semibold text-[var(--color-ink)]">@{replyTarget.author_username}</span>
+                </span>
+                <button onClick={() => setReplyTarget(null)} className="ml-2 shrink-0 text-[11px] text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]">
+                  Cancel
+                </button>
+              </div>
+            )}
+            <div className="flex items-center gap-2 p-3">
+              <div
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-black presence-fill"
+                style={profile ? { ['--p-a' as string]: profile.accent_color_top, ['--p-b' as string]: profile.accent_color_bottom } : undefined}
+              >
+                {profile?.display_name.slice(0, 2).toUpperCase()}
+              </div>
+              <input
+                ref={inputRef}
+                value={commentBody}
+                onChange={(e) => setCommentBody(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                placeholder={replyTarget ? `Reply to @${replyTarget.author_username}…` : 'Add a comment…'}
+                className="flex-1 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-[13px] outline-none focus:border-[var(--presence-default-a)]"
+              />
+              <button
+                onClick={handleSubmit}
+                disabled={!commentBody.trim() || submitting}
+                className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-black disabled:opacity-40"
+              >
+                Post
+              </button>
             </div>
-            <input
-              ref={inputRef}
-              value={commentBody}
-              onChange={(e) => setCommentBody(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              placeholder="Add a comment…"
-              className="flex-1 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface-raised)] px-3 py-1.5 text-[13px] outline-none focus:border-[var(--presence-default-a)]"
-            />
-            <button
-              onClick={handleSubmit}
-              disabled={!commentBody.trim() || submitting}
-              className="rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-black disabled:opacity-40"
-            >
-              Post
-            </button>
           </div>
         </div>
       </div>
