@@ -58,6 +58,8 @@ export function Avatar({
 export function CommentRow({
   comment,
   postId,
+  onReply,
+  isReply,
 }: {
   comment: {
     id: number;
@@ -73,6 +75,12 @@ export function CommentRow({
     created_at: string;
   };
   postId: number;
+  onReply?: () => void;
+  // Slightly smaller avatar/text for a nested reply, so the one level
+  // of indentation this app supports (see 040_comment_replies.sql) is
+  // visually obvious without needing a second indentation level to make
+  // the point.
+  isReply?: boolean;
 }) {
   const queryClient = useQueryClient();
   const profile = useAppStore((s) => s.profile);
@@ -102,7 +110,7 @@ export function CommentRow({
         <Avatar
           url={comment.author_avatar_url}
           name={comment.author_display_name}
-          size={24}
+          size={isReply ? 20 : 24}
           accentTop={comment.author_accent_top}
           accentBottom={comment.author_accent_bottom}
         />
@@ -133,7 +141,17 @@ export function CommentRow({
               @{comment.author_username} · {timeAgo(comment.created_at)}
               {comment.edited_at && ' · edited'}
             </span>
-            <div className="text-[13.5px] leading-relaxed">{renderMarkdown(comment.body_rendered, profile?.username)}</div>
+            <div className={`leading-relaxed ${isReply ? 'text-[13px]' : 'text-[13.5px]'}`}>{renderMarkdown(comment.body_rendered, profile?.username)}</div>
+            {onReply && (
+              // Shown always, not hover-only like edit/delete below —
+              // replying is something anyone reading the thread might
+              // want to do, not just the comment's own author, so it
+              // shouldn't be tucked behind a hover state only the
+              // author's own actions get.
+              <button onClick={onReply} className="mt-0.5 text-[10.5px] font-semibold text-[var(--color-ink-faint)] hover:text-[var(--color-ink)]">
+                Reply
+              </button>
+            )}
           </div>
         )}
       </div>
