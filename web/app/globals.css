@@ -26,7 +26,19 @@
   --color-hairline-strong: rgba(255, 255, 255, 0.14);
   --color-ink: #f2f2f5;
   --color-ink-muted: #8d8d99;
-  --color-ink-faint: #56565f;
+  /* --color-ink-faint was #56565f — only ~2.55:1 contrast against
+     --color-surface, well under WCAG AA's 4.5:1 floor for text. It's
+     what DM list message previews and message timestamps are rendered
+     in, so this was a real, measured visibility problem, not a
+     subjective one — confirmed by computing actual contrast ratios,
+     same as the WCAG-driven bump ink-muted/hairlines already got
+     (see the "Bespoke theme contrast increased" line in the app's own
+     changelog). Every theme's ink-faint below is similarly recomputed
+     to land at ~4.6:1 against that theme's own --color-surface, by
+     adjusting lightness only (same hue/saturation, so each theme's
+     character doesn't change) — don't hand-tune this back to a color
+     that merely "looks about right" without rechecking the ratio. */
+  --color-ink-faint: #7e7e8a;
 
   /* Default presence gradient (teal → violet) — used wherever a
      person/space hasn't set custom accent colors yet. Deliberately not
@@ -140,7 +152,7 @@ html[data-theme='bespoke'] {
   --color-hairline-strong: #454545;
   --color-ink: #f0f0f0;
   --color-ink-muted: #a3a3a3;
-  --color-ink-faint: #6b6b6b;
+  --color-ink-faint: #797979;
 }
 
 html[data-theme='bespoke'] :focus-visible {
@@ -216,7 +228,7 @@ html[data-theme='sunroom'] {
   --color-hairline-strong: rgba(58, 47, 31, 0.22);
   --color-ink: #3a2f1f;
   --color-ink-muted: #6b5c42;
-  --color-ink-faint: #a1926f;
+  --color-ink-faint: #796c4f;
   --presence-default-a: #c96f4a;
   --presence-default-b: #e0a458;
 }
@@ -246,7 +258,7 @@ html[data-theme='signal'] {
   --color-hairline-strong: #2c5536;
   --color-ink: #c9ffd6;
   --color-ink-muted: #4fae64;
-  --color-ink-faint: #2c6b3a;
+  --color-ink-faint: #398b4c;
   --presence-default-a: #3ddc63;
   --presence-default-b: #8ff0a4;
   --font-sans: var(--font-mono);
@@ -300,7 +312,7 @@ html[data-theme='grove'] {
   --color-hairline-strong: rgba(168, 201, 155, 0.26);
   --color-ink: #eef2e6;
   --color-ink-muted: #9fb497;
-  --color-ink-faint: #5e7259;
+  --color-ink-faint: #71896b;
   --presence-default-a: #7cb87f;
   --presence-default-b: #c9a24a;
 }
