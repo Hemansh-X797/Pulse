@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { getCompactModeSync, setCompactMode } from '../../hooks/useCompactMode';
 import { getChatBubblesSync, setChatBubbles } from '../../hooks/useChatBubbles';
 import { getThemeSync, setTheme, type ThemeName } from '../../hooks/useTheme';
+import { Toggle } from './shared';
 
 const STORAGE_KEY = 'palspace-reduced-motion';
 
@@ -14,19 +15,6 @@ const THEME_SWATCHES: { name: ThemeName; a: string; b: string; corners: string }
   { name: 'signal', a: '#050806', b: '#3ddc63', corners: '' },
   { name: 'grove', a: '#121b15', b: '#7cb87f', corners: 'rounded-[7px_2px_7px_2px]' },
 ];
-
-function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      role="switch"
-      aria-checked={on}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? 'presence-fill' : 'bg-[var(--color-surface-overlay)]'}`}
-    >
-      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${on ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
-    </button>
-  );
-}
 
 export function AppearanceSettings() {
   const [reducedMotion, setReducedMotion] = useState(false);
