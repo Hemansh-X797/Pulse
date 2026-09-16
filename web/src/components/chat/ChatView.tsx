@@ -918,8 +918,23 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
 
   async function handleDelete(id: number) {
     if (!window.confirm('Delete this message?')) return;
+    // This used to fire-and-forget deleteMessage() with no try/catch and
+    // no revert — the optimistic "deleted" state above would apply
+    // instantly and stay applied even if the actual server-side update
+    // failed, so the message would look deleted in this one open tab
+    // right up until the next refetch (switching channels and back, or
+    // a reload) silently brought the real, undeleted message right back
+    // — which reads exactly like "messages don't actually delete."
+    // Whatever the underlying cause of a given failure (RLS, network,
+    // anything), the UI should never claim success it can't back up.
+    const previous = messages;
     setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, deleted: true, body_rendered: '' } : m)));
-    await deleteMessage(id);
+    try {
+      await deleteMessage(id);
+    } catch (e) {
+      setMessages(previous);
+      setAttachError(e instanceof Error ? e.message : 'Could not delete this message — try again.');
+    }
   }
 
   async function handleReact(messageId: number, emoji: string) {
