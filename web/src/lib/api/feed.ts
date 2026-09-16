@@ -132,6 +132,23 @@ export async function searchPostsByHashtag(tag: string, limit = 30): Promise<Fee
   return data ?? [];
 }
 
+// UserProfile.tsx has had a "Media grid — next slice, not stubbed here on
+// purpose" comment marking this exact gap: there was no way to see a
+// person's own post history from their profile at all, only the global/
+// following feed. feed_view already carries everything needed per row
+// (author fields, reaction/comment counts), so this is the same view,
+// just filtered to one author instead of "everyone" or "who I follow".
+export async function listUserPosts(authorId: string, limit = 60): Promise<FeedItem[]> {
+  const { data, error } = await supabase
+    .from('feed_view')
+    .select('*')
+    .eq('author_id', authorId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function createPost(body: string, mediaUrl?: string) {
   const trimmed = body.trim();
   if (!trimmed && !mediaUrl) throw new Error('post needs text or an image');
@@ -218,7 +235,7 @@ export async function listComments(postId: number): Promise<(PostComment & { aut
   });
 }
 
-export async function addComment(postId: number, body: string) {
+export async function addComment(postId: number, body: string, parentCommentId?: number) {
   const trimmed = body.trim();
   if (!trimmed) throw new Error('comment cannot be empty');
 
@@ -228,7 +245,7 @@ export async function addComment(postId: number, body: string) {
   const rendered = renderEmoji(trimmed);
   const { data, error } = await supabase
     .from('post_comments')
-    .insert({ post_id: postId, author_id: userData.user.id, body_raw: trimmed, body_rendered: rendered })
+    .insert({ post_id: postId, author_id: userData.user.id, body_raw: trimmed, body_rendered: rendered, parent_comment_id: parentCommentId ?? null })
     .select()
     .single();
   if (error) throw error;
