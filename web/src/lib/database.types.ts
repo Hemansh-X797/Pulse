@@ -219,14 +219,33 @@ export interface Database {
           body_rendered: string;
           edited_at: string | null;
           created_at: string;
+          parent_comment_id: number | null;
         };
-        Insert: { post_id: number; author_id: string; body_raw: string; body_rendered: string };
+        Insert: { post_id: number; author_id: string; body_raw: string; body_rendered: string; parent_comment_id?: number | null };
         Update: Partial<Pick<Database['public']['Tables']['post_comments']['Row'], 'body_raw' | 'body_rendered' | 'edited_at'>>;
         Relationships: [];
       };
       post_reactions: {
         Row: { post_id: number; user_id: string; emoji: string; created_at: string };
         Insert: { post_id: number; user_id: string; emoji: string };
+        Update: never;
+        Relationships: [];
+      };
+      reels: {
+        Row: { id: number; author_id: string; video_url: string; caption: string; caption_rendered: string; created_at: string };
+        Insert: { author_id: string; video_url: string; caption: string; caption_rendered: string };
+        Update: never;
+        Relationships: [];
+      };
+      reel_likes: {
+        Row: { reel_id: number; user_id: string; created_at: string };
+        Insert: { reel_id: number; user_id: string };
+        Update: never;
+        Relationships: [];
+      };
+      reel_comments: {
+        Row: { id: number; reel_id: number; author_id: string; body_raw: string; body_rendered: string; created_at: string };
+        Insert: { reel_id: number; author_id: string; body_raw: string; body_rendered: string };
         Update: never;
         Relationships: [];
       };
@@ -369,6 +388,26 @@ export interface Database {
       };
       friends_view: {
         Row: { user_id: string; friend_id: string; friends_since: string };
+        Relationships: [];
+      };
+      reel_feed_view: {
+        Row: {
+          id: number;
+          author_id: string;
+          author_username: string;
+          author_display_name: string;
+          author_avatar_url: string;
+          author_avatar_decoration: string | null;
+          author_accent_top: string;
+          author_accent_bottom: string;
+          author_name_style: { font?: string; effect?: string; colors?: string[] } | null;
+          video_url: string;
+          caption_rendered: string;
+          created_at: string;
+          like_count: number;
+          comment_count: number;
+          liked_by_me: boolean;
+        };
         Relationships: [];
       };
     };
