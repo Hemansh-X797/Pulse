@@ -129,6 +129,8 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
   const setActiveChannel = useAppStore((s) => s.setActiveChannel);
   const setUnreadByChannel = useAppStore((s) => s.setUnreadByChannel);
   const unreadByChannel = useAppStore((s) => s.unreadByChannel);
+  const setMentionsByChannel = useAppStore((s) => s.setMentionsByChannel);
+  const mentionsByChannel = useAppStore((s) => s.mentionsByChannel);
   const compactMode = useCompactMode();
   const chatBubbles = useChatBubbles();
   const call = useCall(channelId);
@@ -152,6 +154,10 @@ export function ChatView({ channelId, channelLabel }: { channelId: string; chann
     if (unreadByChannel[channelId]) {
       const { [channelId]: _cleared, ...rest } = unreadByChannel;
       setUnreadByChannel(rest);
+    }
+    if (mentionsByChannel[channelId]) {
+      const { [channelId]: _clearedMention, ...restMentions } = mentionsByChannel;
+      setMentionsByChannel(restMentions);
     }
     return () => setActiveChannel(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
