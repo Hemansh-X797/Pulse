@@ -19,8 +19,19 @@ interface AppState {
 
   // ---- unread / notifications ----
   unreadByChannel: Record<string, number>;
+  // Separate from unreadByChannel on purpose: unread is "there are new
+  // messages here," which for a DM is already inherently about you (the
+  // whole conversation is), so a distinct "ping" indicator there would
+  // just be a louder duplicate of the same information. This tracks
+  // specifically "you were @mentioned here" — meaningful for a busy
+  // space channel with dozens of unread messages where only a couple
+  // actually named you, and meant to be surfaced (as an amber "ping"
+  // badge) only in space channel lists, never in the DM list. See
+  // SecondarySidebar's two rendering branches for where each is used.
+  mentionsByChannel: Record<string, number>;
   unreadNotifications: number;
   setUnreadByChannel: (counts: Record<string, number>) => void;
+  setMentionsByChannel: (counts: Record<string, number>) => void;
   setUnreadNotifications: (count: number) => void;
   totalUnreadChannels: () => number;
 
@@ -51,8 +62,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveChannel: (channelId) => set({ activeChannelId: channelId }),
 
   unreadByChannel: {},
+  mentionsByChannel: {},
   unreadNotifications: 0,
   setUnreadByChannel: (counts) => set({ unreadByChannel: counts }),
+  setMentionsByChannel: (counts) => set({ mentionsByChannel: counts }),
   setUnreadNotifications: (count) => set({ unreadNotifications: count }),
   totalUnreadChannels: () => Object.values(get().unreadByChannel).reduce((a, b) => a + b, 0),
 
@@ -69,6 +82,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeSpaceId: null,
       activeChannelId: null,
       unreadByChannel: {},
+      mentionsByChannel: {},
       unreadNotifications: 0,
       connectionStatus: 'disconnected',
       presenceByUserId: {},
