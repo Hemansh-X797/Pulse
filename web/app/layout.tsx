@@ -167,10 +167,22 @@ function AppGraph() {
 // JS catches up. Runs synchronously because it's a plain <script> tag
 // in <head>, not a React effect — same reasoning as any dark-mode
 // flash-prevention script.
+//
+// IMPORTANT: this `valid` list is a hand-duplicated copy of
+// VALID_THEMES in src/hooks/useTheme.ts, because a plain inline
+// <script> string can't import a TS module. That duplication is
+// exactly what caused a real bug: Grove was added to useTheme.ts's
+// VALID_THEMES when the theme shipped, but never added here — so
+// selecting Grove worked and persisted to localStorage correctly, but
+// every subsequent full page load (including "close the app, reopen
+// it") had this script reject 'grove' as unrecognized and force
+// data-theme back to 'bespoke' before React ever got a chance to
+// correct it. If you add a 6th theme, it must be added to BOTH this
+// array and useTheme.ts's VALID_THEMES, or this exact bug recurs.
 const THEME_INIT_SCRIPT = `
 try {
   var t = localStorage.getItem('palspace-theme');
-  var valid = ['bespoke', 'classic', 'sunroom', 'signal'];
+  var valid = ['bespoke', 'classic', 'sunroom', 'signal', 'grove'];
   document.documentElement.setAttribute('data-theme', valid.indexOf(t) !== -1 ? t : 'bespoke');
 } catch (e) {
   document.documentElement.setAttribute('data-theme', 'bespoke');
