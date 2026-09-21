@@ -1,0 +1,203 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!--
+    "Solar Flare" — a warm counterpart to Verdant Ring: instead of
+    rigid rotating armor plates, this is a soft corona of drifting flame
+    tongues and embers, closer in spirit to flame-ring.svg but animated
+    and considerably more detailed (flame-ring.svg is a static 17-line
+    piece; this is a fully animated build using the same 100x100 ring
+    convention and CSS-keyframe technique as psion.svg/duality.svg).
+  -->
+  <defs>
+    <radialGradient id="sfCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff4d6" />
+      <stop offset="35%" stop-color="#ffb238" />
+      <stop offset="70%" stop-color="#ff6a1f" stop-opacity="0.55" />
+      <stop offset="100%" stop-color="#ff3d1f" stop-opacity="0" />
+    </radialGradient>
+
+    <linearGradient id="sfFlame1" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#ff5a1f" stop-opacity="0" />
+      <stop offset="40%" stop-color="#ff8a2e" stop-opacity="0.85" />
+      <stop offset="100%" stop-color="#ffe27a" stop-opacity="1" />
+    </linearGradient>
+    <linearGradient id="sfFlame2" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#e8430f" stop-opacity="0" />
+      <stop offset="45%" stop-color="#ff6f1f" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#ffcf6b" stop-opacity="1" />
+    </linearGradient>
+
+    <radialGradient id="sfEmber" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff2c4" />
+      <stop offset="60%" stop-color="#ff9a3d" />
+      <stop offset="100%" stop-color="#ff9a3d" stop-opacity="0" />
+    </radialGradient>
+
+    <filter id="sfGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="1.5" result="b" />
+      <feMerge>
+        <feMergeNode in="b" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    /* Each flame tongue sways independently around its own base point,
+       like real fire — a shared single rotation for the whole ring
+       would look mechanical, which is exactly wrong for this piece. */
+    .sf-flame {
+      animation: sfSway 2.6s ease-in-out infinite;
+      transform-box: fill-box;
+      transform-origin: bottom center;
+    }
+    .sf-flame.f2 { animation-duration: 3.1s; animation-delay: 0.3s; }
+    .sf-flame.f3 { animation-duration: 2.3s; animation-delay: 0.6s; }
+    .sf-flame.f4 { animation-duration: 2.9s; animation-delay: 0.15s; }
+    .sf-flame.f5 { animation-duration: 2.5s; animation-delay: 0.45s; }
+    .sf-flame.f6 { animation-duration: 3.3s; animation-delay: 0.75s; }
+    .sf-flame.f7 { animation-duration: 2.7s; animation-delay: 0.9s; }
+    .sf-flame.f8 { animation-duration: 2.4s; animation-delay: 0.2s; }
+    @keyframes sfSway {
+      0%, 100% { transform: rotate(-6deg) scaleY(1); }
+      50% { transform: rotate(7deg) scaleY(1.12); }
+    }
+
+    .sf-core { animation: sfPulse 1.8s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+    @keyframes sfPulse {
+      0%, 100% { opacity: 0.6; transform: scale(0.92); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Embers drifting slowly outward and fading, then resetting — a
+       simple loop but staggered per-ember so they never all reset in
+       the same frame. */
+    .sf-ember { animation: sfDrift 4s ease-out infinite; }
+    .sf-ember.e2 { animation-delay: 1s; }
+    .sf-ember.e3 { animation-delay: 2s; }
+    .sf-ember.e4 { animation-delay: 0.5s; }
+    .sf-ember.e5 { animation-delay: 2.6s; }
+    .sf-ember.e6 { animation-delay: 3.2s; }
+    @keyframes sfDrift {
+      0% { transform: translateY(0) scale(0.6); opacity: 0; }
+      15% { opacity: 1; }
+      100% { transform: translateY(-14px) scale(0.15); opacity: 0; }
+    }
+
+    /* Whole ring breathes very slightly in overall brightness, tying
+       all the independently-timed flames/embers together as one piece
+       rather than a scatter of unrelated animations. */
+    .sf-group { animation: sfBreathe 3.4s ease-in-out infinite; }
+    @keyframes sfBreathe {
+      0%, 100% { filter: brightness(1); }
+      50% { filter: brightness(1.08); }
+    }
+
+    /* Heat-shimmer rings — slow outward expansion + fade, staggered so
+       the two rings are never at the same radius/opacity at once. */
+    .sf-shimmer { animation: sfShimmer 3.6s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+    .sf-shimmer.s2 { animation-delay: 1.8s; }
+    @keyframes sfShimmer {
+      0% { transform: scale(0.85); opacity: 0; }
+      30% { opacity: 1; }
+      100% { transform: scale(1.25); opacity: 0; }
+    }
+  </style>
+
+  <g class="sf-group">
+    <!-- Soft ambient glow behind everything -->
+    <circle cx="50" cy="50" r="46" fill="url(#sfCore)" opacity="0.18" />
+
+    <!-- Eight flame tongues spaced around the ring, each rooted at its
+         own base point on the circle and swaying independently. Built
+         as simple layered teardrop paths (two overlapping colors per
+         flame for depth) rather than a single flat shape. -->
+    <g filter="url(#sfGlow)">
+      <g transform="rotate(0 50 50) translate(50 4)">
+        <path class="sf-flame f1" d="M0,10 C-4,4 -3,-3 0,-8 C3,-3 4,4 0,10 Z" fill="url(#sfFlame2)" />
+        <path class="sf-flame f1" d="M0,8 C-2.4,3 -2,-2 0,-6 C2,-2 2.4,3 0,8 Z" fill="url(#sfFlame1)" />
+      </g>
+      <g transform="rotate(45 50 50) translate(50 4)">
+        <path class="sf-flame f2" d="M0,10 C-4,4 -3,-3 0,-8 C3,-3 4,4 0,10 Z" fill="url(#sfFlame2)" />
+        <path class="sf-flame f2" d="M0,8 C-2.4,3 -2,-2 0,-6 C2,-2 2.4,3 0,8 Z" fill="url(#sfFlame1)" />
+      </g>
+      <g transform="rotate(90 50 50) translate(50 4)">
+        <path class="sf-flame f3" d="M0,10 C-4,4 -3,-3 0,-8 C3,-3 4,4 0,10 Z" fill="url(#sfFlame2)" />
+        <path class="sf-flame f3" d="M0,8 C-2.4,3 -2,-2 0,-6 C2,-2 2.4,3 0,8 Z" fill="url(#sfFlame1)" />
+      </g>
+      <g transform="rotate(135 50 50) translate(50 4)">
+        <path class="sf-flame f4" d="M0,10 C-4,4 -3,-3 0,-8 C3,-3 4,4 0,10 Z" fill="url(#sfFlame2)" />
+        <path class="sf-flame f4" d="M0,8 C-2.4,3 -2,-2 0,-6 C2,-2 2.4,3 0,8 Z" fill="url(#sfFlame1)" />
+      </g>
+      <g transform="rotate(180 50 50) translate(50 4)">
+        <path class="sf-flame f5" d="M0,10 C-4,4 -3,-3 0,-8 C3,-3 4,4 0,10 Z" fill="url(#sfFlame2)" />
+        <path class="sf-flame f5" d="M0,8 C-2.4,3 -2,-2 0,-6 C2,-2 2.4,3 0,8 Z" fill="url(#sfFlame1)" />
+      </g>
+      <g transform="rotate(225 50 50) translate(50 4)">
+        <path class="sf-flame f6" d="M0,10 C-4,4 -3,-3 0,-8 C3,-3 4,4 0,10 Z" fill="url(#sfFlame2)" />
+        <path class="sf-flame f6" d="M0,8 C-2.4,3 -2,-2 0,-6 C2,-2 2.4,3 0,8 Z" fill="url(#sfFlame1)" />
+      </g>
+      <g transform="rotate(270 50 50) translate(50 4)">
+        <path class="sf-flame f7" d="M0,10 C-4,4 -3,-3 0,-8 C3,-3 4,4 0,10 Z" fill="url(#sfFlame2)" />
+        <path class="sf-flame f7" d="M0,8 C-2.4,3 -2,-2 0,-6 C2,-2 2.4,3 0,8 Z" fill="url(#sfFlame1)" />
+      </g>
+      <g transform="rotate(315 50 50) translate(50 4)">
+        <path class="sf-flame f8" d="M0,10 C-4,4 -3,-3 0,-8 C3,-3 4,4 0,10 Z" fill="url(#sfFlame2)" />
+        <path class="sf-flame f8" d="M0,8 C-2.4,3 -2,-2 0,-6 C2,-2 2.4,3 0,8 Z" fill="url(#sfFlame1)" />
+      </g>
+    </g>
+
+    <!-- Thin molten ring binding the flame bases together -->
+    <circle cx="50" cy="50" r="44.5" fill="none" stroke="#ff8a2e" stroke-opacity="0.5" stroke-width="1.1" />
+    <circle cx="50" cy="50" r="44.5" fill="none" stroke="#ffe27a" stroke-opacity="0.3" stroke-width="0.4" />
+
+    <!-- Drifting embers rising off the ring at six points -->
+    <g filter="url(#sfGlow)">
+      <circle class="sf-ember e1" cx="50" cy="6" r="1.1" fill="url(#sfEmber)" transform="rotate(20 50 50)" />
+      <circle class="sf-ember e2" cx="50" cy="6" r="0.9" fill="url(#sfEmber)" transform="rotate(80 50 50)" />
+      <circle class="sf-ember e3" cx="50" cy="6" r="1.2" fill="url(#sfEmber)" transform="rotate(140 50 50)" />
+      <circle class="sf-ember e4" cx="50" cy="6" r="0.8" fill="url(#sfEmber)" transform="rotate(200 50 50)" />
+      <circle class="sf-ember e5" cx="50" cy="6" r="1" fill="url(#sfEmber)" transform="rotate(260 50 50)" />
+      <circle class="sf-ember e6" cx="50" cy="6" r="1.1" fill="url(#sfEmber)" transform="rotate(320 50 50)" />
+    </g>
+
+    /* Faint inner core pulse, kept subtle so it never fights the
+         avatar image layered on top of this decoration */
+    <circle class="sf-core" cx="50" cy="50" r="30" fill="url(#sfCore)" opacity="0.1" />
+
+    <!-- Heat-shimmer rings — two very faint concentric circles slowly
+         expanding and fading outward on staggered loops, standing in
+         for the visual distortion real heat produces around a flame
+         source. A third animated layer distinct from the flame sway and
+         ember drift above, so the piece has motion at three different
+         visual scales (tongues, embers, ambient shimmer) rather than
+         everything moving at once. -->
+    <circle class="sf-shimmer s1" cx="50" cy="50" r="36" fill="none" stroke="#ffcf6b" stroke-opacity="0.25" stroke-width="0.5" />
+    <circle class="sf-shimmer s2" cx="50" cy="50" r="36" fill="none" stroke="#ff9a3d" stroke-opacity="0.2" stroke-width="0.5" />
+
+    <!-- Small secondary embers seated between the main six, at a
+         slightly smaller radius and faster drift, adding density
+         without just duplicating the same six points. -->
+    <g filter="url(#sfGlow)">
+      <circle class="sf-ember e2" cx="50" cy="9" r="0.6" fill="url(#sfEmber)" transform="rotate(50 50 50)" />
+      <circle class="sf-ember e4" cx="50" cy="9" r="0.5" fill="url(#sfEmber)" transform="rotate(110 50 50)" />
+      <circle class="sf-ember e6" cx="50" cy="9" r="0.7" fill="url(#sfEmber)" transform="rotate(170 50 50)" />
+      <circle class="sf-ember e1" cx="50" cy="9" r="0.5" fill="url(#sfEmber)" transform="rotate(230 50 50)" />
+      <circle class="sf-ember e3" cx="50" cy="9" r="0.6" fill="url(#sfEmber)" transform="rotate(290 50 50)" />
+      <circle class="sf-ember e5" cx="50" cy="9" r="0.5" fill="url(#sfEmber)" transform="rotate(350 50 50)" />
+    </g>
+
+    <!-- Base scorch marks — small dark arcs at the root of every other
+         flame, grounding the fire visually rather than having each
+         tongue float with no visible source. Purely static, no
+         animation of their own, which is deliberate: not everything in
+         a piece like this needs to move for the whole thing to read as
+         alive, and a few fixed anchor details make the animated parts
+         read more clearly against something still. -->
+    <g stroke="#3a1c0a" stroke-opacity="0.4" stroke-width="1.4" stroke-linecap="round" fill="none">
+      <path d="M -3,0 A 3 3 0 0 1 3,0" transform="rotate(0 50 50) translate(50 6)" />
+      <path d="M -3,0 A 3 3 0 0 1 3,0" transform="rotate(90 50 50) translate(50 6)" />
+      <path d="M -3,0 A 3 3 0 0 1 3,0" transform="rotate(180 50 50) translate(50 6)" />
+      <path d="M -3,0 A 3 3 0 0 1 3,0" transform="rotate(270 50 50) translate(50 6)" />
+    </g>
+  </g>
+</svg>
