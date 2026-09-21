@@ -170,7 +170,19 @@ export function PostDetailModal({
             </div>
           )}
 
-          <div className="mt-auto flex items-center gap-4 pt-3">
+          {/* mt-auto pushes this row to the bottom of the post pane — the
+              right call on desktop, where the post pane and comments
+              pane sit side by side as two independently tall columns
+              (md:flex-row below), so anchoring actions to the bottom of
+              a fixed-height column looks deliberate. But on mobile these
+              two panes stack vertically instead, and mt-auto still tried
+              to push this row to the bottom of the *post pane's own
+              full height* before the comments pane even begins — for
+              any short post (a one-line status with no image), that's a
+              large dead gap between the like button and the comments
+              section for no visible reason. Scoped to md: only, so
+              mobile just gets a plain small top margin instead. */}
+          <div className="mt-4 flex items-center gap-4 md:mt-auto md:pt-3">
             <button onClick={onToggleLike} className="group flex items-center gap-1.5" aria-pressed={liked} aria-label={liked ? 'Unlike' : 'Like'}>
               <Heart size={20} strokeWidth={2} className={liked ? 'fill-red-500 text-red-500' : 'text-[var(--color-ink-muted)] group-hover:text-[var(--color-ink)]'} />
               {post.reaction_count > 0 && (
@@ -225,12 +237,24 @@ export function PostDetailModal({
               </div>
             )}
             <div className="flex items-center gap-2 p-3">
-              <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-black presence-fill"
-                style={profile ? { ['--p-a' as string]: profile.accent_color_top, ['--p-b' as string]: profile.accent_color_bottom } : undefined}
-              >
-                {profile?.display_name.slice(0, 2).toUpperCase()}
-              </div>
+              {/* Used to always render initials here regardless of
+                  whether the person actually has an avatar set — every
+                  comment row correctly checks author_avatar_url first
+                  and only falls back to initials when it's genuinely
+                  missing, but this one composer avatar skipped that
+                  check entirely, so your own real profile picture never
+                  showed here even though it shows everywhere else
+                  (comments, feed, DMs). */}
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="h-7 w-7 shrink-0 rounded-full object-cover" />
+              ) : (
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-black presence-fill"
+                  style={profile ? { ['--p-a' as string]: profile.accent_color_top, ['--p-b' as string]: profile.accent_color_bottom } : undefined}
+                >
+                  {profile?.display_name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
               <input
                 ref={inputRef}
                 value={commentBody}
