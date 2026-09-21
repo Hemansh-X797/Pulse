@@ -153,9 +153,24 @@ export function ProfileSettings() {
         </div>
 
         <div className="px-5 pb-5">
+          {/* -mt-8 moved here, onto the whole decorated-avatar unit,
+              rather than on just the inner avatar div below — it used
+              to sit on the avatar alone, which pulled the avatar up to
+              overlap the banner while DecoratedAvatar's own wrapper (and
+              therefore the decoration image centered on *that* wrapper's
+              box) stayed put where it naturally sits in the DOM flow.
+              The avatar would shift up 32px independently of its own
+              decoration ring, leaving something like the Crown
+              decoration appearing to float well above the avatar it was
+              supposed to sit on. Applying the negative margin to the
+              outer wrapper instead moves the avatar and its decoration
+              up together as one rigid block, so the decoration stays
+              correctly centered on the avatar regardless of where the
+              whole unit is offset to. */}
+          <div className="-mt-8 mb-3">
           <DecoratedAvatar decorationId={profile?.equipped_avatar_decoration} size={64}>
             <div
-              className="group relative -mt-8 mb-3 flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border-4 border-[var(--color-surface)] text-lg font-bold text-black"
+              className="group relative flex h-16 w-16 cursor-pointer items-center justify-center rounded-full border-4 border-[var(--color-surface)] text-lg font-bold text-black"
               style={
                 avatarUrl
                   ? { backgroundImage: `url(${avatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -184,6 +199,7 @@ export function ProfileSettings() {
               />
             </div>
           </DecoratedAvatar>
+          </div>
 
           {uploadError && (
             <div className="mb-4 flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-300">
