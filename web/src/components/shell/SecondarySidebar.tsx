@@ -72,6 +72,7 @@ function SpaceTopicList() {
   const spaceId = params.spaceId;
   const pathname = usePathname() ?? '';
   const unreadByChannel = useAppStore((s) => s.unreadByChannel);
+  const mentionsByChannel = useAppStore((s) => s.mentionsByChannel);
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -119,6 +120,16 @@ function SpaceTopicList() {
     const href = `/spaces/${spaceId}/${topic.id}`;
     const active = pathname === href;
     const unread = unreadByChannel[topic.id] ?? 0;
+    // A "ping" specifically means someone @mentioned you here — kept
+    // deliberately distinct from plain unread (see useAppStore.ts's
+    // comment on mentionsByChannel). Discord's own convention is
+    // exactly this split: a plain dot for "there's new activity," and a
+    // loud filled number badge reserved for "you were actually named."
+    // Before this, every space channel used the loud badge for *any*
+    // unread message regardless of whether it named you at all, which
+    // meant a busy channel with 40 unread messages and zero mentions
+    // looked exactly as urgent as one where you were pinged five times.
+    const mentions = mentionsByChannel[topic.id] ?? 0;
     return (
       <div key={topic.id} className="group/topic relative flex items-center">
         <Link
@@ -138,11 +149,13 @@ function SpaceTopicList() {
               intentional visual departure from Discord's look, not an
               oversight (the small icon above still conveys "text
               channel" without the character itself). */}
-          <span className={unread > 0 && !active ? 'font-semibold text-[var(--color-ink)]' : ''}>{topic.name}</span>
-          {unread > 0 && (
-            <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full presence-fill px-1 font-mono text-[10px] font-bold text-black">
-              {unread > 9 ? '9+' : unread}
+          <span className={(unread > 0 || mentions > 0) && !active ? 'font-semibold text-[var(--color-ink)]' : ''}>{topic.name}</span>
+          {mentions > 0 ? (
+            <span className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#f0b429] px-1 font-mono text-[10px] font-bold text-black">
+              {mentions > 9 ? '9+' : mentions}
             </span>
+          ) : (
+            unread > 0 && <span className="ml-auto h-[7px] w-[7px] rounded-full bg-[var(--color-ink-muted)]" aria-label={`${unread} unread`} />
           )}
         </Link>
         {canManageChannels && (
