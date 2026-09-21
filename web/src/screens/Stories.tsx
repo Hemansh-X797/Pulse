@@ -65,39 +65,68 @@ export function Stories() {
         )}
 
         <div className="flex flex-wrap gap-5">
-          {/* Your own ring — always first, shows a + when you have none yet */}
+          {/* Your own ring — always first. Used to be that once you had
+              any active story at all, the entire "add another" path
+              became permanently unreachable: the ring's one click target
+              only ever navigated to view your existing story, and the
+              "+" badge (along with the whole add-menu below it) was
+              conditionally rendered on `!myGroup` and simply disappeared
+              the moment you posted your first story of the day. Fixed by
+              splitting this into two separate, always-present click
+              targets — the ring itself still views your story when you
+              have one, but the "+" badge is now its own independent
+              button that always opens the add-menu regardless of
+              whether myGroup exists, the same way Instagram/Snapchat's
+              own story tray lets you keep adding to your story ring
+              indefinitely rather than capping it at one. */}
           <div className="relative flex w-20 flex-col items-center gap-1.5">
-            <button
-              onClick={() => (myGroup ? router.push(`/stories/${profile?.username}`) : setAddMenuOpen((v) => !v))}
-              className="flex flex-col items-center gap-1.5"
-            >
-              <div
-                className={`relative flex h-16 w-16 items-center justify-center rounded-full p-[2.5px] ${myGroup ? 'presence-fill' : 'bg-[var(--color-hairline-strong)]'}`}
-                style={
-                  myGroup
-                    ? { ['--p-a' as string]: profile?.accent_color_top, ['--p-b' as string]: profile?.accent_color_bottom }
-                    : undefined
-                }
+            {/* A <button> can't validly contain another <button> — which
+                is exactly why the "+" badge used to be a plain <span>
+                nested inside the ring's single button, unable to have
+                its own independent click behavior at all. Restructured
+                so the ring and the "+" badge are two sibling buttons
+                inside their own shared `relative` wrapper: the ring
+                still navigates to view your story when you have one,
+                and the "+" — always present now, not conditional on
+                `!myGroup` — always reopens the add-menu, exactly the
+                Instagram/Snapchat pattern of "tap the ring to view, tap
+                the badge to add another." */}
+            <div className="relative">
+              <button
+                onClick={() => (myGroup ? router.push(`/stories/${profile?.username}`) : setAddMenuOpen((v) => !v))}
+                className="flex h-16 w-16 items-center justify-center rounded-full"
               >
-                <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-void)] p-0.5">
-                  {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-surface-raised)] text-sm font-bold">
-                      {profile?.display_name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
+                <div
+                  className={`flex h-full w-full items-center justify-center rounded-full p-[2.5px] ${myGroup ? 'presence-fill' : 'bg-[var(--color-hairline-strong)]'}`}
+                  style={
+                    myGroup
+                      ? { ['--p-a' as string]: profile?.accent_color_top, ['--p-b' as string]: profile?.accent_color_bottom }
+                      : undefined
+                  }
+                >
+                  <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-void)] p-0.5">
+                    {profile?.avatar_url ? (
+                      <img src={profile.avatar_url} alt="" className="h-full w-full rounded-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--color-surface-raised)] text-sm font-bold">
+                        {profile?.display_name.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {!myGroup && (
-                  <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--presence-default-a)] text-black">
-                    {uploading ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-black/30 border-t-black" /> : <Plus size={12} />}
-                  </span>
-                )}
-              </div>
-              <span className="text-[11.5px] text-[var(--color-ink-muted)]">{myGroup ? 'Your story' : 'Add story'}</span>
-            </button>
+              </button>
 
-            {addMenuOpen && !myGroup && (
+              <button
+                onClick={() => setAddMenuOpen((v) => !v)}
+                aria-label="Add another story"
+                className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[var(--color-void)] bg-[var(--presence-default-a)] text-black transition-transform hover:scale-110"
+              >
+                {uploading ? <span className="h-3 w-3 animate-spin rounded-full border-2 border-black/30 border-t-black" /> : <Plus size={13} />}
+              </button>
+            </div>
+            <span className="text-[11.5px] text-[var(--color-ink-muted)]">{myGroup ? 'Your story' : 'Add story'}</span>
+
+            {addMenuOpen && (
               <div className="absolute left-1/2 top-full z-20 mt-1.5 w-40 -translate-x-1/2 overflow-hidden rounded-xl border border-[var(--color-hairline-strong)] bg-[var(--color-surface-overlay)] shadow-xl">
                 <button
                   onClick={() => {
