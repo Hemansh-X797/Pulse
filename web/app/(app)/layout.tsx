@@ -19,6 +19,7 @@ import { listFriends } from '../../src/lib/api/friends';
 import { listNotifications } from '../../src/lib/api/notifications';
 import { listAvatarDecorationCatalog } from '../../src/lib/avatarDecorations';
 import { listProfileDecorCatalog } from '../../src/lib/profileDecor';
+import { consumePendingInviteRedirect } from '../../src/lib/pendingInvite';
 
 // Replaces the TanStack Router `appLayoutRoute.beforeLoad` guard. That
 // version could redirect *before* the page rendered because the router
@@ -115,7 +116,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (!loading) {
       const profile = useAppStore.getState().profile;
       if (profile && !profile.onboarding_completed && pathname !== '/onboarding') {
-        router.replace('/onboarding');
+        // An OAuth sign-in that started from an invite link stashed its
+        // destination in localStorage before leaving for the provider
+        // (see pendingInvite.ts) — this is the first point after the
+        // OAuth round-trip where that can be picked back up and handed
+        // to onboarding as the same ?redirect= param the password-signup
+        // path already uses, so both routes converge on the same
+        // "onboarding skips to the invite once the age check is done"
+        // behavior in Onboarding.tsx, rather than OAuth silently losing
+        // the invite that password signup already fixed.
+        const pending = consumePendingInviteRedirect();
+        router.replace(pending ? `/onboarding?redirect=${encodeURIComponent(pending)}` : '/onboarding');
+      } else if (profile?.onboarding_completed) {
+        // Existing (already-onboarded) account signing back in via OAuth
+        // from an invite link — onboarding is skipped entirely for them,
+        // so this is the only place left that can still hand off a
+        // pending invite redirect before it's lost for good.
+        const pending = consumePendingInviteRedirect();
+        if (pending && pending !== pathname) {
+          router.replace(pending);
+        }
       }
     }
   }, [loading, router, pathname]);
