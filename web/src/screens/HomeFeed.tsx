@@ -234,12 +234,12 @@ function HomeFeedInner() {
           </div>
         </div>
 
-        <div className="mb-1 flex items-center gap-1 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-1">
+        <div className="mb-1.5 flex items-center gap-1.5 rounded-full border border-[var(--color-hairline)] bg-[var(--color-surface)] p-1.5">
           {(['for-you', 'following'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setFeedTab(tab)}
-              className={`flex-1 rounded-full py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors ${
+              className={`flex-1 rounded-full py-2 text-center font-mono text-[11px] font-semibold uppercase tracking-[0.15em] transition-colors ${
                 feedTab === tab ? 'bg-white text-black' : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]'
               }`}
             >
