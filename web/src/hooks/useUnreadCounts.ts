@@ -14,9 +14,20 @@ import type { Session } from '@supabase/supabase-js';
  * zero no matter how many unread messages existed. This closes that gap:
  * one fetch on session-ready, then a live realtime top-up per message so
  * the badge doesn't need a page reload to update.
+ *
+ * Also tracks mentionsByChannel alongside it — a genuinely distinct
+ * count of messages that specifically @mention the current user, versus
+ * "any unread message at all." See useAppStore.ts's comment on why these
+ * are kept separate rather than folded into one number: a "ping" badge
+ * only means something in a busy space channel with lots of unread
+ * traffic that mostly isn't about you, and is meant to never appear on
+ * the DM list (every DM message is already inherently addressed to you,
+ * so a redundant ping indicator there would just be visual noise) — see
+ * SecondarySidebar for the two places that each count actually renders.
  */
 export function useUnreadCounts(session: Session | null) {
   const setUnreadByChannel = useAppStore((s) => s.setUnreadByChannel);
+  const setMentionsByChannel = useAppStore((s) => s.setMentionsByChannel);
   // Cached in a ref rather than component state — read inside the
   // realtime callback below, doesn't need to trigger re-renders itself.
   const notifsEnabledRef = useRef(true);
@@ -24,8 +35,20 @@ export function useUnreadCounts(session: Session | null) {
   useEffect(() => {
     if (!session) {
       setUnreadByChannel({});
+      setMentionsByChannel({});
       return;
     }
+
+    const myUsername = useAppStore.getState().profile?.username;
+    // Matches "@username" as a whole token — a real mention, not just
+    // the username appearing as a substring of some other word. Built
+    // once per session-mount rather than per-message; escaping the
+    // username defensively even though usernames are already
+    // alphanumeric-only elsewhere in this app, in case that constraint
+    // ever loosens later.
+    const mentionPattern = myUsername
+      ? new RegExp(`(?:^|[^a-zA-Z0-9_])@${myUsername.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-zA-Z0-9_])`, 'i')
+      : null;
 
     getNotificationPreferences()
       .then((prefs) => {
@@ -69,11 +92,20 @@ export function useUnreadCounts(session: Session | null) {
           [message.channel_id]: (s.unreadByChannel[message.channel_id] ?? 0) + 1,
         },
       }));
+
+      if (mentionPattern?.test(message.body_raw)) {
+        useAppStore.setState((s) => ({
+          mentionsByChannel: {
+            ...s.mentionsByChannel,
+            [message.channel_id]: (s.mentionsByChannel[message.channel_id] ?? 0) + 1,
+          },
+        }));
+      }
     });
 
     return () => {
       cancelled = true;
       unsubscribe(channel);
     };
-  }, [session, setUnreadByChannel]);
+  }, [session, setUnreadByChannel, setMentionsByChannel]);
 }
